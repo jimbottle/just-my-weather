@@ -1,0 +1,29 @@
+# Cold-launch smoke test: the app opens and the default glance renders real
+# weather from NWS, end to end.
+#
+# Location permission is GRANTED up front so no system dialog interrupts the
+# run (the dialog is nondeterministic — Android stops showing it after repeated
+# denials). With or without a device fix the app resolves a US location and
+# fetches live data, so we assert the Ready-state shape (a temperature and an
+# "Updated" time) rather than a specific city.
+appId: io.raylytics.justmyweather
+---
+- launchApp:
+    clearState: true
+    permissions:
+      all: allow
+
+# Wait for the real network fetch to land in the Ready state.
+- extendedWaitUntil:
+    visible: "Refresh"
+    timeout: 25000
+- assertVisible:
+    text: ".*°"
+- assertVisible:
+    text: "Updated.*"
+
+# Refresh re-fetches without crashing.
+- tapOn: "Refresh"
+- extendedWaitUntil:
+    visible: "Refresh"
+    timeout: 25000
