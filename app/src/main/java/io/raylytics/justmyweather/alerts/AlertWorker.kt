@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
@@ -32,8 +33,8 @@ class AlertWorker(
         val container = (applicationContext as JustMyWeatherApp).container
         val repository = container.alertRulesRepository
 
-        val rules = repository.rules.first().filter { it.enabled }
-        if (rules.isEmpty()) {
+        val rules = repository.rules.first()
+        if (rules.none { it.enabled }) {
             repository.setFiringIds(emptySet())
             return Result.success()
         }
@@ -48,23 +49,16 @@ class AlertWorker(
                 return Result.success() // don't hammer on a non-transient failure
             }
 
-        val previouslyFiring = repository.firingIds()
-        val nowFiring = mutableSetOf<String>()
-        rules.forEach { rule ->
-            val decision = AlertEvaluator.evaluate(rule, snapshot)
-            if (decision.fired) {
-                nowFiring += rule.id
-                if (rule.id !in previouslyFiring) {
-                    container.alertNotifier.notify(rule, decision)
-                }
-            }
-        }
-        repository.setFiringIds(nowFiring)
+        // Pure transition-dedup: notify only rules that just entered fired.
+        val outcome = AlertTransitions.compute(rules, snapshot, repository.firingIds())
+        outcome.toNotify.forEach { container.alertNotifier.notify(it.rule, it.decision) }
+        repository.setFiringIds(outcome.nowFiring)
         return Result.success()
     }
 
     companion object {
         private const val UNIQUE_NAME = "personal-alerts"
+        private const val ONCE_NAME = "personal-alerts-once"
 
         /** Idempotent: KEEP means re-scheduling on each launch doesn't reset the
          * timer. The worker self-guards when there are no rules, so it's safe to
@@ -80,10 +74,13 @@ class AlertWorker(
                 .enqueueUniquePeriodicWork(UNIQUE_NAME, ExistingPeriodicWorkPolicy.KEEP, request)
         }
 
-        /** A single immediate check, enqueued on app launch so a rule the user
-         * just added gives timely feedback instead of waiting for the next hour.
-         * Transition dedup still applies, so an already-firing condition won't
-         * re-notify. */
+        /** A single immediate check — on app launch and after a rule is added or
+         * enabled — so a freshly-added rule gives timely feedback instead of
+         * waiting for the next hourly tick. Unique + KEEP means a burst of
+         * changes coalesces into one run (which reads the latest rules) and the
+         * one-time check serialises against itself, avoiding the duplicate-fetch
+         * and double-notify race that concurrent runs would risk. Transition
+         * dedup still applies, so an already-firing condition won't re-notify. */
         fun runOnce(context: Context) {
             val request =
                 OneTimeWorkRequestBuilder<AlertWorker>()
@@ -91,7 +88,8 @@ class AlertWorker(
                         Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build(),
                     )
                     .build()
-            WorkManager.getInstance(context).enqueue(request)
+            WorkManager.getInstance(context)
+                .enqueueUniqueWork(ONCE_NAME, ExistingWorkPolicy.KEEP, request)
         }
     }
 }

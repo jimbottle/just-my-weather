@@ -20,19 +20,26 @@ import java.util.UUID
  */
 class AlertsViewModel(
     private val repository: AlertRulesRepository,
+    /** Kicks an immediate alert check. Invoked after a change that could make a
+     * rule newly fire, so the user gets feedback now instead of next hour. */
+    private val onRulesActivated: () -> Unit = {},
 ) : ViewModel() {
     val rules: StateFlow<List<AlertRule>> =
         repository.rules.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     fun add(field: WeatherField, comparison: Comparison, threshold: Double) =
-        edit { it + AlertRule(UUID.randomUUID().toString(), field, comparison, threshold) }
+        edit(check = true) { it + AlertRule(UUID.randomUUID().toString(), field, comparison, threshold) }
 
     fun toggle(id: String) =
-        edit { rules -> rules.map { if (it.id == id) it.copy(enabled = !it.enabled) else it } }
+        edit(check = true) { rules -> rules.map { if (it.id == id) it.copy(enabled = !it.enabled) else it } }
 
-    fun delete(id: String) = edit { rules -> rules.filterNot { it.id == id } }
+    // Deleting can't make a rule fire, so no check needed.
+    fun delete(id: String) = edit(check = false) { rules -> rules.filterNot { it.id == id } }
 
-    private fun edit(transform: (List<AlertRule>) -> List<AlertRule>) {
-        viewModelScope.launch { repository.save(transform(rules.value)) }
+    private fun edit(check: Boolean, transform: (List<AlertRule>) -> List<AlertRule>) {
+        viewModelScope.launch {
+            repository.save(transform(rules.value))
+            if (check) onRulesActivated()
+        }
     }
 }

@@ -16,6 +16,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import io.raylytics.justmyweather.alerts.AlertWorker
 import io.raylytics.justmyweather.ui.alerts.AlertsScreen
 import io.raylytics.justmyweather.ui.alerts.AlertsViewModel
 import io.raylytics.justmyweather.ui.customize.CustomizeScreen
@@ -51,7 +52,12 @@ class MainActivity : ComponentActivity() {
 
     private val alertsViewModel: AlertsViewModel by viewModels {
         viewModelFactory {
-            initializer { AlertsViewModel(container.alertRulesRepository) }
+            initializer {
+                AlertsViewModel(
+                    container.alertRulesRepository,
+                    onRulesActivated = { AlertWorker.runOnce(applicationContext) },
+                )
+            }
         }
     }
 

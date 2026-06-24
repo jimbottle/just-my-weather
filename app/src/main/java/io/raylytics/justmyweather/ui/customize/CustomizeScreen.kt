@@ -17,6 +17,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -28,6 +29,9 @@ import androidx.compose.ui.unit.dp
 import io.raylytics.justmyweather.view.FieldSetting
 import io.raylytics.justmyweather.view.ViewConfig
 import io.raylytics.justmyweather.view.WeatherField
+import kotlinx.coroutines.delay
+
+private const val RELABEL_DEBOUNCE_MS = 400L
 
 /**
  * The customization layer: pick which data points appear, reorder them (the top
@@ -107,12 +111,17 @@ private fun FieldRow(
         // persisted config streams back in; the field's default name shows as
         // the placeholder, so an empty box clearly means "use the default".
         var label by remember(setting.field) { mutableStateOf(setting.customLabel ?: "") }
+        // Debounce persistence: typing only writes to DataStore once the user
+        // pauses, instead of a disk write per keystroke. The delay is cancelled
+        // and restarted on each change; the guard skips the no-op initial write.
+        LaunchedEffect(label) {
+            delay(RELABEL_DEBOUNCE_MS)
+            val normalized = label.ifBlank { null }
+            if (normalized != setting.customLabel) onRelabel(normalized)
+        }
         OutlinedTextField(
             value = label,
-            onValueChange = {
-                label = it
-                onRelabel(it.ifBlank { null })
-            },
+            onValueChange = { label = it },
             placeholder = { Text(setting.field.defaultLabel) },
             singleLine = true,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
