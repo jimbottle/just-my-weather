@@ -51,7 +51,11 @@ fun HomeScreen(
                     ErrorView(message = state.message, onRefresh = onRefresh)
 
                 is HomeUiState.Ready ->
-                    GlanceView(snapshot = state.snapshot, onRefresh = onRefresh)
+                    GlanceView(
+                        snapshot = state.snapshot,
+                        refreshing = state.refreshing,
+                        onRefresh = onRefresh,
+                    )
             }
         }
     }
@@ -60,6 +64,7 @@ fun HomeScreen(
 @Composable
 private fun GlanceView(
     snapshot: WeatherSnapshot,
+    refreshing: Boolean,
     onRefresh: () -> Unit,
 ) {
     Column(
@@ -84,13 +89,20 @@ private fun GlanceView(
                 textAlign = TextAlign.Center,
             )
         }
-        Text(
-            text = "Updated ${observedLabel(snapshot)}",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 12.dp),
-        )
-        TextButton(onClick = onRefresh) { Text("Refresh") }
+        // Only claim a time when the station actually reported one.
+        observedLabel(snapshot)?.let { updated ->
+            Text(
+                text = "Updated $updated",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 12.dp),
+            )
+        }
+        // The button label reflects the refreshing flag, so a re-fetch is an
+        // observable state change (and the flag stops being dead state).
+        TextButton(onClick = onRefresh, enabled = !refreshing) {
+            Text(if (refreshing) "Refreshing…" else "Refresh")
+        }
     }
 }
 
@@ -115,5 +127,5 @@ private fun ErrorView(
 
 private val timeFormat = DateTimeFormatter.ofPattern("h:mm a", Locale.getDefault())
 
-private fun observedLabel(snapshot: WeatherSnapshot): String =
-    snapshot.observedAt.atZone(ZoneId.systemDefault()).format(timeFormat)
+private fun observedLabel(snapshot: WeatherSnapshot): String? =
+    snapshot.observedAt?.atZone(ZoneId.systemDefault())?.format(timeFormat)

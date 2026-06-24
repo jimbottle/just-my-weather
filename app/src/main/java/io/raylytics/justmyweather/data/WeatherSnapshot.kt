@@ -18,5 +18,6 @@ data class WeatherSnapshot(
     val windMph: Double?,
     val precipitationIn: Double?,
     val pressureInHg: Double?,
-    val observedAt: Instant,
+    /** When the reading was taken; null when the station omitted it. */
+    val observedAt: Instant?,
 )

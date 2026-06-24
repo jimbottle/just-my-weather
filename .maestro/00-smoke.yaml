@@ -13,17 +13,23 @@ appId: io.raylytics.justmyweather
     permissions:
       all: allow
 
-# Wait for the real network fetch to land in the Ready state.
+# Wait for the real network fetch to land in the Ready state. The budget is
+# generous because the first load chains /points -> /stations -> /observations,
+# which can be slow on a cold emulator or CI network.
 - extendedWaitUntil:
     visible: "Refresh"
-    timeout: 25000
+    timeout: 60000
 - assertVisible:
     text: ".*°"
 - assertVisible:
     text: "Updated.*"
 
-# Refresh re-fetches without crashing.
+# Refresh: the button flips to the disabled "Refreshing…" label during the
+# re-fetch, so waiting for it to reappear as "Refresh" genuinely spans a fetch
+# cycle (not a no-op). The temperature must still be present afterwards.
 - tapOn: "Refresh"
 - extendedWaitUntil:
     visible: "Refresh"
-    timeout: 25000
+    timeout: 60000
+- assertVisible:
+    text: ".*°"

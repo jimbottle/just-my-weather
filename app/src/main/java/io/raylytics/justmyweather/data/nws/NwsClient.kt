@@ -38,17 +38,10 @@ class NwsClient(
             gridY = props.gridY ?: error("nws /points/$lat,$lon missing gridY"),
             forecastZoneId = zoneId,
             observationStationId = stationId,
+            // The /points response already carries the nearest city/state, so
+            // we keep it here rather than re-fetching /points just for a label.
+            relativeLocation = props.toRelativeLocation(),
         )
-    }
-
-    /** Reverse-geocode for a pre-filled label; null when NWS omits the block. */
-    suspend fun resolveLocationLabel(lat: Double, lon: Double): RelativeLocation? {
-        val points = getJson<NwsPointsResponse>("/points/$lat,$lon")
-        val rel = points.properties?.relativeLocation?.properties
-        val city = rel?.city
-        val state = rel?.state
-        if (city.isNullOrEmpty() || state.isNullOrEmpty()) return null
-        return RelativeLocation(city, state)
     }
 
     suspend fun getObservation(stationId: String): CurrentObservation {
@@ -62,7 +55,9 @@ class NwsClient(
         val slp = props.seaLevelPressure
         val bp = props.barometricPressure
         return CurrentObservation(
-            observedAt = props.timestamp?.let(Instant::parse) ?: Instant.now(),
+            // Null when the station omits a timestamp — never substitute the
+            // current clock, which would render absent data as freshly observed.
+            observedAt = props.timestamp?.let(Instant::parse),
             temperatureF = Units.toFahrenheit(temp?.value, temp?.unitCode ?: ""),
             precipitationIn = Units.toInches(precip?.value, precip?.unitCode ?: ""),
             windMph = Units.toMph(wind?.value, wind?.unitCode ?: ""),
@@ -106,6 +101,16 @@ class NwsClient(
         val body = getJson<NwsStationsResponse>("/points/$lat,$lon/stations")
         return body.features.firstOrNull()?.properties?.stationIdentifier
             ?: error("no observation stations near $lat,$lon")
+    }
+
+    /** City/state from the /points block, or null when NWS omits it (offshore
+     * points, lat/lon outside CONUS). */
+    private fun NwsPointsResponse.PointsProperties.toRelativeLocation(): RelativeLocation? {
+        val rel = relativeLocation?.properties
+        val city = rel?.city
+        val state = rel?.state
+        if (city.isNullOrEmpty() || state.isNullOrEmpty()) return null
+        return RelativeLocation(city, state)
     }
 
     private suspend inline fun <reified T> getJson(path: String): T {

@@ -75,6 +75,49 @@ class NwsClientTest {
     }
 
     @Test
+    fun `getActiveAlerts maps features and skips entries missing id or event`() = runTest {
+        val (client, _) =
+            client(
+                HttpResult(
+                    200,
+                    """
+                    {"features":[
+                      {"properties":{"id":"A1","event":"Heat Advisory","severity":"Moderate","headline":"Hot"}},
+                      {"properties":{"severity":"Severe"}}
+                    ]}
+                    """.trimIndent(),
+                    null,
+                ),
+            )
+        val alerts = client.getActiveAlerts("NYZ072")
+        assertEquals(1, alerts.size)
+        assertEquals("A1", alerts[0].id)
+        assertEquals("Heat Advisory", alerts[0].event)
+    }
+
+    @Test
+    fun `getHourlyForecast parses periods and the max of a wind range`() = runTest {
+        val (client, _) =
+            client(
+                HttpResult(
+                    200,
+                    """
+                    {"properties":{"periods":[
+                      {"startTime":"2026-06-24T18:00:00+00:00","temperature":72,"temperatureUnit":"F","windSpeed":"5 to 10 mph"},
+                      {"startTime":"bad-time","temperature":70,"temperatureUnit":"F","windSpeed":"5 mph"}
+                    ]}}
+                    """.trimIndent(),
+                    null,
+                ),
+            )
+        val forecast = client.getHourlyForecast("OKX", 33, 35)
+        // The unparseable startTime drops that period.
+        assertEquals(1, forecast.size)
+        assertEquals(72.0, forecast[0].temperatureF!!, 1e-6)
+        assertEquals(10.0, forecast[0].windMph!!, 1e-6)
+    }
+
+    @Test
     fun `resolveLocation derives zone id from forecastZone url`() = runTest {
         val (client, _) =
             client(

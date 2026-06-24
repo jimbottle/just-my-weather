@@ -10,13 +10,15 @@ import java.time.Instant
  * Ported from almanac-bell's `mobile/src/nws/types.ts`.
  */
 
-/** The grid + zone + station handles NWS hands back for a lat/lon. */
+/** The grid + zone + station handles NWS hands back for a lat/lon, plus the
+ * nearest city/state the same response carries (null outside CONUS). */
 data class PointsLookup(
     val gridId: String,
     val gridX: Int,
     val gridY: Int,
     val forecastZoneId: String,
     val observationStationId: String,
+    val relativeLocation: RelativeLocation? = null,
 )
 
 /** City + state nearest a point, used to pre-fill a human-readable label. */
@@ -27,7 +29,8 @@ data class RelativeLocation(
 
 /** Latest station observation, normalised to American units. */
 data class CurrentObservation(
-    val observedAt: Instant,
+    /** When the station reported this; null if it omitted the timestamp. */
+    val observedAt: Instant?,
     val temperatureF: Double?,
     val precipitationIn: Double?,
     val windMph: Double?,
