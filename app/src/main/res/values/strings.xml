@@ -1,0 +1,6 @@
+<resources>
+    <string name="app_name">Just My Weather</string>
+
+    <!-- Support inbox for in-app feedback / bug reports (Raylytics standard). -->
+    <string name="support_email">dev@raylytics.io</string>
+</resources>

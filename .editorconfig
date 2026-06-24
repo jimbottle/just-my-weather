@@ -1,0 +1,48 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.{kt,kts}]
+indent_style = space
+indent_size = 4
+# 120 lines up with our actual style; Android Studio's default of 100 is
+# tighter than what reads well for descriptive Kotlin DSL + signal/finding
+# constructors.
+max_line_length = 120
+# Trailing commas are PREFERRED in this repo — they keep multi-line
+# constructor edits to single-line diffs. Make ktlint enforce them.
+ktlint_standard_no-wildcard-imports = enabled
+ktlint_standard_trailing-comma-on-call-site = required
+ktlint_standard_trailing-comma-on-declaration-site = required
+# argument-list-wrapping cascades off max-line-length and forces
+# one-arg-per-line on long calls; we prefer the compact form for the
+# few descriptive Compose / Intent calls in this repo. function-signature
+# enforces a similar cascade for function declarations. Both off.
+# `wrapping` itself stays ENABLED — trailing-comma-on-declaration-site
+# requires wrapping to be loaded (ktlint will skip the trailing-comma
+# rule otherwise, defeating the whole point of requiring them above).
+ktlint_standard_argument-list-wrapping = disabled
+ktlint_standard_function-signature = disabled
+# multiline-expression-wrapping demands `fun foo() =\n    expr { ... }`
+# instead of `fun foo() = expr { ... }` even when the latter fits on one
+# line. The single-line form reads better for our IO probes. We also
+# disable string-template-indent because it depends on
+# multiline-expression-wrapping — leaving it enabled causes a partial
+# rule-loading state that surfaces as "KtLint failed to parse file".
+ktlint_standard_multiline-expression-wrapping = disabled
+ktlint_standard_string-template-indent = disabled
+# Compose treats Composable functions as PascalCase by convention. The
+# standard function-naming rule doesn't know that — tell it to skip
+# anything annotated @Composable.
+ktlint_function_naming_ignore_when_annotated_with = Composable
+
+[*.{xml,yml,yaml,json}]
+indent_style = space
+indent_size = 2
+
+[Makefile]
+indent_style = tab

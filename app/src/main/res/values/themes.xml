@@ -1,0 +1,6 @@
+<resources>
+    <!-- The app draws its own Material 3 Compose theme (see ui/theme). This
+         platform theme only needs to host the activity before Compose takes
+         over: no action bar, edge-to-edge friendly. -->
+    <style name="Theme.JustMyWeather" parent="android:Theme.Material.Light.NoActionBar" />
+</resources>

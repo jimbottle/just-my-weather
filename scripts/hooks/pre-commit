@@ -1,0 +1,15 @@
+#!/bin/sh
+# Fast pre-commit gate: unit tests + ktlint only. Keeps every commit honest
+# without the slow Android lint / instrumentation tiers (those run in CI).
+#
+# Install once with:  scripts/hooks/install.sh
+# Bypass in an emergency with:  git commit --no-verify
+set -e
+
+# Skip on docs-only commits — no point compiling Kotlin for a README tweak.
+if git diff --cached --name-only | grep -qE '\.(kt|kts|xml|pro|properties)$'; then
+    echo "pre-commit: running :app:test + :app:ktlintCheck"
+    ./gradlew --quiet :app:testDebugUnitTest :app:ktlintCheck
+else
+    echo "pre-commit: no Kotlin/resource changes staged, skipping build gate"
+fi

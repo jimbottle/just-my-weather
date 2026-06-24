@@ -1,0 +1,16 @@
+#!/bin/sh
+# roborev post-commit hook v4 - auto-reviews every commit
+_roborev_hook() {
+ROBOREV="/Users/evanray/.local/bin/roborev"
+if [ ! -x "$ROBOREV" ]; then
+    ROBOREV=$(command -v roborev 2>/dev/null)
+    [ -z "$ROBOREV" ] || [ ! -x "$ROBOREV" ] && return 0
+fi
+"$ROBOREV" post-commit 2>/dev/null
+}
+_roborev_hook
+# Installed by `wyk init`. Auto-closes bd issues referenced in
+# the commit message (Closes: <id> / Fixes: <id> / Resolves: <id>).
+#
+# To uninstall: rm "$0"
+exec wyk hook post-commit

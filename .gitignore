@@ -1,5 +1,33 @@
+# macOS
+.DS_Store
+
+# IDE / Gradle
+.idea/
+.gradle/
+.kotlin/
+*.iml
+local.properties
+*.hprof
+captures/
+.cxx/
+
+# Android build outputs
+/build/
+**/build/
+
+# Keystores
+*.keystore
+!debug.keystore
+keystore.properties
+
+# Test/coverage artefacts
+/coverage
+**/jacoco/
+**/reports/
 
 # Beads / Dolt files (added by bd init)
 .dolt/
 *.db
 .beads-credential-key
+# roborev snapshots
+/.roborev/
