@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "just_my_weather",
+  "project_id": "350f76ce-2662-41ac-aefa-06f4d5c45bd8"
+}
