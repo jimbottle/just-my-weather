@@ -10,7 +10,14 @@ data class WeatherLocation(
     val latitude: Double,
     val longitude: Double,
     val label: String,
-)
+) {
+    companion object {
+        /** Until the user grants location or picks a place, fall back to
+         * somewhere real so a fresh install (and the alert worker) is never
+         * blank. Shared by the home view and the background worker. */
+        val DEFAULT = WeatherLocation(latitude = 40.7128, longitude = -74.0060, label = "New York, NY")
+    }
+}
 
 /**
  * The one seam between the weather backend and the rest of the app. The UI and

@@ -1,0 +1,187 @@
+package io.raylytics.justmyweather.ui.alerts
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.dp
+import io.raylytics.justmyweather.alerts.AlertRule
+import io.raylytics.justmyweather.alerts.Comparison
+import io.raylytics.justmyweather.view.WeatherField
+
+/**
+ * Personal alerts: the user's own rules about everyday conditions. Quiet by
+ * default — an install with no rules shows a calm empty state and never nags.
+ * The builder is one line: pick a field, above/below, a number. These are
+ * deliberately not hazard warnings (that's the sibling app) — they're "tell me
+ * when it's jacket weather", on the user's terms.
+ */
+@Composable
+fun AlertsScreen(
+    rules: List<AlertRule>,
+    onAdd: (WeatherField, Comparison, Double) -> Unit,
+    onToggle: (String) -> Unit,
+    onDelete: (String) -> Unit,
+    onDone: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 16.dp)
+                .verticalScroll(rememberScrollState()),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("Alerts", style = MaterialTheme.typography.titleMedium)
+                TextButton(onClick = onDone) { Text("Done") }
+            }
+
+            if (rules.isEmpty()) {
+                Text(
+                    text = "No alerts yet. You'll only hear from this app about the conditions " +
+                        "you add here — nothing else.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 8.dp, bottom = 8.dp),
+                )
+            } else {
+                rules.forEach { rule ->
+                    RuleRow(
+                        rule = rule,
+                        onToggle = { onToggle(rule.id) },
+                        onDelete = { onDelete(rule.id) },
+                    )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+                }
+            }
+
+            AddRuleForm(onAdd = onAdd)
+        }
+    }
+}
+
+@Composable
+private fun RuleRow(
+    rule: AlertRule,
+    onToggle: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = rule.summary,
+            style = MaterialTheme.typography.bodyMedium,
+            color =
+                if (rule.enabled) {
+                    MaterialTheme.colorScheme.onBackground
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+            modifier = Modifier.weight(1f),
+        )
+        TextButton(onClick = onDelete) { Text("Remove") }
+        Switch(checked = rule.enabled, onCheckedChange = { onToggle() })
+    }
+}
+
+@Composable
+private fun AddRuleForm(
+    onAdd: (WeatherField, Comparison, Double) -> Unit,
+) {
+    var field by remember { mutableStateOf(WeatherField.alertable.first()) }
+    var comparison by remember { mutableStateOf(Comparison.BELOW) }
+    var thresholdText by remember { mutableStateOf("") }
+    val threshold = thresholdText.toDoubleOrNull()
+
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Text("Add an alert", style = MaterialTheme.typography.labelMedium)
+
+        ChipRow(
+            options = WeatherField.alertable,
+            selected = field,
+            label = { it.defaultLabel },
+            onSelect = { field = it },
+        )
+        ChipRow(
+            options = Comparison.entries,
+            selected = comparison,
+            label = { it.word.replaceFirstChar(Char::uppercase) },
+            onSelect = { comparison = it },
+        )
+
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(
+                value = thresholdText,
+                onValueChange = { thresholdText = it },
+                placeholder = { Text("Value") },
+                singleLine = true,
+                keyboardOptions =
+                    KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+                modifier = Modifier.weight(1f),
+            )
+            TextButton(
+                onClick = {
+                    threshold?.let {
+                        onAdd(field, comparison, it)
+                        thresholdText = ""
+                    }
+                },
+                enabled = threshold != null,
+            ) {
+                Text("Add")
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun <T> ChipRow(
+    options: List<T>,
+    selected: T,
+    label: (T) -> String,
+    onSelect: (T) -> Unit,
+) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        options.forEach { option ->
+            FilterChip(
+                selected = option == selected,
+                onClick = { onSelect(option) },
+                label = { Text(label(option)) },
+            )
+        }
+    }
+}

@@ -36,6 +36,7 @@ fun HomeScreen(
     state: HomeUiState,
     onRefresh: () -> Unit,
     onCustomize: () -> Unit,
+    onAlerts: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
@@ -61,6 +62,7 @@ fun HomeScreen(
                         refreshing = state.refreshing,
                         onRefresh = onRefresh,
                         onCustomize = onCustomize,
+                        onAlerts = onAlerts,
                     )
             }
         }
@@ -74,6 +76,7 @@ private fun GlanceView(
     refreshing: Boolean,
     onRefresh: () -> Unit,
     onCustomize: () -> Unit,
+    onAlerts: () -> Unit,
 ) {
     val rendered: RenderedView = config.render(snapshot)
     Column(
@@ -129,6 +132,7 @@ private fun GlanceView(
                 Text(if (refreshing) "Refreshing…" else "Refresh")
             }
             TextButton(onClick = onCustomize) { Text("Customize") }
+            TextButton(onClick = onAlerts) { Text("Alerts") }
         }
     }
 }

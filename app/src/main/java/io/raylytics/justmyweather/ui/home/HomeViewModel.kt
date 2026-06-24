@@ -50,7 +50,7 @@ class HomeViewModel(
                 else -> WeatherLoad.Loading
             }
         viewModelScope.launch {
-            val location = locationProvider.lastKnownLocation() ?: DEFAULT_LOCATION
+            val location = locationProvider.lastKnownLocation() ?: WeatherLocation.DEFAULT
             weather.value =
                 runCatching { repository.load(location) }
                     .fold(
@@ -75,11 +75,4 @@ class HomeViewModel(
                 "Couldn't reach the weather service. Check your connection."
             else -> message ?: "Something went wrong fetching the weather."
         }
-
-    companion object {
-        /** Until the user grants location or picks a place, show somewhere
-         * real so a fresh install is never blank. */
-        val DEFAULT_LOCATION =
-            WeatherLocation(latitude = 40.7128, longitude = -74.0060, label = "New York, NY")
-    }
 }

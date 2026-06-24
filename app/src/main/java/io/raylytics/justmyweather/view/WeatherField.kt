@@ -24,21 +24,51 @@ enum class WeatherField(
     PRESSURE("pressure", "Pressure"),
     ;
 
+    /** Whether this field is a number you can set an alert threshold on.
+     * Conditions is descriptive text, so it isn't. */
+    val isNumeric: Boolean get() = this != CONDITIONS
+
+    /**
+     * The raw numeric reading for this field (in its display unit), or null when
+     * the snapshot lacks it or the field isn't numeric. This is what the alert
+     * evaluator compares against a threshold.
+     */
+    fun numericValue(snapshot: WeatherSnapshot): Double? =
+        when (this) {
+            TEMPERATURE -> snapshot.temperatureF
+            CONDITIONS -> null
+            WIND -> snapshot.windMph
+            PRECIPITATION -> snapshot.precipitationIn
+            PRESSURE -> snapshot.pressureInHg
+        }
+
+    /** Format a numeric value of this field with its unit ("72°", "10 mph"). */
+    fun formatValue(value: Double): String =
+        when (this) {
+            TEMPERATURE -> "${value.roundToInt()}°"
+            CONDITIONS -> value.roundToInt().toString()
+            WIND -> "${value.roundToInt()} mph"
+            PRECIPITATION -> String.format(Locale.US, "%.2f in", value)
+            PRESSURE -> String.format(Locale.US, "%.2f inHg", value)
+        }
+
     /**
      * The display value for this field, or null when the snapshot lacks it.
-     * A new field adds a branch here — the `when` is exhaustive (no `else`), so
-     * the compiler won't let you forget to format it.
+     * A new field adds a branch to [numericValue] / [formatValue] — both are
+     * exhaustive (no `else`), so the compiler won't let you forget to handle it.
      */
     fun format(snapshot: WeatherSnapshot): String? =
         when (this) {
-            TEMPERATURE -> snapshot.temperatureF?.let { "${it.roundToInt()}°" }
             CONDITIONS -> snapshot.conditions
-            WIND -> snapshot.windMph?.let { if (it < 1.0) "Calm" else "${it.roundToInt()} mph" }
-            PRECIPITATION -> snapshot.precipitationIn?.let { String.format(Locale.US, "%.2f in", it) }
-            PRESSURE -> snapshot.pressureInHg?.let { String.format(Locale.US, "%.2f inHg", it) }
+            // "Calm" reads better than "0 mph" on the glance.
+            WIND -> snapshot.windMph?.let { if (it < 1.0) "Calm" else formatValue(it) }
+            else -> numericValue(snapshot)?.let { formatValue(it) }
         }
 
     companion object {
         fun byKey(key: String): WeatherField? = entries.firstOrNull { it.key == key }
+
+        /** Fields a user can build an alert on. */
+        val alertable: List<WeatherField> get() = entries.filter { it.isNumeric }
     }
 }

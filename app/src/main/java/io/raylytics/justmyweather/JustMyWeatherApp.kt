@@ -3,13 +3,16 @@ package io.raylytics.justmyweather
 import android.app.Application
 import android.content.Context
 import androidx.datastore.preferences.preferencesDataStore
+import io.raylytics.justmyweather.alerts.AlertNotifier
+import io.raylytics.justmyweather.alerts.AlertWorker
+import io.raylytics.justmyweather.data.AlertRulesRepository
 import io.raylytics.justmyweather.data.ViewConfigRepository
 import io.raylytics.justmyweather.data.WeatherRepository
 import io.raylytics.justmyweather.data.nws.NwsClient
 import io.raylytics.justmyweather.data.nws.OkHttpTransport
 import io.raylytics.justmyweather.location.LocationProvider
 
-/** App-wide DataStore for user settings (view config today, more later). */
+/** App-wide DataStore for user settings (view config, alert rules). */
 private val Context.dataStore by preferencesDataStore(name = "settings")
 
 /**
@@ -24,6 +27,8 @@ class AppContainer(context: Context) {
     val weatherRepository = WeatherRepository(nwsClient)
     val locationProvider = LocationProvider(appContext)
     val viewConfigRepository = ViewConfigRepository(appContext.dataStore)
+    val alertRulesRepository = AlertRulesRepository(appContext.dataStore)
+    val alertNotifier = AlertNotifier(appContext)
 }
 
 class JustMyWeatherApp : Application() {
@@ -33,5 +38,12 @@ class JustMyWeatherApp : Application() {
     override fun onCreate() {
         super.onCreate()
         container = AppContainer(this)
+        // Set up alerting infrastructure. Both are idempotent and cheap; the
+        // worker self-guards to a no-op while the user has no rules.
+        container.alertNotifier.ensureChannel()
+        AlertWorker.schedule(this)
+        // A check on launch gives a freshly-added rule timely feedback; the
+        // hourly schedule covers the background case. Both dedup by firing state.
+        AlertWorker.runOnce(this)
     }
 }
