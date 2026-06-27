@@ -17,10 +17,12 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -118,6 +120,17 @@ private fun FieldRow(
             delay(RELABEL_DEBOUNCE_MS)
             val normalized = label.ifBlank { null }
             if (normalized != setting.customLabel) onRelabel(normalized)
+        }
+        // Flush a still-pending edit if the row leaves composition before the
+        // debounce fires — tapping Done or pressing back. Without this, the last
+        // keystroke is silently dropped. rememberUpdatedState keeps onDispose
+        // reading the latest typed value rather than the value at first compose.
+        val latestLabel by rememberUpdatedState(label)
+        DisposableEffect(setting.field) {
+            onDispose {
+                val normalized = latestLabel.ifBlank { null }
+                if (normalized != setting.customLabel) onRelabel(normalized)
+            }
         }
         OutlinedTextField(
             value = label,

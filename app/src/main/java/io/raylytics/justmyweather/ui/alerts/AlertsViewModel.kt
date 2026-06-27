@@ -30,8 +30,12 @@ class AlertsViewModel(
     fun add(field: WeatherField, comparison: Comparison, threshold: Double) =
         edit(check = true) { it + AlertRule(UUID.randomUUID().toString(), field, comparison, threshold) }
 
-    fun toggle(id: String) =
-        edit(check = true) { rules -> rules.map { if (it.id == id) it.copy(enabled = !it.enabled) else it } }
+    // Only an *enable* can make a rule newly fire; disabling just drops it, so
+    // skip the network check in that case.
+    fun toggle(id: String) {
+        val enabling = rules.value.any { it.id == id && !it.enabled }
+        edit(check = enabling) { rules -> rules.map { if (it.id == id) it.copy(enabled = !it.enabled) else it } }
+    }
 
     // Deleting can't make a rule fire, so no check needed.
     fun delete(id: String) = edit(check = false) { rules -> rules.filterNot { it.id == id } }
