@@ -15,15 +15,21 @@ data, different intent. One watches for danger; this one watches for whatever
 
 ## Status
 
-Early. The foundation is in place:
+Pre-1.0, but the core product is in place:
 
 - ✅ Project scaffold (Kotlin · Jetpack Compose · Material 3 · single module)
 - ✅ Weather data layer over the free NWS API (no API key), ported from a
-  battle-tested reference — retries, unit conversion, fully unit-tested
+  battle-tested reference — retries, unit conversion, fully unit-tested; the
+  grid resolution is cached across launches
 - ✅ The default minimalist home view: location · big temperature · one line of
   conditions
-- ⏳ View customization (which data points, order, density, theme)
-- ⏳ Personal rule-based alerting (thresholds, quiet by default)
+- ✅ View customization — pick which data points show, reorder them (the top one
+  is the hero), relabel them, choose a density (spacious ↔ compact), and theme
+  it (light/dark/system · accent · typeface)
+- ✅ Personal rule-based alerting — thresholds on current conditions *and* the
+  forecast ("overnight low below 35°", "chance of rain above 50% within 12h"),
+  quiet by default, fires once per onset, with optional quiet hours
+- ⏳ Custom quiet-hours window, per-rule tone/snooze, configurable cadence
 
 See the issue tracker (beads) for the live plan.
 
@@ -47,9 +53,11 @@ Install the debug APK on a device/emulator:
 ## Contributing
 
 This app is built to be forked. The code aims to be easy to read and easy to
-change: adding a data point, an alert rule type, or a theme should be obvious,
-not surgery. Start with [`CLAUDE.md`](CLAUDE.md) for the architecture map and
-conventions.
+change: adding a data point, an alert subject, or a theme should be obvious, not
+surgery. See **[CONTRIBUTING.md](CONTRIBUTING.md)** for the build/test gate and
+workflow, **[docs/architecture.md](docs/architecture.md)** for the map, and
+**[docs/extending.md](docs/extending.md)** for step-by-step recipes for the
+common extension points.
 
 ## Data & privacy
 
@@ -57,3 +65,8 @@ Weather comes from the public US National Weather Service API — no key, no
 account, US coverage. Location is **coarse** and optional (the platform location
 provider, not Google Play Services); you can also set a place by hand. Personal
 alerts are evaluated and delivered on-device.
+
+## License
+
+Licensed under the [Apache License 2.0](LICENSE) — fork it, ship it, build on
+it. See [NOTICE](NOTICE) for attribution.
