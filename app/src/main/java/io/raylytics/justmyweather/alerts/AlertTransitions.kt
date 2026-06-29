@@ -1,7 +1,5 @@
 package io.raylytics.justmyweather.alerts
 
-import io.raylytics.justmyweather.data.WeatherSnapshot
-
 /** A rule that fired plus why — what the notifier needs. */
 data class FiredAlert(
     val rule: AlertRule,
@@ -30,13 +28,13 @@ data class AlertOutcome(
 object AlertTransitions {
     fun compute(
         rules: List<AlertRule>,
-        snapshot: WeatherSnapshot,
+        context: WeatherContext,
         previouslyFiring: Set<String>,
     ): AlertOutcome {
         val toNotify = mutableListOf<FiredAlert>()
         val nowFiring = mutableSetOf<String>()
         rules.filter { it.enabled }.forEach { rule ->
-            val decision = AlertEvaluator.evaluate(rule, snapshot)
+            val decision = AlertEvaluator.evaluate(rule, context)
             if (decision.fired) {
                 nowFiring += rule.id
                 if (rule.id !in previouslyFiring) {

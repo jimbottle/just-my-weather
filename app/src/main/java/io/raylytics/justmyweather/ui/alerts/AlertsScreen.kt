@@ -20,6 +20,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -30,6 +31,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import io.raylytics.justmyweather.alerts.AlertRule
+import io.raylytics.justmyweather.alerts.AlertWindow
 import io.raylytics.justmyweather.alerts.Comparison
 import io.raylytics.justmyweather.view.WeatherField
 
@@ -43,7 +45,7 @@ import io.raylytics.justmyweather.view.WeatherField
 @Composable
 fun AlertsScreen(
     rules: List<AlertRule>,
-    onAdd: (WeatherField, Comparison, Double) -> Unit,
+    onAdd: (WeatherField, Comparison, Double, AlertWindow) -> Unit,
     onToggle: (String) -> Unit,
     onDelete: (String) -> Unit,
     onDone: () -> Unit,
@@ -116,12 +118,21 @@ private fun RuleRow(
 
 @Composable
 private fun AddRuleForm(
-    onAdd: (WeatherField, Comparison, Double) -> Unit,
+    onAdd: (WeatherField, Comparison, Double, AlertWindow) -> Unit,
 ) {
+    var window by remember { mutableStateOf(AlertWindow.NOW) }
     var field by remember { mutableStateOf(WeatherField.alertable.first()) }
     var comparison by remember { mutableStateOf(Comparison.BELOW) }
     var thresholdText by remember { mutableStateOf("") }
     val threshold = thresholdText.toDoubleOrNull()
+
+    // The forecast only carries temperature and wind, so a forecast window
+    // narrows the field choices; "right now" offers every numeric field.
+    val fields = if (window.isForecast) WeatherField.alertable.filter { it.isForecastable } else WeatherField.alertable
+    // If the selected field isn't available in the new window, snap to a valid one.
+    LaunchedEffect(window) {
+        if (field !in fields) field = fields.first()
+    }
 
     Column(
         modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
@@ -130,7 +141,13 @@ private fun AddRuleForm(
         Text("Add an alert", style = MaterialTheme.typography.labelMedium)
 
         ChipRow(
-            options = WeatherField.alertable,
+            options = AlertWindow.entries,
+            selected = window,
+            label = { it.label },
+            onSelect = { window = it },
+        )
+        ChipRow(
+            options = fields,
             selected = field,
             label = { it.defaultLabel },
             onSelect = { field = it },
@@ -155,7 +172,7 @@ private fun AddRuleForm(
             TextButton(
                 onClick = {
                     threshold?.let {
-                        onAdd(field, comparison, it)
+                        onAdd(field, comparison, it, window)
                         thresholdText = ""
                     }
                 },

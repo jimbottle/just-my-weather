@@ -14,6 +14,8 @@ import io.raylytics.justmyweather.JustMyWeatherApp
 import io.raylytics.justmyweather.data.WeatherLocation
 import kotlinx.coroutines.flow.first
 import java.io.IOException
+import java.time.Instant
+import java.time.ZoneId
 import java.util.concurrent.TimeUnit
 
 /**
@@ -49,8 +51,20 @@ class AlertWorker(
                 return Result.success() // don't hammer on a non-transient failure
             }
 
-        // Pure transition-dedup: notify only rules that just entered fired.
-        val outcome = AlertTransitions.compute(rules, snapshot, repository.firingIds())
+        // The forecast is only fetched when a rule actually needs it, and is
+        // best-effort: if it fails, current-conditions rules still evaluate and
+        // forecast-window rules simply hold until the next tick.
+        val forecast =
+            if (rules.any { it.enabled && it.window.isForecast }) {
+                runCatching { container.weatherRepository.loadForecast(location) }.getOrDefault(emptyList())
+            } else {
+                emptyList()
+            }
+
+        // Pure transition-dedup: notify only rules that just entered fired. The
+        // clock and zone are read here at the edge and handed to the pure path.
+        val context = WeatherContext(snapshot, Instant.now(), forecast, ZoneId.systemDefault())
+        val outcome = AlertTransitions.compute(rules, context, repository.firingIds())
         outcome.toNotify.forEach { container.alertNotifier.notify(it.rule, it.decision) }
         repository.setFiringIds(outcome.nowFiring)
         return Result.success()

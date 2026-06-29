@@ -28,7 +28,10 @@ class AlertEvaluatorTest {
         threshold: Double,
         temp: Double? = 50.0,
         wind: Double? = 5.0,
-    ) = AlertEvaluator.evaluate(AlertRule("r", field, comparison, threshold), snapshot(temp, wind))
+    ) = AlertEvaluator.evaluate(
+        AlertRule("r", field, comparison, threshold),
+        WeatherContext(snapshot(temp, wind), now = Instant.parse("2026-06-24T18:00:00Z")),
+    )
 
     @Test
     fun `below fires when the reading is under the threshold`() {

@@ -1,5 +1,6 @@
 package io.raylytics.justmyweather.data
 
+import io.raylytics.justmyweather.data.nws.ForecastPoint
 import io.raylytics.justmyweather.data.nws.NwsClient
 import io.raylytics.justmyweather.data.nws.PointsLookup
 import kotlinx.coroutines.sync.Mutex
@@ -55,6 +56,16 @@ class WeatherRepository(
             pressureInHg = obs.pressureInHg,
             observedAt = obs.observedAt,
         )
+    }
+
+    /**
+     * The hourly forecast for a location, for forecast-window alerts. Goes
+     * through the same cached point resolution as [load], so a poll that needs
+     * both current and forecast data resolves the grid only once.
+     */
+    suspend fun loadForecast(location: WeatherLocation): List<ForecastPoint> {
+        val point = resolvePoint(location)
+        return nws.getHourlyForecast(point.gridId, point.gridX, point.gridY)
     }
 
     private suspend fun resolvePoint(location: WeatherLocation): PointsLookup {

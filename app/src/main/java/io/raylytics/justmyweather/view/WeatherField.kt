@@ -28,6 +28,12 @@ enum class WeatherField(
      * Conditions is descriptive text, so it isn't. */
     val isNumeric: Boolean get() = this != CONDITIONS
 
+    /** Whether the hourly forecast carries this field, so a forecast-window
+     * alert ("overnight low") can be built on it. The NWS hourly forecast only
+     * gives temperature and wind — keep this in sync with the forecast value
+     * extraction in AlertEvaluator. */
+    val isForecastable: Boolean get() = this == TEMPERATURE || this == WIND
+
     /**
      * The raw numeric reading for this field (in its display unit), or null when
      * the snapshot lacks it or the field isn't numeric. This is what the alert

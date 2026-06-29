@@ -3,6 +3,7 @@ package io.raylytics.justmyweather.ui.alerts
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.raylytics.justmyweather.alerts.AlertRule
+import io.raylytics.justmyweather.alerts.AlertWindow
 import io.raylytics.justmyweather.alerts.Comparison
 import io.raylytics.justmyweather.data.AlertRulesRepository
 import io.raylytics.justmyweather.view.WeatherField
@@ -27,8 +28,10 @@ class AlertsViewModel(
     val rules: StateFlow<List<AlertRule>> =
         repository.rules.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    fun add(field: WeatherField, comparison: Comparison, threshold: Double) =
-        edit(check = true) { it + AlertRule(UUID.randomUUID().toString(), field, comparison, threshold) }
+    fun add(field: WeatherField, comparison: Comparison, threshold: Double, window: AlertWindow = AlertWindow.NOW) =
+        edit(check = true) {
+            it + AlertRule(UUID.randomUUID().toString(), field, comparison, threshold, window = window)
+        }
 
     // Only an *enable* can make a rule newly fire; disabling just drops it, so
     // skip the network check in that case.

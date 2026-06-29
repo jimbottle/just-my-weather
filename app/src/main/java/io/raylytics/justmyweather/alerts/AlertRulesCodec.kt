@@ -20,13 +20,18 @@ object AlertRulesCodec {
         val comparison: String,
         val threshold: Double,
         val enabled: Boolean = true,
+        // Defaulted so rules written before forecast windows existed decode as
+        // NOW rules rather than being dropped.
+        val window: String = AlertWindow.NOW.key,
     )
 
     private val json = Json { ignoreUnknownKeys = true }
 
     fun encode(rules: List<AlertRule>): String =
         json.encodeToString(
-            rules.map { StoredRule(it.id, it.field.key, it.comparison.key, it.threshold, it.enabled) },
+            rules.map {
+                StoredRule(it.id, it.field.key, it.comparison.key, it.threshold, it.enabled, it.window.key)
+            },
         )
 
     fun decode(raw: String?): List<AlertRule> {
@@ -36,7 +41,9 @@ object AlertRulesCodec {
         return stored.mapNotNull { s ->
             val field = WeatherField.byKey(s.field) ?: return@mapNotNull null
             val comparison = Comparison.byKey(s.comparison) ?: return@mapNotNull null
-            AlertRule(s.id, field, comparison, s.threshold, s.enabled)
+            // An unknown window key falls back to NOW rather than dropping the rule.
+            val window = AlertWindow.byKey(s.window) ?: AlertWindow.NOW
+            AlertRule(s.id, field, comparison, s.threshold, s.enabled, window)
         }
     }
 }
