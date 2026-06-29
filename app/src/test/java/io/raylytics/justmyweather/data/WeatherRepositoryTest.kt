@@ -65,8 +65,9 @@ class WeatherRepositoryTest {
 
     @Test
     fun `a point from a shared cache is reused by a fresh repository without re-resolving`() = runTest {
-        // A durable PointCache shared across two repository instances simulates the
-        // cache surviving process death: the second cold start must not re-resolve.
+        // Covers the repository→cache seam: a second repository sharing the cache
+        // reuses the resolved point instead of re-fetching. (The durable
+        // encode/decode path itself is covered by DataStorePointCacheTest.)
         val cache = InMemoryPointCache()
         val location = WeatherLocation(40.71, -74.0, label = "Home")
         repo(RoutingTransport(), cache).load(location)

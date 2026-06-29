@@ -93,9 +93,18 @@ class AlertForecastEvaluatorTest {
     }
 
     @Test
-    fun `chance of rain below threshold does not fire when every hour is wetter`() {
+    fun `chance of rain above threshold does not fire when no hour reaches it`() {
+        // Max over the window is 80%, below the 90% threshold.
         val forecast = listOf(at(2, precip = 60.0), at(5, precip = 80.0))
         assertFalse(evaluate(rule(rain, Comparison.ABOVE, 90.0, AlertWindow.NEXT_12H), forecast).fired)
+    }
+
+    @Test
+    fun `a precip-chance NOW rule never fires - there is no current rain-chance reading`() {
+        // Chance of rain is forecast-only; with a NOW window it reads
+        // currentValue == null, so even a 100% forecast hour can't fire it.
+        val decision = evaluate(rule(rain, Comparison.ABOVE, 10.0, AlertWindow.NOW), listOf(at(1, precip = 100.0)))
+        assertFalse(decision.fired)
     }
 
     @Test
