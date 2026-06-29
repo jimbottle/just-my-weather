@@ -74,9 +74,18 @@ class AlertWorker(
         private const val UNIQUE_NAME = "personal-alerts"
         private const val ONCE_NAME = "personal-alerts-once"
 
+        /**
+         * Schedule or cancel the hourly check to match whether any rule is live.
+         * Called on launch and after every rule edit, so a quiet install (no
+         * enabled rules) does zero background work rather than waking hourly only
+         * to no-op. The worker still self-guards as a safety net.
+         */
+        fun sync(context: Context, hasEnabledRules: Boolean) {
+            if (hasEnabledRules) schedule(context) else cancel(context)
+        }
+
         /** Idempotent: KEEP means re-scheduling on each launch doesn't reset the
-         * timer. The worker self-guards when there are no rules, so it's safe to
-         * always have it scheduled. */
+         * timer. */
         fun schedule(context: Context) {
             val request =
                 PeriodicWorkRequestBuilder<AlertWorker>(1, TimeUnit.HOURS)
@@ -86,6 +95,12 @@ class AlertWorker(
                     .build()
             WorkManager.getInstance(context)
                 .enqueueUniquePeriodicWork(UNIQUE_NAME, ExistingPeriodicWorkPolicy.KEEP, request)
+        }
+
+        /** Stop the hourly check — when the last enabled rule is removed or
+         * disabled, so background work tracks the user actually wanting it. */
+        fun cancel(context: Context) {
+            WorkManager.getInstance(context).cancelUniqueWork(UNIQUE_NAME)
         }
 
         /** A single immediate check — on app launch and after a rule is added or

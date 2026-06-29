@@ -21,9 +21,12 @@ import java.util.UUID
  */
 class AlertsViewModel(
     private val repository: AlertRulesRepository,
+    /** Called after every change with the new rule list, to (re)schedule or
+     * cancel the background worker so it runs only when rules are live. */
+    private val onRulesChanged: (List<AlertRule>) -> Unit = {},
     /** Kicks an immediate alert check. Invoked after a change that could make a
      * rule newly fire, so the user gets feedback now instead of next hour. */
-    private val onRulesActivated: () -> Unit = {},
+    private val onRuleActivated: () -> Unit = {},
 ) : ViewModel() {
     val rules: StateFlow<List<AlertRule>> =
         repository.rules.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -49,8 +52,12 @@ class AlertsViewModel(
 
     private fun edit(check: Boolean, transform: (List<AlertRule>) -> List<AlertRule>) {
         viewModelScope.launch {
-            repository.save(transform(rules.value))
-            if (check) onRulesActivated()
+            val next = transform(rules.value)
+            repository.save(next)
+            // Every edit re-syncs scheduling (add/enable starts it, removing the
+            // last enabled rule stops it); only an activating change checks now.
+            onRulesChanged(next)
+            if (check) onRuleActivated()
         }
     }
 }

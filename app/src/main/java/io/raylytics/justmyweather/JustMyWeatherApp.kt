@@ -13,6 +13,11 @@ import io.raylytics.justmyweather.data.WeatherRepository
 import io.raylytics.justmyweather.data.nws.NwsClient
 import io.raylytics.justmyweather.data.nws.OkHttpTransport
 import io.raylytics.justmyweather.location.LocationProvider
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 
 /** App-wide DataStore for user settings (view config, alert rules). */
 private val Context.dataStore by preferencesDataStore(name = "settings")
@@ -40,15 +45,19 @@ class JustMyWeatherApp : Application() {
     lateinit var container: AppContainer
         private set
 
+    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
     override fun onCreate() {
         super.onCreate()
         container = AppContainer(this)
-        // Set up alerting infrastructure. Both are idempotent and cheap; the
-        // worker self-guards to a no-op while the user has no rules.
         container.alertNotifier.ensureChannel()
-        AlertWorker.schedule(this)
-        // A check on launch gives a freshly-added rule timely feedback; the
-        // hourly schedule covers the background case. Both dedup by firing state.
-        AlertWorker.runOnce(this)
+        // Schedule the hourly check only when rules are live, so a quiet install
+        // does no background work; a launch check gives any standing rule timely
+        // feedback. Reading the rule list is suspending, hence the scope.
+        appScope.launch {
+            val hasRules = container.alertRulesRepository.rules.first().any { it.enabled }
+            AlertWorker.sync(this@JustMyWeatherApp, hasRules)
+            if (hasRules) AlertWorker.runOnce(this@JustMyWeatherApp)
+        }
     }
 }

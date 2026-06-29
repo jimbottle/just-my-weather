@@ -63,7 +63,10 @@ class MainActivity : ComponentActivity() {
             initializer {
                 AlertsViewModel(
                     container.alertRulesRepository,
-                    onRulesActivated = { AlertWorker.runOnce(applicationContext) },
+                    onRulesChanged = { rules ->
+                        AlertWorker.sync(applicationContext, rules.any { it.enabled })
+                    },
+                    onRuleActivated = { AlertWorker.runOnce(applicationContext) },
                 )
             }
         }
