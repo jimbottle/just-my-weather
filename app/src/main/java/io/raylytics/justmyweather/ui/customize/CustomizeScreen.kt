@@ -124,12 +124,14 @@ private fun FieldRow(
         // Flush a still-pending edit if the row leaves composition before the
         // debounce fires — tapping Done or pressing back. Without this, the last
         // keystroke is silently dropped. rememberUpdatedState keeps onDispose
-        // reading the latest typed value rather than the value at first compose.
+        // reading the latest typed value and the latest persisted label, so the
+        // guard compares against the current value and skips an already-saved one.
         val latestLabel by rememberUpdatedState(label)
+        val latestSaved by rememberUpdatedState(setting.customLabel)
         DisposableEffect(setting.field) {
             onDispose {
                 val normalized = latestLabel.ifBlank { null }
-                if (normalized != setting.customLabel) onRelabel(normalized)
+                if (normalized != latestSaved) onRelabel(normalized)
             }
         }
         OutlinedTextField(
