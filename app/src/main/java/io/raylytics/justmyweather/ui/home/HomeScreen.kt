@@ -79,9 +79,11 @@ private fun GlanceView(
     onAlerts: () -> Unit,
 ) {
     val rendered: RenderedView = config.render(snapshot)
+    // Density drives the sizes/spacing; the chosen level lives in the config.
+    val spec = config.density.spec()
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(spec.sectionSpacing),
     ) {
         Text(
             text = snapshot.locationLabel.uppercase(Locale.getDefault()),
@@ -91,15 +93,15 @@ private fun GlanceView(
         // Hero: the value speaks for itself, so no caption above it.
         Text(
             text = rendered.hero?.value ?: "—",
-            style = MaterialTheme.typography.displayLarge,
+            style = spec.heroStyle,
             color = MaterialTheme.colorScheme.onBackground,
             textAlign = TextAlign.Center,
         )
         // Secondary fields, in the user's order, as quiet label · value rows.
         if (rendered.rows.isNotEmpty()) {
             Column(
-                modifier = Modifier.widthIn(max = 320.dp).padding(top = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.widthIn(max = spec.rowMaxWidth).padding(top = spec.sectionSpacing),
+                verticalArrangement = Arrangement.spacedBy(spec.rowSpacing),
             ) {
                 rendered.rows.forEach { row ->
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -117,7 +119,9 @@ private fun GlanceView(
                 }
             }
         }
-        observedLabel(snapshot)?.let { updated ->
+        // The "Updated" line is secondary chrome — hidden at the spacious end so
+        // the calmest view really is just the number.
+        observedLabel(snapshot)?.takeIf { config.density.showsTimestamp }?.let { updated ->
             Text(
                 text = "Updated $updated",
                 style = MaterialTheme.typography.labelMedium,

@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -28,6 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import io.raylytics.justmyweather.view.Density
 import io.raylytics.justmyweather.view.FieldSetting
 import io.raylytics.justmyweather.view.ViewConfig
 import io.raylytics.justmyweather.view.WeatherField
@@ -48,6 +50,7 @@ fun CustomizeScreen(
     onRelabel: (WeatherField, String?) -> Unit,
     onMoveUp: (Int) -> Unit,
     onMoveDown: (Int) -> Unit,
+    onSetDensity: (Density) -> Unit,
     onDone: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -71,6 +74,12 @@ fun CustomizeScreen(
                 modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
             )
 
+            DensityPicker(selected = config.density, onSelect = onSetDensity)
+            HorizontalDivider(
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                modifier = Modifier.padding(vertical = 8.dp),
+            )
+
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                 config.items.forEachIndexed { index, setting ->
                     FieldRow(
@@ -85,6 +94,26 @@ fun CustomizeScreen(
                     HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun DensityPicker(
+    selected: Density,
+    onSelect: (Density) -> Unit,
+) {
+    Text("Density", style = MaterialTheme.typography.labelMedium)
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Density.entries.forEach { density ->
+            FilterChip(
+                selected = density == selected,
+                onClick = { onSelect(density) },
+                label = { Text(density.label) },
+            )
         }
     }
 }

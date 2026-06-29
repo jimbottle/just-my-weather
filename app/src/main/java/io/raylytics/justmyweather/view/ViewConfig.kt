@@ -28,6 +28,7 @@ data class FieldSetting(
  */
 data class ViewConfig(
     val items: List<FieldSetting>,
+    val density: Density = Density.DEFAULT,
 ) {
     val visible: List<FieldSetting> get() = items.filter { it.visible }
 
@@ -36,6 +37,8 @@ data class ViewConfig(
 
     fun relabel(field: WeatherField, label: String?): ViewConfig =
         copy(items = items.map { if (it.field == field) it.copy(customLabel = label) else it })
+
+    fun setDensity(density: Density): ViewConfig = copy(density = density)
 
     fun moveUp(index: Int): ViewConfig = swap(index, index - 1)
 
@@ -70,13 +73,13 @@ data class ViewConfig(
          * duplicates, then append any field the list is missing (a newly-added
          * data point) as hidden, in catalog order.
          */
-        fun normalized(settings: List<FieldSetting>): ViewConfig {
+        fun normalized(settings: List<FieldSetting>, density: Density = Density.DEFAULT): ViewConfig {
             val seen = LinkedHashMap<WeatherField, FieldSetting>()
             settings.forEach { setting -> seen.putIfAbsent(setting.field, setting) }
             WeatherField.entries.forEach { field ->
                 seen.putIfAbsent(field, FieldSetting(field, visible = false))
             }
-            return ViewConfig(seen.values.toList())
+            return ViewConfig(seen.values.toList(), density)
         }
     }
 }

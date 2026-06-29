@@ -21,24 +21,45 @@ object ViewConfigCodec {
         val label: String? = null,
     )
 
+    @Serializable
+    private data class StoredConfig(
+        // Defaulted so a config written before density existed (and any future
+        // build that omits it) decodes at the shipped middle rather than failing.
+        val density: String = Density.DEFAULT.key,
+        val items: List<StoredSetting> = emptyList(),
+    )
+
     private val json = Json { ignoreUnknownKeys = true }
 
     fun encode(config: ViewConfig): String =
         json.encodeToString(
-            config.items.map { StoredSetting(it.field.key, it.visible, it.customLabel) },
+            StoredConfig(
+                density = config.density.key,
+                items = config.items.map { StoredSetting(it.field.key, it.visible, it.customLabel) },
+            ),
         )
 
     /** Decode stored JSON, or the [ViewConfig.DEFAULT] on absent/corrupt data —
      * a broken preference must never crash the home view. */
     fun decode(raw: String?): ViewConfig {
         if (raw.isNullOrBlank()) return ViewConfig.DEFAULT
-        val stored =
-            runCatching { json.decodeFromString<List<StoredSetting>>(raw) }.getOrNull()
-                ?: return ViewConfig.DEFAULT
+        // Current shape: an object with density + items.
+        runCatching { json.decodeFromString<StoredConfig>(raw) }.getOrNull()?.let {
+            return build(it.density, it.items)
+        }
+        // Legacy shape: a bare array of settings, written before density existed.
+        runCatching { json.decodeFromString<List<StoredSetting>>(raw) }.getOrNull()?.let {
+            return build(Density.DEFAULT.key, it)
+        }
+        return ViewConfig.DEFAULT
+    }
+
+    private fun build(densityKey: String, items: List<StoredSetting>): ViewConfig {
+        val density = Density.byKey(densityKey) ?: Density.DEFAULT
         val settings =
-            stored.mapNotNull { s ->
+            items.mapNotNull { s ->
                 WeatherField.byKey(s.key)?.let { FieldSetting(it, s.visible, s.label) }
             }
-        return ViewConfig.normalized(settings)
+        return ViewConfig.normalized(settings, density)
     }
 }

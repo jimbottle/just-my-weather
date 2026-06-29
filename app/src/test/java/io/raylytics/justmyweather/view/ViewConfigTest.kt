@@ -91,4 +91,17 @@ class ViewConfigTest {
         val rendered = ViewConfig.DEFAULT.render(snapshot.copy(temperatureF = null))
         assertEquals("—", rendered.hero?.value)
     }
+
+    @Test
+    fun `the default config ships at the comfortable density`() {
+        assertEquals(Density.COMFORTABLE, ViewConfig.DEFAULT.density)
+    }
+
+    @Test
+    fun `field edits preserve the chosen density`() {
+        // Density and field layout are independent axes — editing one must not
+        // reset the other.
+        val config = ViewConfig.DEFAULT.setDensity(Density.SPACIOUS).toggle(WeatherField.WIND).moveUp(2)
+        assertEquals(Density.SPACIOUS, config.density)
+    }
 }

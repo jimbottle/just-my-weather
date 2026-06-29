@@ -16,6 +16,29 @@ class ViewConfigCodecTest {
     }
 
     @Test
+    fun `round-trips the chosen density`() {
+        val original = ViewConfig.DEFAULT.setDensity(Density.COMPACT)
+        val restored = ViewConfigCodec.decode(ViewConfigCodec.encode(original))
+        assertEquals(Density.COMPACT, restored.density)
+    }
+
+    @Test
+    fun `a config saved before density existed decodes at the default density`() {
+        // The legacy on-disk shape: a bare array of settings, no density wrapper.
+        val raw = """[{"key":"temperature","visible":true},{"key":"conditions","visible":true}]"""
+        val config = ViewConfigCodec.decode(raw)
+        assertEquals(Density.DEFAULT, config.density)
+        // …and the field settings still come through.
+        assertEquals(WeatherField.TEMPERATURE, config.items.first().field)
+    }
+
+    @Test
+    fun `an unknown density key falls back to the default`() {
+        val raw = """{"density":"holographic","items":[{"key":"temperature","visible":true}]}"""
+        assertEquals(Density.DEFAULT, ViewConfigCodec.decode(raw).density)
+    }
+
+    @Test
     fun `absent or corrupt data decodes to the default`() {
         assertEquals(ViewConfig.DEFAULT, ViewConfigCodec.decode(null))
         assertEquals(ViewConfig.DEFAULT, ViewConfigCodec.decode(""))

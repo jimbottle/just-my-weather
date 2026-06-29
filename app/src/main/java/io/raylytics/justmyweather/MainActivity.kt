@@ -132,6 +132,7 @@ private fun App(
                 onRelabel = customizeViewModel::relabel,
                 onMoveUp = customizeViewModel::moveUp,
                 onMoveDown = customizeViewModel::moveDown,
+                onSetDensity = customizeViewModel::setDensity,
                 onDone = { screen = Screen.HOME },
             )
         }
