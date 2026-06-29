@@ -13,6 +13,13 @@ It's the personal-alerting sibling to a hazard-alert weather app: same underlyin
 data, different intent. One watches for danger; this one watches for whatever
 *you* tell it to.
 
+## A look
+
+| The calm default | Build your own view | Your own alerts |
+|:---:|:---:|:---:|
+| <img src="docs/screenshots/glance.png" width="240" alt="The default glance: location, a big temperature, one line of conditions"> | <img src="docs/screenshots/customize.png" width="240" alt="Customize: density, which fields show and their order, and look"> | <img src="docs/screenshots/alerts.png" width="240" alt="Personal alerts: a rule, the builder, and quiet hours"> |
+| One glance answers "what's it like now." | Pick the fields, order, density, and theme. | Rule-based, quiet by default, with quiet hours. |
+
 ## Status
 
 Pre-1.0, but the core product is in place:
