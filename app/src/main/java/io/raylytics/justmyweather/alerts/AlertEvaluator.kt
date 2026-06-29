@@ -1,8 +1,6 @@
 package io.raylytics.justmyweather.alerts
 
 import io.raylytics.justmyweather.data.WeatherSnapshot
-import io.raylytics.justmyweather.data.nws.ForecastPoint
-import io.raylytics.justmyweather.view.WeatherField
 
 /** The outcome of testing one rule against one context. [reason] is written
  * for the user — it becomes the notification body. */
@@ -33,17 +31,17 @@ object AlertEvaluator {
 
     private fun evaluateNow(rule: AlertRule, snapshot: WeatherSnapshot): FireDecision {
         val value =
-            rule.field.numericValue(snapshot)
-                ?: return FireDecision(false, "No ${rule.field.defaultLabel.lowercase()} reading", null)
+            rule.subject.currentValue(snapshot)
+                ?: return FireDecision(false, "No ${rule.subject.label.lowercase()} reading", null)
 
         val fired = rule.comparison.test(value, rule.threshold)
-        val actual = rule.field.formatValue(value)
-        val limit = rule.field.formatValue(rule.threshold)
+        val actual = rule.subject.format(value)
+        val limit = rule.subject.format(rule.threshold)
         val reason =
             if (fired) {
-                "${rule.field.defaultLabel} is $actual, ${rule.comparison.word} your $limit"
+                "${rule.subject.label} is $actual, ${rule.comparison.word} your $limit"
             } else {
-                "${rule.field.defaultLabel} $actual is within range"
+                "${rule.subject.label} $actual is within range"
             }
         return FireDecision(fired, reason, value)
     }
@@ -52,43 +50,31 @@ object AlertEvaluator {
         val values =
             context.forecast
                 .filter { rule.window.contains(it.startTime, context.now, context.zone) }
-                .mapNotNull { forecastValue(rule.field, it) }
+                .mapNotNull { rule.subject.forecastValue(it) }
 
         if (values.isEmpty()) {
-            val label = rule.field.defaultLabel.lowercase()
+            val label = rule.subject.label.lowercase()
             return FireDecision(false, "No $label forecast ${rule.window.phrase}", null)
         }
 
         // BELOW watches the window's low, ABOVE its high — the extreme that could
         // trip the threshold. Evaluating the extreme means a single dip (or spike)
-        // anywhere in the window fires the rule.
+        // anywhere in the window fires the rule; for chance of rain that's "any
+        // hour at/above the threshold".
         val extreme =
             when (rule.comparison) {
                 Comparison.BELOW -> values.min()
                 Comparison.ABOVE -> values.max()
             }
         val fired = rule.comparison.test(extreme, rule.threshold)
-        val actual = rule.field.formatValue(extreme)
-        val limit = rule.field.formatValue(rule.threshold)
+        val actual = rule.subject.format(extreme)
+        val limit = rule.subject.format(rule.threshold)
         val reason =
             if (fired) {
-                "${rule.field.defaultLabel} ${rule.window.phrase} reaches $actual, ${rule.comparison.word} your $limit"
+                "${rule.subject.label} ${rule.window.phrase} reaches $actual, ${rule.comparison.word} your $limit"
             } else {
-                "${rule.field.defaultLabel} ${rule.window.phrase} stays within range"
+                "${rule.subject.label} ${rule.window.phrase} stays within range"
             }
         return FireDecision(fired, reason, extreme)
     }
-
-    /**
-     * The forecast carries only temperature and wind, so only those fields have a
-     * window value; the rest return null and no forecast rule is offered for them.
-     * Exhaustive (no `else`) so adding a [WeatherField] forces a decision here —
-     * keep this in sync with [WeatherField.isForecastable].
-     */
-    private fun forecastValue(field: WeatherField, point: ForecastPoint): Double? =
-        when (field) {
-            WeatherField.TEMPERATURE -> point.temperatureF
-            WeatherField.WIND -> point.windMph
-            WeatherField.CONDITIONS, WeatherField.PRECIPITATION, WeatherField.PRESSURE -> null
-        }
 }

@@ -24,7 +24,7 @@ class AlertTransitionsTest {
     private fun context(temp: Double?) =
         WeatherContext(snapshot(temp), now = Instant.parse("2026-06-24T18:00:00Z"))
 
-    private val cold = AlertRule("cold", WeatherField.TEMPERATURE, Comparison.BELOW, 40.0)
+    private val cold = AlertRule("cold", AlertSubject.Field(WeatherField.TEMPERATURE), Comparison.BELOW, 40.0)
 
     @Test
     fun `enter fired notifies and records the rule as firing`() {

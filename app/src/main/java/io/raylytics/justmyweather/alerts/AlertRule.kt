@@ -1,7 +1,5 @@
 package io.raylytics.justmyweather.alerts
 
-import io.raylytics.justmyweather.view.WeatherField
-
 /** Which side of the threshold fires the alert. */
 enum class Comparison(val key: String, val word: String) {
     ABOVE("above", "above"),
@@ -22,30 +20,28 @@ enum class Comparison(val key: String, val word: String) {
 }
 
 /**
- * One personal alert: "tell me when [field] is [above/below] [threshold]",
+ * One personal alert: "tell me when [subject] is [above/below] [threshold]",
  * optionally over a forecast [window] instead of the current reading.
  *
  * Deliberately small — a single numeric threshold covers the everyday cases
  * (cold snap, jacket weather, wind picking up). The [window] extends it to the
- * hourly forecast ("overnight low below 35°") without a new rule shape. Rules
- * reuse the same [WeatherField] catalog the view does, so the things you watch
- * are the things you can see.
+ * hourly forecast ("overnight low below 35°", "chance of rain above 50% within
+ * 12 hours") without a new rule shape, and the [subject] is usually a view
+ * field, so the things you watch are the things you can see.
  */
 data class AlertRule(
     val id: String,
-    val field: WeatherField,
+    val subject: AlertSubject,
     val comparison: Comparison,
     val threshold: Double,
     val enabled: Boolean = true,
     val window: AlertWindow = AlertWindow.NOW,
 ) {
     /** A plain-language description for the rule list: "Temperature above 75°",
-     * or "Temperature below 35° overnight" for a forecast window.
-     * `this.field` is required — a bare `field` in an accessor is the backing-
-     * field keyword, not this property. */
+     * or "Chance of rain above 50% within 12 hours" for a forecast window. */
     val summary: String
         get() {
-            val core = "${this.field.defaultLabel} ${comparison.word} ${this.field.formatValue(threshold)}"
+            val core = "${subject.label} ${comparison.word} ${subject.format(threshold)}"
             return if (window.isForecast) "$core ${window.phrase}" else core
         }
 }

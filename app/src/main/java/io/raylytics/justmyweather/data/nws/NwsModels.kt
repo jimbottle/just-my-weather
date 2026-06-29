@@ -45,6 +45,8 @@ data class ForecastPoint(
     val startTime: Instant,
     val temperatureF: Double?,
     val windMph: Double?,
+    /** Chance of precipitation for the hour, 0–100, or null when NWS omits it. */
+    val precipProbabilityPercent: Double? = null,
 )
 
 /** An active NWS hazard alert for a zone (used to coexist with, not duplicate,

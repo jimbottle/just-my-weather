@@ -31,9 +31,9 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import io.raylytics.justmyweather.alerts.AlertRule
+import io.raylytics.justmyweather.alerts.AlertSubject
 import io.raylytics.justmyweather.alerts.AlertWindow
 import io.raylytics.justmyweather.alerts.Comparison
-import io.raylytics.justmyweather.view.WeatherField
 
 /**
  * Personal alerts: the user's own rules about everyday conditions. Quiet by
@@ -45,7 +45,7 @@ import io.raylytics.justmyweather.view.WeatherField
 @Composable
 fun AlertsScreen(
     rules: List<AlertRule>,
-    onAdd: (WeatherField, Comparison, Double, AlertWindow) -> Unit,
+    onAdd: (AlertSubject, Comparison, Double, AlertWindow) -> Unit,
     onToggle: (String) -> Unit,
     onDelete: (String) -> Unit,
     onDone: () -> Unit,
@@ -118,20 +118,21 @@ private fun RuleRow(
 
 @Composable
 private fun AddRuleForm(
-    onAdd: (WeatherField, Comparison, Double, AlertWindow) -> Unit,
+    onAdd: (AlertSubject, Comparison, Double, AlertWindow) -> Unit,
 ) {
     var window by remember { mutableStateOf(AlertWindow.NOW) }
-    var field by remember { mutableStateOf(WeatherField.alertable.first()) }
+    var subject by remember { mutableStateOf(AlertSubject.current.first()) }
     var comparison by remember { mutableStateOf(Comparison.BELOW) }
     var thresholdText by remember { mutableStateOf("") }
     val threshold = thresholdText.toDoubleOrNull()
 
-    // The forecast only carries temperature and wind, so a forecast window
-    // narrows the field choices; "right now" offers every numeric field.
-    val fields = if (window.isForecast) WeatherField.alertable.filter { it.isForecastable } else WeatherField.alertable
-    // If the selected field isn't available in the new window, snap to a valid one.
+    // A forecast window narrows the subjects to what the forecast carries
+    // (temperature, wind, plus chance of rain); "right now" offers every
+    // current reading. Subjects are matched by key so the chip stays selected
+    // across the Field/PrecipChance wrapping.
+    val subjects = if (window.isForecast) AlertSubject.forecast else AlertSubject.current
     LaunchedEffect(window) {
-        if (field !in fields) field = fields.first()
+        if (subjects.none { it.key == subject.key }) subject = subjects.first()
     }
 
     Column(
@@ -147,10 +148,10 @@ private fun AddRuleForm(
             onSelect = { window = it },
         )
         ChipRow(
-            options = fields,
-            selected = field,
-            label = { it.defaultLabel },
-            onSelect = { field = it },
+            options = subjects,
+            selected = subject,
+            label = { it.label },
+            onSelect = { subject = it },
         )
         ChipRow(
             options = Comparison.entries,
@@ -172,7 +173,7 @@ private fun AddRuleForm(
             TextButton(
                 onClick = {
                     threshold?.let {
-                        onAdd(field, comparison, it, window)
+                        onAdd(subject, comparison, it, window)
                         thresholdText = ""
                     }
                 },

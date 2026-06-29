@@ -107,6 +107,8 @@ data class NwsForecastResponse(
         val temperature: Double? = null,
         val temperatureUnit: String? = null,
         val windSpeed: String? = null,
+        // NWS gives this as { unitCode: "wmoUnit:percent", value: 40 }.
+        val probabilityOfPrecipitation: NwsValue? = null,
         @SerialName("shortForecast") val shortForecast: String? = null,
     )
 }

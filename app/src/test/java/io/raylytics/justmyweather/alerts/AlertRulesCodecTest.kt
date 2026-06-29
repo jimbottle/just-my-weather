@@ -5,13 +5,17 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 
 class AlertRulesCodecTest {
+    private val temp = AlertSubject.Field(WeatherField.TEMPERATURE)
+    private val wind = AlertSubject.Field(WeatherField.WIND)
+
     @Test
-    fun `round-trips a rule list including the forecast window`() {
+    fun `round-trips a rule list including window and precip-chance subjects`() {
         val rules =
             listOf(
-                AlertRule("a", WeatherField.TEMPERATURE, Comparison.BELOW, 32.0, enabled = true),
-                AlertRule("b", WeatherField.WIND, Comparison.ABOVE, 20.0, enabled = false),
-                AlertRule("c", WeatherField.TEMPERATURE, Comparison.BELOW, 35.0, window = AlertWindow.OVERNIGHT),
+                AlertRule("a", temp, Comparison.BELOW, 32.0, enabled = true),
+                AlertRule("b", wind, Comparison.ABOVE, 20.0, enabled = false),
+                AlertRule("c", temp, Comparison.BELOW, 35.0, window = AlertWindow.OVERNIGHT),
+                AlertRule("d", AlertSubject.PrecipChance, Comparison.ABOVE, 50.0, window = AlertWindow.NEXT_12H),
             )
         assertEquals(rules, AlertRulesCodec.decode(AlertRulesCodec.encode(rules)))
     }

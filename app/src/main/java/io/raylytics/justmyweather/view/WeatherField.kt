@@ -1,6 +1,7 @@
 package io.raylytics.justmyweather.view
 
 import io.raylytics.justmyweather.data.WeatherSnapshot
+import io.raylytics.justmyweather.data.nws.ForecastPoint
 import java.util.Locale
 import kotlin.math.roundToInt
 
@@ -30,9 +31,21 @@ enum class WeatherField(
 
     /** Whether the hourly forecast carries this field, so a forecast-window
      * alert ("overnight low") can be built on it. The NWS hourly forecast only
-     * gives temperature and wind — keep this in sync with the forecast value
-     * extraction in AlertEvaluator. */
+     * gives temperature and wind. */
     val isForecastable: Boolean get() = this == TEMPERATURE || this == WIND
+
+    /**
+     * This field's value for one forecast hour (in its display unit), or null
+     * when the forecast doesn't carry it. The single source for forecast-window
+     * alert evaluation — exhaustive so adding a field forces a decision, and
+     * the non-null cases are exactly [isForecastable].
+     */
+    fun forecastValue(point: ForecastPoint): Double? =
+        when (this) {
+            TEMPERATURE -> point.temperatureF
+            WIND -> point.windMph
+            CONDITIONS, PRECIPITATION, PRESSURE -> null
+        }
 
     /**
      * The raw numeric reading for this field (in its display unit), or null when

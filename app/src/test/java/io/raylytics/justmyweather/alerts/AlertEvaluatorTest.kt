@@ -29,7 +29,7 @@ class AlertEvaluatorTest {
         temp: Double? = 50.0,
         wind: Double? = 5.0,
     ) = AlertEvaluator.evaluate(
-        AlertRule("r", field, comparison, threshold),
+        AlertRule("r", AlertSubject.Field(field), comparison, threshold),
         WeatherContext(snapshot(temp, wind), now = Instant.parse("2026-06-24T18:00:00Z")),
     )
 
@@ -62,7 +62,13 @@ class AlertEvaluatorTest {
 
     @Test
     fun `rule summary reads naturally with the field unit`() {
-        assertEquals("Temperature below 32°", AlertRule("r", WeatherField.TEMPERATURE, Comparison.BELOW, 32.0).summary)
-        assertEquals("Wind above 20 mph", AlertRule("r", WeatherField.WIND, Comparison.ABOVE, 20.0).summary)
+        assertEquals(
+            "Temperature below 32°",
+            AlertRule("r", AlertSubject.Field(WeatherField.TEMPERATURE), Comparison.BELOW, 32.0).summary,
+        )
+        assertEquals(
+            "Wind above 20 mph",
+            AlertRule("r", AlertSubject.Field(WeatherField.WIND), Comparison.ABOVE, 20.0).summary,
+        )
     }
 }

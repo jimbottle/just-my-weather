@@ -93,6 +93,7 @@ class NwsClient(
                 startTime = start,
                 temperatureF = temperatureF,
                 windMph = Units.parseWindSpeedString(p.windSpeed),
+                precipProbabilityPercent = p.probabilityOfPrecipitation?.value,
             )
         }
     }
