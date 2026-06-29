@@ -29,6 +29,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import io.raylytics.justmyweather.view.AccentChoice
@@ -192,9 +193,20 @@ private fun FieldRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         // Reorder controls. Arrows as text keep us off an icon dependency.
+        // testTags (per field key) give UI tests a stable handle on controls
+        // that otherwise carry only a glyph or no text.
+        val key = setting.field.key
         Column {
-            TextButton(onClick = onMoveUp, enabled = canMoveUp) { Text("↑") }
-            TextButton(onClick = onMoveDown, enabled = canMoveDown) { Text("↓") }
+            TextButton(
+                onClick = onMoveUp,
+                enabled = canMoveUp,
+                modifier = Modifier.testTag("moveUp_$key"),
+            ) { Text("↑") }
+            TextButton(
+                onClick = onMoveDown,
+                enabled = canMoveDown,
+                modifier = Modifier.testTag("moveDown_$key"),
+            ) { Text("↓") }
         }
         // Local edit state keyed by field so the cursor stays put while the
         // persisted config streams back in; the field's default name shows as
@@ -229,6 +241,10 @@ private fun FieldRow(
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
             modifier = Modifier.weight(1f),
         )
-        Switch(checked = setting.visible, onCheckedChange = { onToggle() })
+        Switch(
+            checked = setting.visible,
+            onCheckedChange = { onToggle() },
+            modifier = Modifier.testTag("toggle_$key"),
+        )
     }
 }

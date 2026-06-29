@@ -1,0 +1,32 @@
+# Customize flow: a hidden field, once toggled on, appears on the home glance —
+# the live link between the customize screen and the view it drives.
+#
+# Wind ships hidden by default, so its label is absent from home at first. We
+# toggle it on via its testTag (the Switch carries no text), return to the
+# glance, and assert the "Wind" row is now present. testTags are exposed as
+# resource-ids by the root semantics modifier in MainActivity.
+appId: io.raylytics.justmyweather
+---
+- launchApp:
+    clearState: true
+    permissions:
+      all: allow
+
+# Wait for the default glance to render. Wind is hidden, so its row label is
+# not shown yet.
+- extendedWaitUntil:
+    visible: "Customize"
+    timeout: 60000
+- assertNotVisible: "Wind"
+
+# Into customize, flip Wind on, and come back to the glance.
+- tapOn: "Customize"
+- assertVisible: "Customize view"
+- tapOn:
+    id: "toggle_wind"
+- tapOn: "Done"
+
+# The glance now carries a Wind row, driven by the persisted config.
+- extendedWaitUntil:
+    visible: "Wind"
+    timeout: 10000

@@ -8,11 +8,17 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
@@ -86,6 +92,7 @@ class MainActivity : ComponentActivity() {
     private val requestNotifications =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
+    @OptIn(ExperimentalComposeUiApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -96,14 +103,18 @@ class MainActivity : ComponentActivity() {
         setContent {
             val themeConfig by themeViewModel.config.collectAsStateWithLifecycle()
             JustMyWeatherTheme(themeConfig) {
-                App(
-                    homeViewModel = homeViewModel,
-                    customizeViewModel = customizeViewModel,
-                    alertsViewModel = alertsViewModel,
-                    themeConfig = themeConfig,
-                    onThemeChange = themeViewModel::save,
-                    onEnterAlerts = ::requestNotificationsIfNeeded,
-                )
+                // Surface Compose testTags as resource-ids so UI tests (Maestro)
+                // can target controls that carry no stable text, like switches.
+                Box(Modifier.fillMaxSize().semantics { testTagsAsResourceId = true }) {
+                    App(
+                        homeViewModel = homeViewModel,
+                        customizeViewModel = customizeViewModel,
+                        alertsViewModel = alertsViewModel,
+                        themeConfig = themeConfig,
+                        onThemeChange = themeViewModel::save,
+                        onEnterAlerts = ::requestNotificationsIfNeeded,
+                    )
+                }
             }
         }
     }
