@@ -163,18 +163,16 @@ private fun DensityPicker(
     selected: Density,
     onSelect: (Density) -> Unit,
 ) {
-    Text("Density", style = MaterialTheme.typography.labelMedium)
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Density.entries.forEach { density ->
-            FilterChip(
-                selected = density == selected,
-                onClick = { onSelect(density) },
-                label = { Text(density.label) },
-            )
-        }
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text("Density", style = MaterialTheme.typography.labelMedium)
+        // Shares the one FilterChip loop with the theme rows, so spacing and
+        // wrap behaviour can't drift between the two.
+        ChipRow(
+            options = Density.entries,
+            selected = selected,
+            label = { it.label },
+            onSelect = onSelect,
+        )
     }
 }
 

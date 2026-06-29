@@ -55,11 +55,17 @@ object ViewConfigCodec {
     }
 
     private fun build(densityKey: String, items: List<StoredSetting>): ViewConfig {
-        val density = Density.byKey(densityKey) ?: Density.DEFAULT
         val settings =
             items.mapNotNull { s ->
                 WeatherField.byKey(s.key)?.let { FieldSetting(it, s.visible, s.label) }
             }
+        // No recognised settings means this wasn't really a config — an empty or
+        // foreign JSON object (`{}`, `{"version":2}`) that `ignoreUnknownKeys`
+        // happily accepts, or all-unknown field keys. normalize(emptyList) would
+        // yield an all-hidden glance (hero "—", no rows), which is worse than the
+        // documented contract; fall back to DEFAULT instead.
+        if (settings.isEmpty()) return ViewConfig.DEFAULT
+        val density = Density.byKey(densityKey) ?: Density.DEFAULT
         return ViewConfig.normalized(settings, density)
     }
 }

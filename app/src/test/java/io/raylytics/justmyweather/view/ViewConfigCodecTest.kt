@@ -46,6 +46,15 @@ class ViewConfigCodecTest {
     }
 
     @Test
+    fun `a valid but empty or foreign object decodes to the default, not an all-hidden glance`() {
+        // ignoreUnknownKeys would otherwise accept these as a config with no
+        // items, normalizing to every field hidden (hero "—", no rows).
+        assertEquals(ViewConfig.DEFAULT, ViewConfigCodec.decode("{}"))
+        assertEquals(ViewConfig.DEFAULT, ViewConfigCodec.decode("""{"version":2,"theme":"dark"}"""))
+        assertEquals(ViewConfig.DEFAULT, ViewConfigCodec.decode("[]"))
+    }
+
+    @Test
     fun `decode drops unknown field keys and fills in missing ones`() {
         // A config saved by a future/older build: one unknown key, and only
         // wind among the known fields.
