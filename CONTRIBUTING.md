@@ -50,7 +50,8 @@ Bypass the hook with `--no-verify` only in emergencies.
 
 A known Kotlin trap: inside a property accessor, a bare `field` is the
 backing-field keyword, not a constructor property of the same name. Write
-`this.field` when you mean the property (see `AlertRule.summary`).
+`this.field` when you mean the property (see `FieldSetting.label` in
+`view/ViewConfig.kt`).
 
 ## Where things live
 

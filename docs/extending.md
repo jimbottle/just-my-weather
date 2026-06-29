@@ -7,7 +7,7 @@ follow the errors and you're done.
 
 > Trap: inside a property accessor, a bare `field` is Kotlin's backing-field
 > keyword. When you mean a constructor property named `field`, write `this.field`
-> (see `AlertRule.summary`).
+> (see `FieldSetting.label` in `view/ViewConfig.kt`).
 
 ## Add a data point
 
