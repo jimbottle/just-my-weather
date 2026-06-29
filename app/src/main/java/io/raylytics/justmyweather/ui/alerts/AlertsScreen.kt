@@ -31,6 +31,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import io.raylytics.justmyweather.alerts.AlertRule
+import io.raylytics.justmyweather.alerts.AlertSettings
 import io.raylytics.justmyweather.alerts.AlertSubject
 import io.raylytics.justmyweather.alerts.AlertWindow
 import io.raylytics.justmyweather.alerts.Comparison
@@ -45,9 +46,11 @@ import io.raylytics.justmyweather.alerts.Comparison
 @Composable
 fun AlertsScreen(
     rules: List<AlertRule>,
+    settings: AlertSettings,
     onAdd: (AlertSubject, Comparison, Double, AlertWindow) -> Unit,
     onToggle: (String) -> Unit,
     onDelete: (String) -> Unit,
+    onSetQuietHours: (Boolean) -> Unit,
     onDone: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -85,7 +88,36 @@ fun AlertsScreen(
             }
 
             AddRuleForm(onAdd = onAdd)
+
+            HorizontalDivider(
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                modifier = Modifier.padding(vertical = 12.dp),
+            )
+            QuietHoursRow(settings = settings, onSetQuietHours = onSetQuietHours)
         }
+    }
+}
+
+@Composable
+private fun QuietHoursRow(
+    settings: AlertSettings,
+    onSetQuietHours: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text("Quiet hours", style = MaterialTheme.typography.bodyMedium)
+            Text(
+                // Pad to h:mm with a leading zero only where it reads naturally.
+                text = "Deliver silently ${settings.quietStartHour}:00–${settings.quietEndHour}:00",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Switch(checked = settings.quietHoursEnabled, onCheckedChange = onSetQuietHours)
     }
 }
 

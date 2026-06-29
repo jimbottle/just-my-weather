@@ -7,6 +7,7 @@ import io.raylytics.justmyweather.alerts.AlertRule
 import io.raylytics.justmyweather.alerts.AlertSubject
 import io.raylytics.justmyweather.alerts.Comparison
 import io.raylytics.justmyweather.data.AlertRulesRepository
+import io.raylytics.justmyweather.data.AlertSettingsRepository
 import io.raylytics.justmyweather.view.WeatherField
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -58,6 +59,7 @@ class AlertsViewModelTest {
         val vm =
             AlertsViewModel(
                 AlertRulesRepository(FakePreferencesDataStore()),
+                AlertSettingsRepository(FakePreferencesDataStore()),
                 onRulesChanged = { changes += it },
                 onRuleActivated = { checks++ },
             )
@@ -78,6 +80,7 @@ class AlertsViewModelTest {
         val vm =
             AlertsViewModel(
                 repository,
+                AlertSettingsRepository(FakePreferencesDataStore()),
                 onRulesChanged = { changes += it },
                 onRuleActivated = { checks++ },
             )
@@ -102,6 +105,7 @@ class AlertsViewModelTest {
         val vm =
             AlertsViewModel(
                 repository,
+                AlertSettingsRepository(FakePreferencesDataStore()),
                 onRulesChanged = { changes += it },
                 onRuleActivated = { checks++ },
             )

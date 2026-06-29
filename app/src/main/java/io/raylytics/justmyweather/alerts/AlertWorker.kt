@@ -63,9 +63,13 @@ class AlertWorker(
 
         // Pure transition-dedup: notify only rules that just entered fired. The
         // clock and zone are read here at the edge and handed to the pure path.
-        val context = WeatherContext(snapshot, Instant.now(), forecast, ZoneId.systemDefault())
+        val zone = ZoneId.systemDefault()
+        val now = Instant.now()
+        val context = WeatherContext(snapshot, now, forecast, zone)
         val outcome = AlertTransitions.compute(rules, context, repository.firingIds())
-        outcome.toNotify.forEach { container.alertNotifier.notify(it.rule, it.decision) }
+        // Quiet hours hush the delivery (silent channel), they don't drop alerts.
+        val silent = container.alertSettingsRepository.current().isQuietAt(now.atZone(zone).hour)
+        outcome.toNotify.forEach { container.alertNotifier.notify(it.rule, it.decision, silent) }
         repository.setFiringIds(outcome.nowFiring)
         return Result.success()
     }

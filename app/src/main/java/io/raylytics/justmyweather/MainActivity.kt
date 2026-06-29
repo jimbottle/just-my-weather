@@ -63,6 +63,7 @@ class MainActivity : ComponentActivity() {
             initializer {
                 AlertsViewModel(
                     container.alertRulesRepository,
+                    container.alertSettingsRepository,
                     onRulesChanged = { rules ->
                         AlertWorker.sync(applicationContext, rules.any { it.enabled })
                     },
@@ -158,11 +159,14 @@ private fun App(
         Screen.ALERTS -> {
             BackHandler { screen = Screen.HOME }
             val rules by alertsViewModel.rules.collectAsStateWithLifecycle()
+            val alertSettings by alertsViewModel.settings.collectAsStateWithLifecycle()
             AlertsScreen(
                 rules = rules,
+                settings = alertSettings,
                 onAdd = alertsViewModel::add,
                 onToggle = alertsViewModel::toggle,
                 onDelete = alertsViewModel::delete,
+                onSetQuietHours = alertsViewModel::setQuietHours,
                 onDone = { screen = Screen.HOME },
             )
         }

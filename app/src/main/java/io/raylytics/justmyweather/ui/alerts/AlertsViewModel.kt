@@ -3,10 +3,12 @@ package io.raylytics.justmyweather.ui.alerts
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.raylytics.justmyweather.alerts.AlertRule
+import io.raylytics.justmyweather.alerts.AlertSettings
 import io.raylytics.justmyweather.alerts.AlertSubject
 import io.raylytics.justmyweather.alerts.AlertWindow
 import io.raylytics.justmyweather.alerts.Comparison
 import io.raylytics.justmyweather.data.AlertRulesRepository
+import io.raylytics.justmyweather.data.AlertSettingsRepository
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
@@ -21,6 +23,7 @@ import java.util.UUID
  */
 class AlertsViewModel(
     private val repository: AlertRulesRepository,
+    private val settingsRepository: AlertSettingsRepository,
     /** Called after every change with the new rule list, to (re)schedule or
      * cancel the background worker so it runs only when rules are live. */
     private val onRulesChanged: (List<AlertRule>) -> Unit = {},
@@ -30,6 +33,17 @@ class AlertsViewModel(
 ) : ViewModel() {
     val rules: StateFlow<List<AlertRule>> =
         repository.rules.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val settings: StateFlow<AlertSettings> =
+        settingsRepository.settings.stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5_000),
+            AlertSettings.DEFAULT,
+        )
+
+    fun setQuietHours(enabled: Boolean) {
+        viewModelScope.launch { settingsRepository.save(settings.value.copy(quietHoursEnabled = enabled)) }
+    }
 
     fun add(
         subject: AlertSubject,

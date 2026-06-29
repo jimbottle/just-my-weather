@@ -6,6 +6,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import io.raylytics.justmyweather.alerts.AlertNotifier
 import io.raylytics.justmyweather.alerts.AlertWorker
 import io.raylytics.justmyweather.data.AlertRulesRepository
+import io.raylytics.justmyweather.data.AlertSettingsRepository
 import io.raylytics.justmyweather.data.DataStorePointCache
 import io.raylytics.justmyweather.data.ThemeConfigRepository
 import io.raylytics.justmyweather.data.ViewConfigRepository
@@ -38,6 +39,7 @@ class AppContainer(context: Context) {
     val viewConfigRepository = ViewConfigRepository(appContext.dataStore)
     val themeConfigRepository = ThemeConfigRepository(appContext.dataStore)
     val alertRulesRepository = AlertRulesRepository(appContext.dataStore)
+    val alertSettingsRepository = AlertSettingsRepository(appContext.dataStore)
     val alertNotifier = AlertNotifier(appContext)
 }
 
