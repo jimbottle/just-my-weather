@@ -106,6 +106,25 @@ class AlertForecastEvaluatorTest {
     }
 
     @Test
+    fun `overnight checked late at night stays on the imminent night, not the next one`() {
+        // 23:00 UTC: tonight's band is today 20:00 → tomorrow 08:00. A cold hour
+        // tomorrow evening belongs to the *next* night and must not fire; a cold
+        // hour later tonight must.
+        val lateNight = Instant.parse("2026-01-15T23:00:00Z")
+        val rule = AlertRule("r", WeatherField.TEMPERATURE, Comparison.BELOW, 35.0, window = AlertWindow.OVERNIGHT)
+
+        val nextEveningOnly =
+            listOf(ForecastPoint(lateNight.plus(22, ChronoUnit.HOURS), temperatureF = 25.0, windMph = null))
+        val ctxNextEve = WeatherContext(mildNow, lateNight, nextEveningOnly, zone)
+        assertFalse(AlertEvaluator.evaluate(rule, ctxNextEve).fired)
+
+        val laterTonight =
+            listOf(ForecastPoint(lateNight.plus(5, ChronoUnit.HOURS), temperatureF = 25.0, windMph = null))
+        val ctxTonight = WeatherContext(mildNow, lateNight, laterTonight, zone)
+        assertTrue(AlertEvaluator.evaluate(rule, ctxTonight).fired)
+    }
+
+    @Test
     fun `forecast summary appends the window phrase`() {
         val rule = AlertRule("r", WeatherField.TEMPERATURE, Comparison.BELOW, 35.0, window = AlertWindow.OVERNIGHT)
         assertEquals("Temperature below 35° overnight", rule.summary)

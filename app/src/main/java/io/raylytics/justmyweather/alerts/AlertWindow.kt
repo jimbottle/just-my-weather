@@ -44,17 +44,41 @@ enum class AlertWindow(
             NEXT_6H -> withinHours(time, now, 6)
             NEXT_12H -> withinHours(time, now, 12)
             NEXT_24H -> withinHours(time, now, 24)
-            // Tonight's local night band (20:00–08:00) within the next 24h, so an
-            // evening or daytime check still captures the coming night's low.
-            OVERNIGHT -> withinHours(time, now, 24) && isNightHour(time.atZone(zone).hour)
+            // A single imminent night, anchored to local 20:00–08:00 (not a
+            // rolling 24h × night-hour intersection), so a late-night check
+            // stays on the coming night rather than also catching tomorrow eve.
+            OVERNIGHT -> {
+                val (start, end) = overnightBand(now, zone)
+                !time.isBefore(now) && !time.isBefore(start) && time.isBefore(end)
+            }
         }
 
     private fun withinHours(time: Instant, now: Instant, hours: Long): Boolean =
         !time.isBefore(now) && time.isBefore(now.plus(hours, ChronoUnit.HOURS))
 
-    private fun isNightHour(hour: Int): Boolean = hour >= 20 || hour < 8
+    /**
+     * The one overnight band [start, end) that is currently active or next to
+     * come, as local 20:00 → next-day 08:00 in [zone]. Before 08:00 we're in the
+     * night that began the previous evening; otherwise it's tonight's band.
+     */
+    private fun overnightBand(now: Instant, zone: ZoneId): Pair<Instant, Instant> {
+        val local = now.atZone(zone)
+        val today = local.toLocalDate()
+        return if (local.hour < NIGHT_END_HOUR) {
+            val start = today.minusDays(1).atTime(NIGHT_START_HOUR, 0).atZone(zone)
+            val end = today.atTime(NIGHT_END_HOUR, 0).atZone(zone)
+            start.toInstant() to end.toInstant()
+        } else {
+            val start = today.atTime(NIGHT_START_HOUR, 0).atZone(zone)
+            val end = today.plusDays(1).atTime(NIGHT_END_HOUR, 0).atZone(zone)
+            start.toInstant() to end.toInstant()
+        }
+    }
 
     companion object {
+        private const val NIGHT_START_HOUR = 20
+        private const val NIGHT_END_HOUR = 8
+
         fun byKey(key: String): AlertWindow? = entries.firstOrNull { it.key == key }
     }
 }
