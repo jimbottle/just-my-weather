@@ -35,6 +35,7 @@ import io.raylytics.justmyweather.alerts.AlertSettings
 import io.raylytics.justmyweather.alerts.AlertSubject
 import io.raylytics.justmyweather.alerts.AlertWindow
 import io.raylytics.justmyweather.alerts.Comparison
+import java.util.Locale
 
 /**
  * Personal alerts: the user's own rules about everyday conditions. Quiet by
@@ -111,8 +112,14 @@ private fun QuietHoursRow(
         Column(modifier = Modifier.weight(1f)) {
             Text("Quiet hours", style = MaterialTheme.typography.bodyMedium)
             Text(
-                // Pad to h:mm with a leading zero only where it reads naturally.
-                text = "Deliver silently ${settings.quietStartHour}:00–${settings.quietEndHour}:00",
+                // Zero-padded 24h clock, e.g. "07:00" — reads as a clean time range.
+                text =
+                    String.format(
+                        Locale.US,
+                        "Deliver silently %02d:00–%02d:00",
+                        settings.quietStartHour,
+                        settings.quietEndHour,
+                    ),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
