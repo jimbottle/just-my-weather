@@ -5,6 +5,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
+import io.raylytics.justmyweather.view.AccentChoice
+import io.raylytics.justmyweather.view.ThemeConfig
+import io.raylytics.justmyweather.view.ThemeMood
+import io.raylytics.justmyweather.view.TypeChoice
 
 private val LightColors =
     lightColorScheme(
@@ -29,19 +35,47 @@ private val DarkColors =
     )
 
 /**
- * The app theme. Follows the system light/dark mood by default; the
- * customization layer will later let the user pin one or pick their own
- * accent. No dynamic (Material You) colour on purpose — the palette is part of
- * the app's calm, edited identity rather than the wallpaper's.
+ * The app theme, driven by the user's [ThemeConfig]. Mood picks light/dark (or
+ * follows the system), accent recolours the single primary hue, and the type
+ * choice swaps the face. No dynamic (Material You) colour on purpose — the
+ * palette is part of the app's calm, edited identity rather than the
+ * wallpaper's.
+ *
+ * The enum→pixels mapping lives here in one place; the [ThemeConfig] itself
+ * stays pure data so it persists and tests without Compose.
  */
 @Composable
 fun JustMyWeatherTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    config: ThemeConfig = ThemeConfig.DEFAULT,
     content: @Composable () -> Unit,
 ) {
+    val dark =
+        when (config.mood) {
+            ThemeMood.SYSTEM -> isSystemInDarkTheme()
+            ThemeMood.LIGHT -> false
+            ThemeMood.DARK -> true
+        }
+    val base = if (dark) DarkColors else LightColors
     MaterialTheme(
-        colorScheme = if (darkTheme) DarkColors else LightColors,
-        typography = Typography,
+        colorScheme = base.copy(primary = accentColor(config.accent)),
+        typography = appTypography(fontFamily(config.type)),
         content = content,
     )
 }
+
+private fun accentColor(accent: AccentChoice): Color =
+    when (accent) {
+        AccentChoice.AMBER -> Accent
+        AccentChoice.TANGERINE -> AccentTangerine
+        AccentChoice.ROSE -> AccentRose
+        AccentChoice.SKY -> AccentSky
+        AccentChoice.SAGE -> AccentSage
+        AccentChoice.VIOLET -> AccentViolet
+    }
+
+private fun fontFamily(type: TypeChoice): FontFamily =
+    when (type) {
+        TypeChoice.SANS -> FontFamily.SansSerif
+        TypeChoice.SERIF -> FontFamily.Serif
+        TypeChoice.MONO -> FontFamily.Monospace
+    }

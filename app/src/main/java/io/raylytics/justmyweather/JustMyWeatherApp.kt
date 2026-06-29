@@ -6,6 +6,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import io.raylytics.justmyweather.alerts.AlertNotifier
 import io.raylytics.justmyweather.alerts.AlertWorker
 import io.raylytics.justmyweather.data.AlertRulesRepository
+import io.raylytics.justmyweather.data.ThemeConfigRepository
 import io.raylytics.justmyweather.data.ViewConfigRepository
 import io.raylytics.justmyweather.data.WeatherRepository
 import io.raylytics.justmyweather.data.nws.NwsClient
@@ -27,6 +28,7 @@ class AppContainer(context: Context) {
     val weatherRepository = WeatherRepository(nwsClient)
     val locationProvider = LocationProvider(appContext)
     val viewConfigRepository = ViewConfigRepository(appContext.dataStore)
+    val themeConfigRepository = ThemeConfigRepository(appContext.dataStore)
     val alertRulesRepository = AlertRulesRepository(appContext.dataStore)
     val alertNotifier = AlertNotifier(appContext)
 }

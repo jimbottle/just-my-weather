@@ -24,6 +24,8 @@ import io.raylytics.justmyweather.ui.customize.CustomizeViewModel
 import io.raylytics.justmyweather.ui.home.HomeScreen
 import io.raylytics.justmyweather.ui.home.HomeViewModel
 import io.raylytics.justmyweather.ui.theme.JustMyWeatherTheme
+import io.raylytics.justmyweather.ui.theme.ThemeViewModel
+import io.raylytics.justmyweather.view.ThemeConfig
 
 /** The screens this app has. A plain enum + state switch is all the navigation
  * a handful of destinations need — no nav library to learn or wire. */
@@ -47,6 +49,12 @@ class MainActivity : ComponentActivity() {
     private val customizeViewModel: CustomizeViewModel by viewModels {
         viewModelFactory {
             initializer { CustomizeViewModel(container.viewConfigRepository) }
+        }
+    }
+
+    private val themeViewModel: ThemeViewModel by viewModels {
+        viewModelFactory {
+            initializer { ThemeViewModel(container.themeConfigRepository) }
         }
     }
 
@@ -82,11 +90,14 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            JustMyWeatherTheme {
+            val themeConfig by themeViewModel.config.collectAsStateWithLifecycle()
+            JustMyWeatherTheme(themeConfig) {
                 App(
                     homeViewModel = homeViewModel,
                     customizeViewModel = customizeViewModel,
                     alertsViewModel = alertsViewModel,
+                    themeConfig = themeConfig,
+                    onThemeChange = themeViewModel::save,
                     onEnterAlerts = ::requestNotificationsIfNeeded,
                 )
             }
@@ -105,6 +116,8 @@ private fun App(
     homeViewModel: HomeViewModel,
     customizeViewModel: CustomizeViewModel,
     alertsViewModel: AlertsViewModel,
+    themeConfig: ThemeConfig,
+    onThemeChange: (ThemeConfig) -> Unit,
     onEnterAlerts: () -> Unit,
 ) {
     var screen by rememberSaveable { mutableStateOf(Screen.HOME) }
@@ -133,6 +146,8 @@ private fun App(
                 onMoveUp = customizeViewModel::moveUp,
                 onMoveDown = customizeViewModel::moveDown,
                 onSetDensity = customizeViewModel::setDensity,
+                theme = themeConfig,
+                onThemeChange = onThemeChange,
                 onDone = { screen = Screen.HOME },
             )
         }

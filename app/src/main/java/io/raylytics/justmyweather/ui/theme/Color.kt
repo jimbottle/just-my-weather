@@ -21,5 +21,15 @@ val MutedDark = Color(0xFF9DA2AA)
 val SurfaceDark = Color(0xFF0E1115)
 val FaintDark = Color(0xFF1B1F25)
 
-// Shared warm accent — the sun in the icon.
+// Shared warm accent — the sun in the icon. The default of the accent palette
+// below; the customization layer lets the user pick another.
 val Accent = Color(0xFFF2B705)
+
+// The accent palette the customization layer offers. Each is a single saturated
+// hue meant to read against the near-monochrome surface, kept muted enough to
+// stay calm. Mapped from AccentChoice in Theme.kt.
+val AccentTangerine = Color(0xFFEC6A1E)
+val AccentRose = Color(0xFFE5436B)
+val AccentSky = Color(0xFF2E9BD6)
+val AccentSage = Color(0xFF5FA777)
+val AccentViolet = Color(0xFF8B5CF6)

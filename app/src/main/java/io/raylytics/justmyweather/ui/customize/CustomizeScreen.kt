@@ -2,6 +2,8 @@ package io.raylytics.justmyweather.ui.customize
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -29,8 +31,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import io.raylytics.justmyweather.view.AccentChoice
 import io.raylytics.justmyweather.view.Density
 import io.raylytics.justmyweather.view.FieldSetting
+import io.raylytics.justmyweather.view.ThemeConfig
+import io.raylytics.justmyweather.view.ThemeMood
+import io.raylytics.justmyweather.view.TypeChoice
 import io.raylytics.justmyweather.view.ViewConfig
 import io.raylytics.justmyweather.view.WeatherField
 import kotlinx.coroutines.delay
@@ -51,6 +57,8 @@ fun CustomizeScreen(
     onMoveUp: (Int) -> Unit,
     onMoveDown: (Int) -> Unit,
     onSetDensity: (Density) -> Unit,
+    theme: ThemeConfig,
+    onThemeChange: (ThemeConfig) -> Unit,
     onDone: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -93,7 +101,59 @@ fun CustomizeScreen(
                     )
                     HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
                 }
+
+                ThemePicker(theme = theme, onChange = onThemeChange)
             }
+        }
+    }
+}
+
+@Composable
+private fun ThemePicker(
+    theme: ThemeConfig,
+    onChange: (ThemeConfig) -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Text("Look", style = MaterialTheme.typography.labelMedium)
+        ChipRow(
+            options = ThemeMood.entries,
+            selected = theme.mood,
+            label = { it.label },
+            onSelect = { onChange(theme.withMood(it)) },
+        )
+        ChipRow(
+            options = AccentChoice.entries,
+            selected = theme.accent,
+            label = { it.label },
+            onSelect = { onChange(theme.withAccent(it)) },
+        )
+        ChipRow(
+            options = TypeChoice.entries,
+            selected = theme.type,
+            label = { it.label },
+            onSelect = { onChange(theme.withType(it)) },
+        )
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun <T> ChipRow(
+    options: List<T>,
+    selected: T,
+    label: (T) -> String,
+    onSelect: (T) -> Unit,
+) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        options.forEach { option ->
+            FilterChip(
+                selected = option == selected,
+                onClick = { onSelect(option) },
+                label = { Text(label(option)) },
+            )
         }
     }
 }
