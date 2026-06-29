@@ -30,9 +30,8 @@ data class WeatherLocation(
  */
 class WeatherRepository(
     private val nws: NwsClient,
+    private val pointCache: PointCache = InMemoryPointCache(),
 ) {
-    private val pointCache = mutableMapOf<String, PointsLookup>()
-
     // Serialises point resolution so two refreshes fired close together (VM
     // init + the location-permission grant) don't both hit the network for the
     // same coordinate — the second awaits the lock and finds the cached value.
@@ -71,9 +70,9 @@ class WeatherRepository(
     private suspend fun resolvePoint(location: WeatherLocation): PointsLookup {
         val key = "${location.latitude},${location.longitude}"
         return resolveMutex.withLock {
-            pointCache[key]
+            pointCache.get(key)
                 ?: nws.resolveLocation(location.latitude, location.longitude)
-                    .also { pointCache[key] = it }
+                    .also { pointCache.put(key, it) }
         }
     }
 }

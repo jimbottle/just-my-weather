@@ -6,6 +6,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import io.raylytics.justmyweather.alerts.AlertNotifier
 import io.raylytics.justmyweather.alerts.AlertWorker
 import io.raylytics.justmyweather.data.AlertRulesRepository
+import io.raylytics.justmyweather.data.DataStorePointCache
 import io.raylytics.justmyweather.data.ThemeConfigRepository
 import io.raylytics.justmyweather.data.ViewConfigRepository
 import io.raylytics.justmyweather.data.WeatherRepository
@@ -25,7 +26,9 @@ class AppContainer(context: Context) {
     private val nwsClient = NwsClient(transport = OkHttpTransport())
     private val appContext = context.applicationContext
 
-    val weatherRepository = WeatherRepository(nwsClient)
+    // The point cache is persisted so a cold start reuses the resolved grid
+    // instead of re-hitting /points + /stations.
+    val weatherRepository = WeatherRepository(nwsClient, DataStorePointCache(appContext.dataStore))
     val locationProvider = LocationProvider(appContext)
     val viewConfigRepository = ViewConfigRepository(appContext.dataStore)
     val themeConfigRepository = ThemeConfigRepository(appContext.dataStore)

@@ -33,7 +33,8 @@ class WeatherRepositoryTest {
         fun pointsLookups() = requested.count { "/points/" in it && !it.endsWith("/stations") }
     }
 
-    private fun repo(transport: RoutingTransport) = WeatherRepository(NwsClient(transport = transport))
+    private fun repo(transport: RoutingTransport, cache: PointCache = InMemoryPointCache()) =
+        WeatherRepository(NwsClient(transport = transport), cache)
 
     @Test
     fun `blank label is filled from the points relativeLocation`() = runTest {
@@ -60,6 +61,19 @@ class WeatherRepositoryTest {
         // Two loads, but /points (and /stations) resolved only once; the second
         // load only re-fetches the observation.
         assertEquals(1, transport.pointsLookups())
+    }
+
+    @Test
+    fun `a point from a shared cache is reused by a fresh repository without re-resolving`() = runTest {
+        // A durable PointCache shared across two repository instances simulates the
+        // cache surviving process death: the second cold start must not re-resolve.
+        val cache = InMemoryPointCache()
+        val location = WeatherLocation(40.71, -74.0, label = "Home")
+        repo(RoutingTransport(), cache).load(location)
+
+        val secondStart = RoutingTransport()
+        repo(secondStart, cache).load(location)
+        assertEquals(0, secondStart.pointsLookups())
     }
 
     private companion object {

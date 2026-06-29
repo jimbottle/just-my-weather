@@ -118,6 +118,33 @@ class NwsClientTest {
     }
 
     @Test
+    fun `getHourlyForecast reads precip probability and converts celsius temps`() = runTest {
+        val (client, _) =
+            client(
+                HttpResult(
+                    200,
+                    """
+                    {"properties":{"periods":[
+                      {"startTime":"2026-06-24T18:00:00+00:00","temperature":20,"temperatureUnit":"C",
+                       "windSpeed":"5 mph",
+                       "probabilityOfPrecipitation":{"unitCode":"wmoUnit:percent","value":40}},
+                      {"startTime":"2026-06-24T19:00:00+00:00","temperature":68,"temperatureUnit":"F",
+                       "windSpeed":"5 mph"}
+                    ]}}
+                    """.trimIndent(),
+                    null,
+                ),
+            )
+        val forecast = client.getHourlyForecast("OKX", 33, 35)
+        assertEquals(2, forecast.size)
+        // 20°C → 68°F, and the precip chance comes through.
+        assertEquals(68.0, forecast[0].temperatureF!!, 1e-6)
+        assertEquals(40.0, forecast[0].precipProbabilityPercent!!, 1e-6)
+        // A period without probabilityOfPrecipitation leaves it null, not zero.
+        assertEquals(null, forecast[1].precipProbabilityPercent)
+    }
+
+    @Test
     fun `resolveLocation derives zone id from forecastZone url`() = runTest {
         val (client, _) =
             client(
