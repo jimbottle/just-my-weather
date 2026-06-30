@@ -1,5 +1,7 @@
 # Just My Weather
 
+[![CI](https://github.com/jimbottle/just-my-weather/actions/workflows/ci.yml/badge.svg)](https://github.com/jimbottle/just-my-weather/actions/workflows/ci.yml)
+
 A weather app that shows you exactly what you care about, arranged exactly how
 you want it, alerts you on exactly the conditions you choose, and nothing else.
 
