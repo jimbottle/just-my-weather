@@ -72,7 +72,8 @@ common extension points.
 
 Weather comes from the public US National Weather Service API — no key, no
 account, US coverage. Location is **coarse** and optional (the platform location
-provider, not Google Play Services); you can also set a place by hand. Personal
+provider, not Google Play Services); without it, the app falls back to a
+sensible default place (picking/saving your own place is planned). Personal
 alerts are evaluated and delivered on-device.
 
 ## License
