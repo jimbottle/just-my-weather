@@ -97,6 +97,47 @@ class AlertsViewModelTest {
     }
 
     @Test
+    fun `changing cadence retunes the worker only while a rule is live`() = runTest(dispatcher) {
+        val repository = AlertRulesRepository(FakePreferencesDataStore())
+        repository.save(listOf(AlertRule("a", temp, Comparison.BELOW, 40.0, enabled = true)))
+        val cadences = mutableListOf<Int>()
+        val vm =
+            AlertsViewModel(
+                repository,
+                AlertSettingsRepository(FakePreferencesDataStore()),
+                onCadenceChanged = { cadences += it },
+            )
+        // Collect both flows so rules.value and settings.value reflect state.
+        val rulesCollector = launch { vm.rules.collect {} }
+        val settingsCollector = launch { vm.settings.collect {} }
+        advanceUntilIdle()
+
+        vm.setPollCadence(180)
+        advanceUntilIdle()
+
+        assertEquals(listOf(180), cadences) // retuned while a rule is live
+        assertEquals(180, vm.settings.value.pollMinutes) // and persisted
+        rulesCollector.cancel()
+        settingsCollector.cancel()
+    }
+
+    @Test
+    fun `changing cadence with no rules persists but does not retune`() = runTest(dispatcher) {
+        val cadences = mutableListOf<Int>()
+        val vm =
+            AlertsViewModel(
+                AlertRulesRepository(FakePreferencesDataStore()),
+                AlertSettingsRepository(FakePreferencesDataStore()),
+                onCadenceChanged = { cadences += it },
+            )
+
+        vm.setPollCadence(360)
+        advanceUntilIdle()
+
+        assertEquals(emptyList<Int>(), cadences) // nothing scheduled to retune
+    }
+
+    @Test
     fun `deleting a rule reports the empty list and skips the check`() = runTest(dispatcher) {
         val repository = AlertRulesRepository(FakePreferencesDataStore())
         repository.save(listOf(AlertRule("a", temp, Comparison.BELOW, 40.0, enabled = true)))

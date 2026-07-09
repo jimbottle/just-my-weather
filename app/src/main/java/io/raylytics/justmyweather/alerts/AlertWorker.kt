@@ -79,26 +79,28 @@ class AlertWorker(
         private const val ONCE_NAME = "personal-alerts-once"
 
         /**
-         * Schedule or cancel the hourly check to match whether any rule is live.
-         * Called on launch and after every rule edit, so a quiet install (no
-         * enabled rules) does zero background work rather than waking hourly only
-         * to no-op. The worker still self-guards as a safety net.
+         * Schedule or cancel the periodic check to match whether any rule is live
+         * and the user's chosen [pollMinutes] cadence. Called on launch and after
+         * every rule/cadence change, so a quiet install (no enabled rules) does
+         * zero background work rather than waking only to no-op. The worker still
+         * self-guards as a safety net.
          */
-        fun sync(context: Context, hasEnabledRules: Boolean) {
-            if (hasEnabledRules) schedule(context) else cancel(context)
+        fun sync(context: Context, hasEnabledRules: Boolean, pollMinutes: Int) {
+            if (hasEnabledRules) schedule(context, pollMinutes) else cancel(context)
         }
 
-        /** Idempotent: KEEP means re-scheduling on each launch doesn't reset the
-         * timer. */
-        fun schedule(context: Context) {
+        /** UPDATE (not KEEP) so re-scheduling on launch preserves the existing
+         * schedule when the interval is unchanged, but a changed cadence takes
+         * effect — the standard way to retune periodic work. */
+        fun schedule(context: Context, pollMinutes: Int) {
             val request =
-                PeriodicWorkRequestBuilder<AlertWorker>(1, TimeUnit.HOURS)
+                PeriodicWorkRequestBuilder<AlertWorker>(pollMinutes.toLong(), TimeUnit.MINUTES)
                     .setConstraints(
                         Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build(),
                     )
                     .build()
             WorkManager.getInstance(context)
-                .enqueueUniquePeriodicWork(UNIQUE_NAME, ExistingPeriodicWorkPolicy.KEEP, request)
+                .enqueueUniquePeriodicWork(UNIQUE_NAME, ExistingPeriodicWorkPolicy.UPDATE, request)
         }
 
         /** Stop the hourly check — when the last enabled rule is removed or

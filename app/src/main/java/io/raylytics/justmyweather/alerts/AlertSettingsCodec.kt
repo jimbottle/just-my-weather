@@ -17,18 +17,27 @@ object AlertSettingsCodec {
         val quietHoursEnabled: Boolean = AlertSettings.DEFAULT.quietHoursEnabled,
         val quietStartHour: Int = AlertSettings.DEFAULT.quietStartHour,
         val quietEndHour: Int = AlertSettings.DEFAULT.quietEndHour,
+        val pollMinutes: Int = AlertSettings.DEFAULT.pollMinutes,
     )
 
     private val json = Json { ignoreUnknownKeys = true }
 
     fun encode(settings: AlertSettings): String =
         json.encodeToString(
-            Stored(settings.quietHoursEnabled, settings.quietStartHour, settings.quietEndHour),
+            Stored(
+                settings.quietHoursEnabled,
+                settings.quietStartHour,
+                settings.quietEndHour,
+                settings.pollMinutes,
+            ),
         )
 
     fun decode(raw: String?): AlertSettings {
         if (raw.isNullOrBlank()) return AlertSettings.DEFAULT
         val stored = runCatching { json.decodeFromString<Stored>(raw) }.getOrNull() ?: return AlertSettings.DEFAULT
-        return AlertSettings(stored.quietHoursEnabled, stored.quietStartHour, stored.quietEndHour)
+        // An out-of-range cadence (older/foreign blob) falls back to the default.
+        val poll =
+            stored.pollMinutes.takeIf { it in AlertSettings.POLL_CHOICES } ?: AlertSettings.DEFAULT.pollMinutes
+        return AlertSettings(stored.quietHoursEnabled, stored.quietStartHour, stored.quietEndHour, poll)
     }
 }

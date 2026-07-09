@@ -30,6 +30,8 @@ class AlertsViewModel(
     /** Kicks an immediate alert check. Invoked after a change that could make a
      * rule newly fire, so the user gets feedback now instead of next hour. */
     private val onRuleActivated: () -> Unit = {},
+    /** Called when the poll cadence changes, to retune the periodic worker. */
+    private val onCadenceChanged: (Int) -> Unit = {},
 ) : ViewModel() {
     val rules: StateFlow<List<AlertRule>> =
         repository.rules.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -43,6 +45,14 @@ class AlertsViewModel(
 
     fun setQuietHours(enabled: Boolean) {
         viewModelScope.launch { settingsRepository.save(settings.value.copy(quietHoursEnabled = enabled)) }
+    }
+
+    fun setPollCadence(minutes: Int) {
+        viewModelScope.launch {
+            settingsRepository.save(settings.value.copy(pollMinutes = minutes))
+            // Retune the worker only while rules are live (else it's not scheduled).
+            if (rules.value.any { it.enabled }) onCadenceChanged(minutes)
+        }
     }
 
     fun add(

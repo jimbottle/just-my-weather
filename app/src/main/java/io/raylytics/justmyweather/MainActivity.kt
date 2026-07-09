@@ -71,9 +71,20 @@ class MainActivity : ComponentActivity() {
                     container.alertRulesRepository,
                     container.alertSettingsRepository,
                     onRulesChanged = { rules ->
-                        AlertWorker.sync(applicationContext, rules.any { it.enabled })
+                        AlertWorker.sync(
+                            applicationContext,
+                            rules.any { it.enabled },
+                            alertsViewModel.settings.value.pollMinutes,
+                        )
                     },
                     onRuleActivated = { AlertWorker.runOnce(applicationContext) },
+                    onCadenceChanged = { minutes ->
+                        AlertWorker.sync(
+                            applicationContext,
+                            alertsViewModel.rules.value.any { it.enabled },
+                            minutes,
+                        )
+                    },
                 )
             }
         }
@@ -178,6 +189,7 @@ private fun App(
                 onToggle = alertsViewModel::toggle,
                 onDelete = alertsViewModel::delete,
                 onSetQuietHours = alertsViewModel::setQuietHours,
+                onSetPollCadence = alertsViewModel::setPollCadence,
                 onDone = { screen = Screen.HOME },
             )
         }

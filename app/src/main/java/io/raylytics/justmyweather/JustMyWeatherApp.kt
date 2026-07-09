@@ -58,7 +58,8 @@ class JustMyWeatherApp : Application() {
         // feedback. Reading the rule list is suspending, hence the scope.
         appScope.launch {
             val hasRules = container.alertRulesRepository.rules.first().any { it.enabled }
-            AlertWorker.sync(this@JustMyWeatherApp, hasRules)
+            val cadence = container.alertSettingsRepository.current().pollMinutes
+            AlertWorker.sync(this@JustMyWeatherApp, hasRules, cadence)
             if (hasRules) AlertWorker.runOnce(this@JustMyWeatherApp)
         }
     }

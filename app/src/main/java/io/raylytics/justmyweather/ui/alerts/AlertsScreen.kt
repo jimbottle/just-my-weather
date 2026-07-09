@@ -52,6 +52,7 @@ fun AlertsScreen(
     onToggle: (String) -> Unit,
     onDelete: (String) -> Unit,
     onSetQuietHours: (Boolean) -> Unit,
+    onSetPollCadence: (Int) -> Unit,
     onDone: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -95,6 +96,27 @@ fun AlertsScreen(
                 modifier = Modifier.padding(vertical = 12.dp),
             )
             QuietHoursRow(settings = settings, onSetQuietHours = onSetQuietHours)
+            CadenceRow(selected = settings.pollMinutes, onSelect = onSetPollCadence)
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun CadenceRow(
+    selected: Int,
+    onSelect: (Int) -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxWidth().padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text("Check every", style = MaterialTheme.typography.labelMedium)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            AlertSettings.POLL_CHOICES.forEach { minutes ->
+                FilterChip(
+                    selected = minutes == selected,
+                    onClick = { onSelect(minutes) },
+                    label = { Text(AlertSettings.pollLabel(minutes)) },
+                )
+            }
         }
     }
 }
