@@ -33,6 +33,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import io.raylytics.justmyweather.view.AccentChoice
+import io.raylytics.justmyweather.view.DailyLayout
+import io.raylytics.justmyweather.view.DailyStyle
 import io.raylytics.justmyweather.view.Density
 import io.raylytics.justmyweather.view.FieldSetting
 import io.raylytics.justmyweather.view.ThemeConfig
@@ -60,6 +62,8 @@ fun CustomizeScreen(
     onMoveDown: (Int) -> Unit,
     onSetDensity: (Density) -> Unit,
     onSetDefaultMode: (ViewMode) -> Unit,
+    onSetDailyStyle: (DailyStyle) -> Unit,
+    onSetDailyLayout: (DailyLayout) -> Unit,
     theme: ThemeConfig,
     onThemeChange: (ThemeConfig) -> Unit,
     onDone: () -> Unit,
@@ -87,6 +91,12 @@ fun CustomizeScreen(
 
             DensityPicker(selected = config.density, onSelect = onSetDensity)
             DefaultModePicker(selected = config.defaultMode, onSelect = onSetDefaultMode)
+            DailyViewPicker(
+                style = config.dailyStyle,
+                layout = config.dailyLayout,
+                onSetStyle = onSetDailyStyle,
+                onSetLayout = onSetDailyLayout,
+            )
             HorizontalDivider(
                 color = MaterialTheme.colorScheme.surfaceVariant,
                 modifier = Modifier.padding(vertical = 8.dp),
@@ -176,6 +186,32 @@ private fun DensityPicker(
             selected = selected,
             label = { it.label },
             onSelect = onSelect,
+        )
+    }
+}
+
+/** How the Daily framing draws: one high/low per day or NWS's day-and-night
+ * halves, and side-by-side (the scroll) or stacked rows. */
+@Composable
+private fun DailyViewPicker(
+    style: DailyStyle,
+    layout: DailyLayout,
+    onSetStyle: (DailyStyle) -> Unit,
+    onSetLayout: (DailyLayout) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 10.dp)) {
+        Text("Daily view", style = MaterialTheme.typography.labelMedium)
+        ChipRow(
+            options = DailyStyle.entries,
+            selected = style,
+            label = { it.label },
+            onSelect = onSetStyle,
+        )
+        ChipRow(
+            options = DailyLayout.entries,
+            selected = layout,
+            label = { it.label },
+            onSelect = onSetLayout,
         )
     }
 }

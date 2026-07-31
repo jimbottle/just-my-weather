@@ -212,6 +212,8 @@ private fun App(
                 onMoveDown = customizeViewModel::moveDown,
                 onSetDensity = customizeViewModel::setDensity,
                 onSetDefaultMode = customizeViewModel::setDefaultMode,
+                onSetDailyStyle = customizeViewModel::setDailyStyle,
+                onSetDailyLayout = customizeViewModel::setDailyLayout,
                 theme = themeConfig,
                 onThemeChange = onThemeChange,
                 onDone = { screen = Screen.HOME },

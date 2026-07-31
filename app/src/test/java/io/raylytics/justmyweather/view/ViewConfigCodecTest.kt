@@ -36,6 +36,24 @@ class ViewConfigCodecTest {
     }
 
     @Test
+    fun `round-trips the daily style and layout`() {
+        val original = ViewConfig.DEFAULT.setDailyStyle(DailyStyle.HALF_DAY).setDailyLayout(DailyLayout.COLUMN)
+        val restored = ViewConfigCodec.decode(ViewConfigCodec.encode(original))
+        assertEquals(DailyStyle.HALF_DAY, restored.dailyStyle)
+        assertEquals(DailyLayout.COLUMN, restored.dailyLayout)
+    }
+
+    @Test
+    fun `a config saved before daily options existed gets the defaults, and unknown keys fall back`() {
+        val legacy = """{"mode":"daily","items":[{"key":"temperature","visible":true}]}"""
+        assertEquals(DailyStyle.DEFAULT, ViewConfigCodec.decode(legacy).dailyStyle)
+        assertEquals(DailyLayout.DEFAULT, ViewConfigCodec.decode(legacy).dailyLayout)
+        val unknown = """{"dailyStyle":"spiral","dailyLayout":"3d","items":[{"key":"temperature","visible":true}]}"""
+        assertEquals(DailyStyle.DEFAULT, ViewConfigCodec.decode(unknown).dailyStyle)
+        assertEquals(DailyLayout.DEFAULT, ViewConfigCodec.decode(unknown).dailyLayout)
+    }
+
+    @Test
     fun `an unknown mode key falls back to Now`() {
         val raw = """{"mode":"biweekly","items":[{"key":"temperature","visible":true}]}"""
         assertEquals(ViewMode.NOW, ViewConfigCodec.decode(raw).defaultMode)

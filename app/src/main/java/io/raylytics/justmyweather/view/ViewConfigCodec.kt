@@ -29,6 +29,8 @@ object ViewConfigCodec {
         // Same defaulting story: configs written before view modes existed
         // decode to the calm Now glance.
         val mode: String = ViewMode.DEFAULT.key,
+        val dailyStyle: String = DailyStyle.DEFAULT.key,
+        val dailyLayout: String = DailyLayout.DEFAULT.key,
         val items: List<StoredSetting> = emptyList(),
     )
 
@@ -39,6 +41,8 @@ object ViewConfigCodec {
             StoredConfig(
                 density = config.density.key,
                 mode = config.defaultMode.key,
+                dailyStyle = config.dailyStyle.key,
+                dailyLayout = config.dailyLayout.key,
                 items = config.items.map { StoredSetting(it.field.key, it.visible, it.customLabel) },
             ),
         )
@@ -47,18 +51,19 @@ object ViewConfigCodec {
      * a broken preference must never crash the home view. */
     fun decode(raw: String?): ViewConfig {
         if (raw.isNullOrBlank()) return ViewConfig.DEFAULT
-        // Current shape: an object with density + mode + items.
+        // Current shape: an object with density + mode + daily options + items.
         runCatching { json.decodeFromString<StoredConfig>(raw) }.getOrNull()?.let {
-            return build(it.density, it.mode, it.items)
+            return build(it)
         }
         // Legacy shape: a bare array of settings, written before density existed.
         runCatching { json.decodeFromString<List<StoredSetting>>(raw) }.getOrNull()?.let {
-            return build(Density.DEFAULT.key, ViewMode.DEFAULT.key, it)
+            return build(StoredConfig(items = it))
         }
         return ViewConfig.DEFAULT
     }
 
-    private fun build(densityKey: String, modeKey: String, items: List<StoredSetting>): ViewConfig {
+    private fun build(stored: StoredConfig): ViewConfig {
+        val (densityKey, modeKey, dailyStyleKey, dailyLayoutKey, items) = stored
         val settings =
             items.mapNotNull { s ->
                 WeatherField.byKey(s.key)?.let { FieldSetting(it, s.visible, s.label) }
@@ -71,6 +76,8 @@ object ViewConfigCodec {
         if (settings.isEmpty()) return ViewConfig.DEFAULT
         val density = Density.byKey(densityKey) ?: Density.DEFAULT
         val mode = ViewMode.byKey(modeKey) ?: ViewMode.DEFAULT
-        return ViewConfig.normalized(settings, density, mode)
+        val dailyStyle = DailyStyle.byKey(dailyStyleKey) ?: DailyStyle.DEFAULT
+        val dailyLayout = DailyLayout.byKey(dailyLayoutKey) ?: DailyLayout.DEFAULT
+        return ViewConfig.normalized(settings, density, mode, dailyStyle, dailyLayout)
     }
 }

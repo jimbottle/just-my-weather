@@ -7,10 +7,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -26,6 +28,8 @@ import androidx.compose.ui.unit.dp
 import io.raylytics.justmyweather.data.WeatherSnapshot
 import io.raylytics.justmyweather.data.nws.DailyPeriod
 import io.raylytics.justmyweather.data.nws.ForecastPoint
+import io.raylytics.justmyweather.view.DailyLayout
+import io.raylytics.justmyweather.view.DailyStyle
 import io.raylytics.justmyweather.view.RenderedView
 import io.raylytics.justmyweather.view.ViewConfig
 import io.raylytics.justmyweather.view.ViewMode
@@ -103,14 +107,14 @@ private fun GlanceView(
 
         when (state.mode) {
             ViewMode.NOW -> NowContent(snapshot = snapshot, config = config)
-            ViewMode.HOURLY ->
-                ForecastStrip(items = state.hourly, error = state.forecastError) { hour ->
-                    HourTile(hour)
-                }
+            ViewMode.HOURLY -> HourlyContent(hours = state.hourly, error = state.forecastError)
             ViewMode.DAILY ->
-                ForecastStrip(items = state.daily, error = state.forecastError) { period ->
-                    DayTile(period)
-                }
+                DailyContent(
+                    periods = state.daily,
+                    error = state.forecastError,
+                    style = config.dailyStyle,
+                    layout = config.dailyLayout,
+                )
         }
 
         // The "Updated" line is secondary chrome — hidden at the spacious end so
@@ -204,24 +208,18 @@ private fun ModeToggle(
     }
 }
 
-/** The horizontally scrolling forecast window shared by Hourly and Daily:
- * null items = first fetch still in flight; an error shows in place quietly.
- * Loaded data always wins over an error — a stale message must never cover a
- * strip we can actually draw. */
+/** Shared load/error/empty framing for the forecast views: null items = first
+ * fetch still in flight; an error shows in place quietly. Loaded data always
+ * wins over an error — a stale message must never cover a strip we can
+ * actually draw. */
 @Composable
-private fun <T> ForecastStrip(
+private fun <T> ForecastFrame(
     items: List<T>?,
     error: String?,
-    tile: @Composable (T) -> Unit,
+    content: @Composable (List<T>) -> Unit,
 ) {
     when {
-        !items.isNullOrEmpty() ->
-            Row(
-                modifier = Modifier.horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(20.dp),
-            ) {
-                items.forEach { tile(it) }
-            }
+        !items.isNullOrEmpty() -> content(items)
         error != null ->
             Text(
                 text = error,
@@ -242,6 +240,197 @@ private fun <T> ForecastStrip(
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+    }
+}
+
+/** The hourly strip, with date labels inside the scroll marking each
+ * local-midnight boundary so the hours read grouped by day. */
+@Composable
+private fun HourlyContent(
+    hours: List<ForecastPoint>?,
+    error: String?,
+) {
+    ForecastFrame(items = hours, error = error) { list ->
+        Row(
+            modifier = Modifier.horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(20.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            groupHoursByDay(list, ZoneId.systemDefault()).forEach { group ->
+                DateTile(group.date)
+                group.hours.forEach { HourTile(it) }
+            }
+        }
+    }
+}
+
+/** The daily view in the user's chosen shape (combined high/low or half-day
+ * periods) and direction (strip or stacked). */
+@Composable
+private fun DailyContent(
+    periods: List<DailyPeriod>?,
+    error: String?,
+    style: DailyStyle,
+    layout: DailyLayout,
+) {
+    ForecastFrame(items = periods, error = error) { list ->
+        when (layout) {
+            DailyLayout.ROW ->
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(20.dp),
+                ) {
+                    when (style) {
+                        DailyStyle.COMBINED -> combineDays(list).forEach { CombinedDayTile(it) }
+                        DailyStyle.HALF_DAY -> list.forEach { DayTile(it) }
+                    }
+                }
+            DailyLayout.COLUMN ->
+                Column(
+                    modifier =
+                        Modifier
+                            .widthIn(max = 320.dp)
+                            .heightIn(max = 380.dp)
+                            .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    when (style) {
+                        DailyStyle.COMBINED -> combineDays(list).forEach { CombinedDayRow(it) }
+                        DailyStyle.HALF_DAY -> list.forEach { HalfDayRow(it) }
+                    }
+                }
+        }
+    }
+}
+
+/** A date marker inside the hourly scroll: weekday over month/day, quietly
+ * accented so the day boundaries are findable at a glance. */
+@Composable
+private fun DateTile(date: java.time.LocalDate) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(
+            text = date.format(weekdayFormat).uppercase(Locale.getDefault()),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.primary,
+        )
+        Text(
+            text = date.format(monthDayFormat),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun CombinedDayTile(day: DayForecast) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = Modifier.width(96.dp),
+    ) {
+        Text(
+            text = day.name,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(
+                text = day.highF?.let { "${it.roundToInt()}°" } ?: "—",
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onBackground,
+            )
+            Text(
+                text = day.lowF?.let { "${it.roundToInt()}°" } ?: "—",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Text(
+            text = day.shortForecast ?: " ",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center,
+        )
+    }
+}
+
+/** One stacked row of the vertical daily list: name + summary on the left,
+ * high (bold) and low (quiet) on the right. */
+@Composable
+private fun CombinedDayRow(day: DayForecast) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = day.name,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onBackground,
+            )
+            day.shortForecast?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                text = day.highF?.let { "${it.roundToInt()}°" } ?: "—",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onBackground,
+            )
+            Text(
+                text = day.lowF?.let { "${it.roundToInt()}°" } ?: "—",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun HalfDayRow(period: DailyPeriod) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = period.name,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onBackground,
+            )
+            period.shortForecast?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        Text(
+            text = period.temperatureF?.let { "${it.roundToInt()}°" } ?: "—",
+            style = MaterialTheme.typography.titleMedium,
+            color =
+                if (period.isDaytime) {
+                    MaterialTheme.colorScheme.onBackground
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+        )
     }
 }
 
@@ -326,6 +515,8 @@ private fun ErrorView(
 
 private val timeFormat = DateTimeFormatter.ofPattern("h:mm a", Locale.getDefault())
 private val hourFormat = DateTimeFormatter.ofPattern("h a", Locale.getDefault())
+private val weekdayFormat = DateTimeFormatter.ofPattern("EEE", Locale.getDefault())
+private val monthDayFormat = DateTimeFormatter.ofPattern("MMM d", Locale.getDefault())
 
 private fun observedLabel(snapshot: WeatherSnapshot): String? =
     snapshot.observedAt?.atZone(ZoneId.systemDefault())?.format(timeFormat)
