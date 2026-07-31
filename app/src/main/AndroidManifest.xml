@@ -6,8 +6,9 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <!-- Coarse location is enough to resolve an NWS grid point; we never
-         ask for fine location. The user can also enter a place by hand,
-         so the permission is optional and requested only on demand. -->
+         ask for fine location. The permission is optional and requested on
+         demand — without it the app falls back to a default place
+         (picking/saving your own place is planned). -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
     <!-- Personal alerts post local notifications (Android 13+ opt-in). -->

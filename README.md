@@ -37,8 +37,9 @@ Pre-1.0, but the core product is in place:
   it (light/dark/system · accent · typeface)
 - ✅ Personal rule-based alerting — thresholds on current conditions *and* the
   forecast ("overnight low below 35°", "chance of rain above 50% within 12h"),
-  quiet by default, fires once per onset, with optional quiet hours
-- ⏳ Custom quiet-hours window, per-rule tone/snooze, configurable cadence
+  quiet by default, fires once per onset, with optional quiet hours and a
+  configurable polling cadence
+- ⏳ Custom quiet-hours window, per-rule tone/snooze
 
 See the issue tracker (beads) for the live plan.
 
