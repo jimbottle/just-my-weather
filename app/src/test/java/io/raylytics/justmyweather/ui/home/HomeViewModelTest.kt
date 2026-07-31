@@ -10,6 +10,7 @@ import io.raylytics.justmyweather.data.nws.HttpTransport
 import io.raylytics.justmyweather.data.nws.NwsClient
 import io.raylytics.justmyweather.view.ViewConfig
 import io.raylytics.justmyweather.view.ViewMode
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -19,6 +20,7 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.jupiter.api.AfterEach
@@ -59,11 +61,13 @@ class HomeViewModelTest {
     }
 
     /** Routes by endpoint, counts fetches per forecast framing, and can fail
-     * the daily endpoint on demand. */
+     * the daily endpoint on demand or park one daily response on a gate so a
+     * test can act while that fetch is genuinely in flight. */
     private class RoutingTransport : HttpTransport {
         var hourlyFetches = 0
         var dailyFetches = 0
         var failDaily = false
+        var gateDaily: CompletableDeferred<Unit>? = null
 
         override suspend fun get(url: String, headers: Map<String, String>): HttpResult {
             val body =
@@ -77,6 +81,11 @@ class HomeViewModelTest {
                     }
                     url.endsWith("/forecast") -> {
                         dailyFetches++
+                        // Park exactly one response, then let later ones flow.
+                        gateDaily?.let { gate ->
+                            gateDaily = null
+                            gate.await()
+                        }
                         if (failDaily) return HttpResult(500, "boom", null)
                         DAILY
                     }
@@ -162,6 +171,49 @@ class HomeViewModelTest {
         assertEquals(2, h.transport.dailyFetches)
         assertNotNull(h.vm.ready().daily)
         assertNull(h.vm.ready().forecastError)
+    }
+
+    @Test
+    fun `tapping the already-selected chip retries a failed framing`() = runTest(dispatcher) {
+        val h = harness()
+        advanceUntilIdle()
+
+        h.transport.failDaily = true
+        h.vm.setMode(ViewMode.DAILY)
+        advanceUntilIdle()
+        assertNotNull(h.vm.ready().forecastError)
+
+        // Same-chip tap: the mode doesn't change, so this is the retry path.
+        h.transport.failDaily = false
+        h.vm.setMode(ViewMode.DAILY)
+        advanceUntilIdle()
+        assertEquals(2, h.transport.dailyFetches)
+        assertNotNull(h.vm.ready().daily)
+        assertNull(h.vm.ready().forecastError)
+    }
+
+    @Test
+    fun `refresh discards the result of a fetch that was in flight when it cleared`() = runTest(dispatcher) {
+        val h = harness()
+        advanceUntilIdle()
+
+        // Park the daily fetch mid-flight, then refresh while it's suspended.
+        val gate = CompletableDeferred<Unit>()
+        h.transport.gateDaily = gate
+        h.vm.setMode(ViewMode.DAILY)
+        runCurrent()
+        assertEquals(1, h.transport.dailyFetches)
+
+        h.vm.refresh()
+        runCurrent()
+
+        // The parked fetch completes with pre-refresh data; the clear (queued
+        // behind the mutex) must wipe it, and the post-refresh ensure must
+        // fetch fresh — the stale result never survives as "current".
+        gate.complete(Unit)
+        advanceUntilIdle()
+        assertEquals(2, h.transport.dailyFetches)
+        assertNotNull(h.vm.ready().daily)
     }
 
     @Test

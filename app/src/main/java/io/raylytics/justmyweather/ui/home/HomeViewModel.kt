@@ -113,11 +113,15 @@ class HomeViewModel(
         }
     }
 
-    /** The mode collector in `init` is the single fetch trigger — calling
-     * ensureForecast here too would double-fetch a failing framing (the
-     * needed-check only dedups once data has landed). */
+    /** The mode collector in `init` triggers the fetch on every mode change.
+     * A same-chip tap changes nothing (StateFlow conflates equal values), so
+     * exactly then we fetch directly — that's tap-to-retry for a failed
+     * framing, and a no-op on loaded data thanks to the needed-check. The two
+     * triggers can never both fire for one tap, so no double-fetch. */
     fun setMode(mode: ViewMode) {
+        val sameChip = this.mode.value == mode
         chosenMode.value = mode
+        if (sameChip) viewModelScope.launch { ensureForecast(mode) }
     }
 
     private suspend fun ensureForecast(mode: ViewMode) {
