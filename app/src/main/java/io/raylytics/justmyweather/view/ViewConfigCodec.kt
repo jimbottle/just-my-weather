@@ -62,10 +62,12 @@ object ViewConfigCodec {
         return ViewConfig.DEFAULT
     }
 
+    // Named property reads only — positional destructuring would silently
+    // rebind keys if StoredConfig's field order ever changes, and the codec's
+    // fall-back-to-default resilience would mask the corruption.
     private fun build(stored: StoredConfig): ViewConfig {
-        val (densityKey, modeKey, dailyStyleKey, dailyLayoutKey, items) = stored
         val settings =
-            items.mapNotNull { s ->
+            stored.items.mapNotNull { s ->
                 WeatherField.byKey(s.key)?.let { FieldSetting(it, s.visible, s.label) }
             }
         // No recognised settings means this wasn't really a config — an empty or
@@ -74,10 +76,10 @@ object ViewConfigCodec {
         // yield an all-hidden glance (hero "—", no rows), which is worse than the
         // documented contract; fall back to DEFAULT instead.
         if (settings.isEmpty()) return ViewConfig.DEFAULT
-        val density = Density.byKey(densityKey) ?: Density.DEFAULT
-        val mode = ViewMode.byKey(modeKey) ?: ViewMode.DEFAULT
-        val dailyStyle = DailyStyle.byKey(dailyStyleKey) ?: DailyStyle.DEFAULT
-        val dailyLayout = DailyLayout.byKey(dailyLayoutKey) ?: DailyLayout.DEFAULT
+        val density = Density.byKey(stored.density) ?: Density.DEFAULT
+        val mode = ViewMode.byKey(stored.mode) ?: ViewMode.DEFAULT
+        val dailyStyle = DailyStyle.byKey(stored.dailyStyle) ?: DailyStyle.DEFAULT
+        val dailyLayout = DailyLayout.byKey(stored.dailyLayout) ?: DailyLayout.DEFAULT
         return ViewConfig.normalized(settings, density, mode, dailyStyle, dailyLayout)
     }
 }

@@ -19,6 +19,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -98,6 +99,10 @@ private fun GlanceView(
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(spec.sectionSpacing),
+        // Scroll fallback: on short viewports (landscape, split-screen) a tall
+        // framing — the stacked daily list especially — must degrade to
+        // scrolling, never to clipped, unreachable chips and buttons.
+        modifier = Modifier.verticalScroll(rememberScrollState()),
     ) {
         Text(
             text = snapshot.locationLabel.uppercase(Locale.getDefault()),
@@ -251,12 +256,14 @@ private fun HourlyContent(
     error: String?,
 ) {
     ForecastFrame(items = hours, error = error) { list ->
+        // Derived state: reshaping ~156 points is pure, so cache per list.
+        val groups = remember(list) { groupHoursByDay(list, ZoneId.systemDefault()) }
         Row(
             modifier = Modifier.horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(20.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            groupHoursByDay(list, ZoneId.systemDefault()).forEach { group ->
+            groups.forEach { group ->
                 DateTile(group.date)
                 group.hours.forEach { HourTile(it) }
             }
@@ -274,6 +281,8 @@ private fun DailyContent(
     layout: DailyLayout,
 ) {
     ForecastFrame(items = periods, error = error) { list ->
+        // Derived state: pairing the half-day periods is pure, cache per list.
+        val days = remember(list, style) { if (style == DailyStyle.COMBINED) combineDays(list) else emptyList() }
         when (layout) {
             DailyLayout.ROW ->
                 Row(
@@ -281,12 +290,15 @@ private fun DailyContent(
                     horizontalArrangement = Arrangement.spacedBy(20.dp),
                 ) {
                     when (style) {
-                        DailyStyle.COMBINED -> combineDays(list).forEach { CombinedDayTile(it) }
+                        DailyStyle.COMBINED -> days.forEach { CombinedDayTile(it) }
                         DailyStyle.HALF_DAY -> list.forEach { DayTile(it) }
                     }
                 }
             DailyLayout.COLUMN ->
                 Column(
+                    // The height cap keeps the stacked list from swallowing the
+                    // whole glance; its own scroll shows the tail, and the
+                    // glance column's scroll fallback covers short viewports.
                     modifier =
                         Modifier
                             .widthIn(max = 320.dp)
@@ -295,7 +307,7 @@ private fun DailyContent(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     when (style) {
-                        DailyStyle.COMBINED -> combineDays(list).forEach { CombinedDayRow(it) }
+                        DailyStyle.COMBINED -> days.forEach { CombinedDayRow(it) }
                         DailyStyle.HALF_DAY -> list.forEach { HalfDayRow(it) }
                     }
                 }
