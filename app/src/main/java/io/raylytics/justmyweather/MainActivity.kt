@@ -135,7 +135,10 @@ class MainActivity : ComponentActivity() {
                     if (dark) {
                         SystemBarStyle.dark(Color.TRANSPARENT)
                     } else {
-                        SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT)
+                        // The darkScrim only shows on API 24/25, which can't
+                        // render dark nav-bar icons: a translucent dark bar
+                        // keeps the white buttons visible over a light theme.
+                        SystemBarStyle.light(Color.TRANSPARENT, Color.argb(0x80, 0x1B, 0x1B, 0x1B))
                     }
                 enableEdgeToEdge(statusBarStyle = bars, navigationBarStyle = bars)
             }
