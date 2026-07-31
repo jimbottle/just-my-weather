@@ -17,7 +17,9 @@ enum class ViewMode(
     ;
 
     companion object {
-        val DEFAULT = NOW
+        /** Hourly: the Now hero always sits above the framing, so the default
+         * shows current conditions AND the day ahead in one screen. */
+        val DEFAULT = HOURLY
 
         fun byKey(key: String): ViewMode? = entries.firstOrNull { it.key == key }
     }

@@ -1,10 +1,11 @@
 package io.raylytics.justmyweather.view
 
 /*
- * How the Daily framing draws: which shape each day takes, and which way the
- * strip runs. Both are user choices on the customize screen, persisted in
- * ViewConfig. Add an entry to either enum and the picker, codec, and home
- * rendering pick it up from the entries list.
+ * How the forecast framings draw: which shape each day takes, and which way a
+ * framing's list runs (Hourly and Daily each pick their own ForecastLayout).
+ * All user choices on the customize screen, persisted in ViewConfig. Add an
+ * entry to either enum and the picker, codec, and home rendering pick it up
+ * from the entries list.
  */
 
 /** One tile per day (high + low together) or NWS's native half-day periods. */
@@ -24,8 +25,8 @@ enum class DailyStyle(
     }
 }
 
-/** The daily strip's direction: the horizontal scroll, or stacked rows. */
-enum class DailyLayout(
+/** A forecast list's direction: the horizontal scroll, or stacked rows. */
+enum class ForecastLayout(
     /** Stable persistence key — never rename once shipped. */
     val key: String,
     val label: String,
@@ -37,6 +38,6 @@ enum class DailyLayout(
     companion object {
         val DEFAULT = ROW
 
-        fun byKey(key: String): DailyLayout? = entries.firstOrNull { it.key == key }
+        fun byKey(key: String): ForecastLayout? = entries.firstOrNull { it.key == key }
     }
 }

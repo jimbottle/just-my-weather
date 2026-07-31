@@ -30,33 +30,41 @@ class ViewConfigCodecTest {
     }
 
     @Test
-    fun `a config saved before view modes existed opens on Now`() {
+    fun `a config saved before view modes existed opens on the shipped default`() {
         val raw = """{"density":"comfortable","items":[{"key":"temperature","visible":true}]}"""
-        assertEquals(ViewMode.NOW, ViewConfigCodec.decode(raw).defaultMode)
+        assertEquals(ViewMode.DEFAULT, ViewConfigCodec.decode(raw).defaultMode)
     }
 
     @Test
-    fun `round-trips the daily style and layout`() {
-        val original = ViewConfig.DEFAULT.setDailyStyle(DailyStyle.HALF_DAY).setDailyLayout(DailyLayout.COLUMN)
+    fun `round-trips the daily style and both layouts independently`() {
+        val original =
+            ViewConfig.DEFAULT
+                .setDailyStyle(DailyStyle.HALF_DAY)
+                .setDailyLayout(ForecastLayout.COLUMN)
+                .setHourlyLayout(ForecastLayout.ROW)
         val restored = ViewConfigCodec.decode(ViewConfigCodec.encode(original))
         assertEquals(DailyStyle.HALF_DAY, restored.dailyStyle)
-        assertEquals(DailyLayout.COLUMN, restored.dailyLayout)
+        assertEquals(ForecastLayout.COLUMN, restored.dailyLayout)
+        // The two layouts persist separately — stacking daily must not stack hourly.
+        assertEquals(ForecastLayout.ROW, restored.hourlyLayout)
+        val flipped = ViewConfigCodec.decode(ViewConfigCodec.encode(original.setHourlyLayout(ForecastLayout.COLUMN)))
+        assertEquals(ForecastLayout.COLUMN, flipped.hourlyLayout)
     }
 
     @Test
     fun `a config saved before daily options existed gets the defaults, and unknown keys fall back`() {
         val legacy = """{"mode":"daily","items":[{"key":"temperature","visible":true}]}"""
         assertEquals(DailyStyle.DEFAULT, ViewConfigCodec.decode(legacy).dailyStyle)
-        assertEquals(DailyLayout.DEFAULT, ViewConfigCodec.decode(legacy).dailyLayout)
+        assertEquals(ForecastLayout.DEFAULT, ViewConfigCodec.decode(legacy).dailyLayout)
         val unknown = """{"dailyStyle":"spiral","dailyLayout":"3d","items":[{"key":"temperature","visible":true}]}"""
         assertEquals(DailyStyle.DEFAULT, ViewConfigCodec.decode(unknown).dailyStyle)
-        assertEquals(DailyLayout.DEFAULT, ViewConfigCodec.decode(unknown).dailyLayout)
+        assertEquals(ForecastLayout.DEFAULT, ViewConfigCodec.decode(unknown).dailyLayout)
     }
 
     @Test
-    fun `an unknown mode key falls back to Now`() {
+    fun `an unknown mode key falls back to the shipped default`() {
         val raw = """{"mode":"biweekly","items":[{"key":"temperature","visible":true}]}"""
-        assertEquals(ViewMode.NOW, ViewConfigCodec.decode(raw).defaultMode)
+        assertEquals(ViewMode.DEFAULT, ViewConfigCodec.decode(raw).defaultMode)
     }
 
     @Test

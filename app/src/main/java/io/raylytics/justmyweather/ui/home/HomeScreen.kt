@@ -29,8 +29,8 @@ import androidx.compose.ui.unit.dp
 import io.raylytics.justmyweather.data.WeatherSnapshot
 import io.raylytics.justmyweather.data.nws.DailyPeriod
 import io.raylytics.justmyweather.data.nws.ForecastPoint
-import io.raylytics.justmyweather.view.DailyLayout
 import io.raylytics.justmyweather.view.DailyStyle
+import io.raylytics.justmyweather.view.ForecastLayout
 import io.raylytics.justmyweather.view.RenderedView
 import io.raylytics.justmyweather.view.ViewConfig
 import io.raylytics.justmyweather.view.ViewMode
@@ -110,9 +110,18 @@ private fun GlanceView(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
+        // The Now glance always leads — the framing below adds to it rather
+        // than replacing it, so the screen answers "right now" AND "ahead".
+        NowContent(snapshot = snapshot, config = config)
+
         when (state.mode) {
-            ViewMode.NOW -> NowContent(snapshot = snapshot, config = config)
-            ViewMode.HOURLY -> HourlyContent(hours = state.hourly, error = state.forecastError)
+            ViewMode.NOW -> Unit // Just the glance: the calm minimum.
+            ViewMode.HOURLY ->
+                HourlyContent(
+                    hours = state.hourly,
+                    error = state.forecastError,
+                    layout = config.hourlyLayout,
+                )
             ViewMode.DAILY ->
                 DailyContent(
                     periods = state.daily,
@@ -124,15 +133,14 @@ private fun GlanceView(
 
         // The "Updated" line is secondary chrome — hidden at the spacious end so
         // the calmest view really is just the number.
-        observedLabel(snapshot)?.takeIf { config.density.showsTimestamp && state.mode == ViewMode.NOW }
-            ?.let { updated ->
-                Text(
-                    text = "Updated $updated",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 12.dp),
-                )
-            }
+        observedLabel(snapshot)?.takeIf { config.density.showsTimestamp }?.let { updated ->
+            Text(
+                text = "Updated $updated",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 12.dp),
+            )
+        }
 
         ModeToggle(selected = state.mode, onSelect = onSetMode)
 
@@ -248,25 +256,80 @@ private fun <T> ForecastFrame(
     }
 }
 
-/** The hourly strip, with date labels inside the scroll marking each
- * local-midnight boundary so the hours read grouped by day. */
+/** The hourly view: date labels mark each local-midnight boundary so the
+ * hours read grouped by day, in the strip or as stacked rows with date
+ * section headers. */
 @Composable
 private fun HourlyContent(
     hours: List<ForecastPoint>?,
     error: String?,
+    layout: ForecastLayout,
 ) {
     ForecastFrame(items = hours, error = error) { list ->
         // Derived state: reshaping ~156 points is pure, so cache per list.
         val groups = remember(list) { groupHoursByDay(list, ZoneId.systemDefault()) }
-        Row(
-            modifier = Modifier.horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(20.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            groups.forEach { group ->
-                DateTile(group.date)
-                group.hours.forEach { HourTile(it) }
+        when (layout) {
+            ForecastLayout.ROW ->
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(20.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    groups.forEach { group ->
+                        DateTile(group.date)
+                        group.hours.forEach { HourTile(it) }
+                    }
+                }
+            ForecastLayout.COLUMN ->
+                Column(
+                    // Same cap-and-scroll contract as the stacked daily list.
+                    modifier =
+                        Modifier
+                            .widthIn(max = 320.dp)
+                            .heightIn(max = 380.dp)
+                            .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    groups.forEach { group ->
+                        Text(
+                            text = "${group.date.format(weekdayFormat)}, ${group.date.format(monthDayFormat)}",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(top = 6.dp),
+                        )
+                        group.hours.forEach { HourRow(it) }
+                    }
+                }
+        }
+    }
+}
+
+/** One stacked row of the vertical hourly list: time, rain chance, temp. */
+@Composable
+private fun HourRow(hour: ForecastPoint) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = hour.startTime.atZone(ZoneId.systemDefault()).format(hourFormat).lowercase(Locale.getDefault()),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            hour.precipProbabilityPercent?.takeIf { it > 0 }?.let {
+                Text(
+                    text = "${it.roundToInt()}%",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
             }
+            Text(
+                text = hour.temperatureF?.let { "${it.roundToInt()}°" } ?: "—",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onBackground,
+            )
         }
     }
 }
@@ -278,13 +341,13 @@ private fun DailyContent(
     periods: List<DailyPeriod>?,
     error: String?,
     style: DailyStyle,
-    layout: DailyLayout,
+    layout: ForecastLayout,
 ) {
     ForecastFrame(items = periods, error = error) { list ->
         // Derived state: pairing the half-day periods is pure, cache per list.
         val days = remember(list, style) { if (style == DailyStyle.COMBINED) combineDays(list) else emptyList() }
         when (layout) {
-            DailyLayout.ROW ->
+            ForecastLayout.ROW ->
                 Row(
                     modifier = Modifier.horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(20.dp),
@@ -294,7 +357,7 @@ private fun DailyContent(
                         DailyStyle.HALF_DAY -> list.forEach { DayTile(it) }
                     }
                 }
-            DailyLayout.COLUMN ->
+            ForecastLayout.COLUMN ->
                 Column(
                     // The height cap keeps the stacked list from swallowing the
                     // whole glance; its own scroll shows the tail, and the

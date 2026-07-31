@@ -214,6 +214,7 @@ private fun App(
                 onSetDefaultMode = customizeViewModel::setDefaultMode,
                 onSetDailyStyle = customizeViewModel::setDailyStyle,
                 onSetDailyLayout = customizeViewModel::setDailyLayout,
+                onSetHourlyLayout = customizeViewModel::setHourlyLayout,
                 theme = themeConfig,
                 onThemeChange = onThemeChange,
                 onDone = { screen = Screen.HOME },

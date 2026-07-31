@@ -32,9 +32,11 @@ data class ViewConfig(
     /** Which time framing the home screen opens on; the toggle there can still
      * switch away for the session. */
     val defaultMode: ViewMode = ViewMode.DEFAULT,
-    /** How the Daily framing draws each day, and which way its strip runs. */
+    /** How the Daily framing draws each day, and which way each framing's
+     * list runs. */
     val dailyStyle: DailyStyle = DailyStyle.DEFAULT,
-    val dailyLayout: DailyLayout = DailyLayout.DEFAULT,
+    val dailyLayout: ForecastLayout = ForecastLayout.DEFAULT,
+    val hourlyLayout: ForecastLayout = ForecastLayout.DEFAULT,
 ) {
     val visible: List<FieldSetting> get() = items.filter { it.visible }
 
@@ -50,7 +52,9 @@ data class ViewConfig(
 
     fun setDailyStyle(style: DailyStyle): ViewConfig = copy(dailyStyle = style)
 
-    fun setDailyLayout(layout: DailyLayout): ViewConfig = copy(dailyLayout = layout)
+    fun setDailyLayout(layout: ForecastLayout): ViewConfig = copy(dailyLayout = layout)
+
+    fun setHourlyLayout(layout: ForecastLayout): ViewConfig = copy(hourlyLayout = layout)
 
     fun moveUp(index: Int): ViewConfig = swap(index, index - 1)
 
@@ -90,14 +94,15 @@ data class ViewConfig(
             density: Density = Density.DEFAULT,
             defaultMode: ViewMode = ViewMode.DEFAULT,
             dailyStyle: DailyStyle = DailyStyle.DEFAULT,
-            dailyLayout: DailyLayout = DailyLayout.DEFAULT,
+            dailyLayout: ForecastLayout = ForecastLayout.DEFAULT,
+            hourlyLayout: ForecastLayout = ForecastLayout.DEFAULT,
         ): ViewConfig {
             val seen = LinkedHashMap<WeatherField, FieldSetting>()
             settings.forEach { setting -> seen.putIfAbsent(setting.field, setting) }
             WeatherField.entries.forEach { field ->
                 seen.putIfAbsent(field, FieldSetting(field, visible = false))
             }
-            return ViewConfig(seen.values.toList(), density, defaultMode, dailyStyle, dailyLayout)
+            return ViewConfig(seen.values.toList(), density, defaultMode, dailyStyle, dailyLayout, hourlyLayout)
         }
     }
 }

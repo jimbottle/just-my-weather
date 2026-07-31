@@ -26,11 +26,12 @@ object ViewConfigCodec {
         // Defaulted so a config written before density existed (and any future
         // build that omits it) decodes at the shipped middle rather than failing.
         val density: String = Density.DEFAULT.key,
-        // Same defaulting story: configs written before view modes existed
-        // decode to the calm Now glance.
+        // Same defaulting story: configs written before an option existed
+        // decode to that option's shipped default.
         val mode: String = ViewMode.DEFAULT.key,
         val dailyStyle: String = DailyStyle.DEFAULT.key,
-        val dailyLayout: String = DailyLayout.DEFAULT.key,
+        val dailyLayout: String = ForecastLayout.DEFAULT.key,
+        val hourlyLayout: String = ForecastLayout.DEFAULT.key,
         val items: List<StoredSetting> = emptyList(),
     )
 
@@ -43,6 +44,7 @@ object ViewConfigCodec {
                 mode = config.defaultMode.key,
                 dailyStyle = config.dailyStyle.key,
                 dailyLayout = config.dailyLayout.key,
+                hourlyLayout = config.hourlyLayout.key,
                 items = config.items.map { StoredSetting(it.field.key, it.visible, it.customLabel) },
             ),
         )
@@ -79,7 +81,8 @@ object ViewConfigCodec {
         val density = Density.byKey(stored.density) ?: Density.DEFAULT
         val mode = ViewMode.byKey(stored.mode) ?: ViewMode.DEFAULT
         val dailyStyle = DailyStyle.byKey(stored.dailyStyle) ?: DailyStyle.DEFAULT
-        val dailyLayout = DailyLayout.byKey(stored.dailyLayout) ?: DailyLayout.DEFAULT
-        return ViewConfig.normalized(settings, density, mode, dailyStyle, dailyLayout)
+        val dailyLayout = ForecastLayout.byKey(stored.dailyLayout) ?: ForecastLayout.DEFAULT
+        val hourlyLayout = ForecastLayout.byKey(stored.hourlyLayout) ?: ForecastLayout.DEFAULT
+        return ViewConfig.normalized(settings, density, mode, dailyStyle, dailyLayout, hourlyLayout)
     }
 }

@@ -12,6 +12,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -29,14 +30,17 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import io.raylytics.justmyweather.ui.theme.accentColor
 import io.raylytics.justmyweather.view.AccentChoice
-import io.raylytics.justmyweather.view.DailyLayout
 import io.raylytics.justmyweather.view.DailyStyle
 import io.raylytics.justmyweather.view.Density
 import io.raylytics.justmyweather.view.FieldSetting
+import io.raylytics.justmyweather.view.ForecastLayout
 import io.raylytics.justmyweather.view.ThemeConfig
 import io.raylytics.justmyweather.view.ThemeMood
 import io.raylytics.justmyweather.view.TypeChoice
@@ -63,7 +67,8 @@ fun CustomizeScreen(
     onSetDensity: (Density) -> Unit,
     onSetDefaultMode: (ViewMode) -> Unit,
     onSetDailyStyle: (DailyStyle) -> Unit,
-    onSetDailyLayout: (DailyLayout) -> Unit,
+    onSetDailyLayout: (ForecastLayout) -> Unit,
+    onSetHourlyLayout: (ForecastLayout) -> Unit,
     theme: ThemeConfig,
     onThemeChange: (ThemeConfig) -> Unit,
     onDone: () -> Unit,
@@ -89,20 +94,23 @@ fun CustomizeScreen(
                 modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
             )
 
-            DensityPicker(selected = config.density, onSelect = onSetDensity)
-            DefaultModePicker(selected = config.defaultMode, onSelect = onSetDefaultMode)
-            DailyViewPicker(
-                style = config.dailyStyle,
-                layout = config.dailyLayout,
-                onSetStyle = onSetDailyStyle,
-                onSetLayout = onSetDailyLayout,
-            )
-            HorizontalDivider(
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                modifier = Modifier.padding(vertical = 8.dp),
-            )
-
+            // Everything below the header scrolls as one page — the option
+            // sections have outgrown a fixed header on small screens.
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                DensityPicker(selected = config.density, onSelect = onSetDensity)
+                DefaultModePicker(selected = config.defaultMode, onSelect = onSetDefaultMode)
+                HourlyViewPicker(layout = config.hourlyLayout, onSetLayout = onSetHourlyLayout)
+                DailyViewPicker(
+                    style = config.dailyStyle,
+                    layout = config.dailyLayout,
+                    onSetStyle = onSetDailyStyle,
+                    onSetLayout = onSetDailyLayout,
+                )
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    modifier = Modifier.padding(vertical = 8.dp),
+                )
+
                 config.items.forEachIndexed { index, setting ->
                     FieldRow(
                         setting = setting,
@@ -138,18 +146,39 @@ private fun ThemePicker(
             label = { it.label },
             onSelect = { onChange(theme.withMood(it)) },
         )
-        ChipRow(
-            options = AccentChoice.entries,
-            selected = theme.accent,
-            label = { it.label },
-            onSelect = { onChange(theme.withAccent(it)) },
-        )
+        AccentChipRow(selected = theme.accent, onSelect = { onChange(theme.withAccent(it)) })
         ChipRow(
             options = TypeChoice.entries,
             selected = theme.type,
             label = { it.label },
             onSelect = { onChange(theme.withType(it)) },
         )
+    }
+}
+
+/** The accent picker wears its own paint: a selected chip's background is the
+ * actual accent colour, so the row doubles as a swatch. Label contrast flips
+ * black/white by the colour's luminance. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun AccentChipRow(
+    selected: AccentChoice,
+    onSelect: (AccentChoice) -> Unit,
+) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        AccentChoice.entries.forEach { choice ->
+            val swatch = accentColor(choice)
+            FilterChip(
+                selected = choice == selected,
+                onClick = { onSelect(choice) },
+                label = { Text(choice.label) },
+                colors =
+                    FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = swatch,
+                        selectedLabelColor = if (swatch.luminance() > 0.5f) Color.Black else Color.White,
+                    ),
+            )
+        }
     }
 }
 
@@ -190,14 +219,31 @@ private fun DensityPicker(
     }
 }
 
+/** Which way the hourly list runs: the side-by-side scroll or stacked rows. */
+@Composable
+private fun HourlyViewPicker(
+    layout: ForecastLayout,
+    onSetLayout: (ForecastLayout) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 10.dp)) {
+        Text("Hourly view", style = MaterialTheme.typography.labelMedium)
+        ChipRow(
+            options = ForecastLayout.entries,
+            selected = layout,
+            label = { it.label },
+            onSelect = onSetLayout,
+        )
+    }
+}
+
 /** How the Daily framing draws: one high/low per day or NWS's day-and-night
  * halves, and side-by-side (the scroll) or stacked rows. */
 @Composable
 private fun DailyViewPicker(
     style: DailyStyle,
-    layout: DailyLayout,
+    layout: ForecastLayout,
     onSetStyle: (DailyStyle) -> Unit,
-    onSetLayout: (DailyLayout) -> Unit,
+    onSetLayout: (ForecastLayout) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 10.dp)) {
         Text("Daily view", style = MaterialTheme.typography.labelMedium)
@@ -208,7 +254,7 @@ private fun DailyViewPicker(
             onSelect = onSetStyle,
         )
         ChipRow(
-            options = DailyLayout.entries,
+            options = ForecastLayout.entries,
             selected = layout,
             label = { it.label },
             onSelect = onSetLayout,

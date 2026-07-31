@@ -69,7 +69,9 @@ fun themeResolvesToDark(config: ThemeConfig): Boolean =
         ThemeMood.DARK -> true
     }
 
-private fun accentColor(accent: AccentChoice): Color =
+/** The pixel colour for an accent choice. Public because the customize
+ * screen paints each accent chip with its own colour. */
+fun accentColor(accent: AccentChoice): Color =
     when (accent) {
         AccentChoice.AMBER -> Accent
         AccentChoice.TANGERINE -> AccentTangerine

@@ -3,9 +3,9 @@ package io.raylytics.justmyweather.ui.customize
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.raylytics.justmyweather.data.ViewConfigRepository
-import io.raylytics.justmyweather.view.DailyLayout
 import io.raylytics.justmyweather.view.DailyStyle
 import io.raylytics.justmyweather.view.Density
+import io.raylytics.justmyweather.view.ForecastLayout
 import io.raylytics.justmyweather.view.ViewConfig
 import io.raylytics.justmyweather.view.ViewMode
 import io.raylytics.justmyweather.view.WeatherField
@@ -40,7 +40,9 @@ class CustomizeViewModel(
 
     fun setDailyStyle(style: DailyStyle) = edit { it.setDailyStyle(style) }
 
-    fun setDailyLayout(layout: DailyLayout) = edit { it.setDailyLayout(layout) }
+    fun setDailyLayout(layout: ForecastLayout) = edit { it.setDailyLayout(layout) }
+
+    fun setHourlyLayout(layout: ForecastLayout) = edit { it.setHourlyLayout(layout) }
 
     private fun edit(transform: (ViewConfig) -> ViewConfig) {
         viewModelScope.launch { repository.save(transform(config.value)) }
