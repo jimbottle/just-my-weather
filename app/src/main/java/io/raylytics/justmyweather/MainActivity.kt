@@ -6,10 +6,14 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -106,6 +110,10 @@ class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalComposeUiApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Android 15+ forces edge-to-edge for targetSdk 35; opting in explicitly
+        // makes every OS version render the same way, so one inset strategy
+        // (the safeDrawingPadding below) covers them all.
+        enableEdgeToEdge()
 
         if (!container.locationProvider.hasPermission()) {
             requestLocation.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
@@ -116,7 +124,16 @@ class MainActivity : ComponentActivity() {
             JustMyWeatherTheme(themeConfig) {
                 // Surface Compose testTags as resource-ids so UI tests (Maestro)
                 // can target controls that carry no stable text, like switches.
-                Box(Modifier.fillMaxSize().semantics { testTagsAsResourceId = true }) {
+                // The background paints the full edge-to-edge window (so the
+                // areas behind the system bars match the app), then the padding
+                // keeps every screen's content clear of bars and cutouts.
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.background)
+                        .safeDrawingPadding()
+                        .semantics { testTagsAsResourceId = true },
+                ) {
                     App(
                         homeViewModel = homeViewModel,
                         customizeViewModel = customizeViewModel,
