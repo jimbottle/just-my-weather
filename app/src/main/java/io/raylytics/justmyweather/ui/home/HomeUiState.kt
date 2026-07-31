@@ -23,7 +23,7 @@ sealed interface HomeUiState {
         val snapshot: WeatherSnapshot,
         val config: ViewConfig,
         val refreshing: Boolean = false,
-        val mode: ViewMode = ViewMode.NOW,
+        val mode: ViewMode = ViewMode.DEFAULT,
         val hourly: List<ForecastPoint>? = null,
         val daily: List<DailyPeriod>? = null,
         /** Short message when the selected framing's fetch failed; the Now

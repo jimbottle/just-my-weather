@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.FilterChip
@@ -281,23 +283,24 @@ private fun HourlyContent(
                     }
                 }
             ForecastLayout.COLUMN ->
-                Column(
-                    // Same cap-and-scroll contract as the stacked daily list.
-                    modifier =
-                        Modifier
-                            .widthIn(max = 320.dp)
-                            .heightIn(max = 380.dp)
-                            .verticalScroll(rememberScrollState()),
+                // Lazy: a week of hours is ~156 rows — an order of magnitude
+                // more than any other list here — and only a handful fit the
+                // 380dp viewport. The bounded height keeps the nesting legal
+                // inside the glance column's scroll fallback.
+                LazyColumn(
+                    modifier = Modifier.widthIn(max = 320.dp).heightIn(max = 380.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     groups.forEach { group ->
-                        Text(
-                            text = "${group.date.format(weekdayFormat)}, ${group.date.format(monthDayFormat)}",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(top = 6.dp),
-                        )
-                        group.hours.forEach { HourRow(it) }
+                        item(key = "date-${group.date}") {
+                            Text(
+                                text = "${group.date.format(weekdayFormat)}, ${group.date.format(monthDayFormat)}",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(top = 6.dp),
+                            )
+                        }
+                        items(group.hours, key = { it.startTime.toEpochMilli() }) { HourRow(it) }
                     }
                 }
         }

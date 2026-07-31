@@ -175,7 +175,11 @@ private fun AccentChipRow(
                 colors =
                     FilterChipDefaults.filterChipColors(
                         selectedContainerColor = swatch,
-                        selectedLabelColor = if (swatch.luminance() > 0.5f) Color.Black else Color.White,
+                        // 0.179 is the relative-luminance point where black and
+                        // white text have equal WCAG contrast — above it black
+                        // wins, below it white does. (0.5 would hand most of
+                        // this palette the lower-contrast label.)
+                        selectedLabelColor = if (swatch.luminance() > 0.179f) Color.Black else Color.White,
                     ),
             )
         }

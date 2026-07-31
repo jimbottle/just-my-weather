@@ -52,13 +52,17 @@ class ViewConfigCodecTest {
     }
 
     @Test
-    fun `a config saved before daily options existed gets the defaults, and unknown keys fall back`() {
+    fun `a config saved before layout options existed gets the defaults, and unknown keys fall back`() {
         val legacy = """{"mode":"daily","items":[{"key":"temperature","visible":true}]}"""
         assertEquals(DailyStyle.DEFAULT, ViewConfigCodec.decode(legacy).dailyStyle)
         assertEquals(ForecastLayout.DEFAULT, ViewConfigCodec.decode(legacy).dailyLayout)
-        val unknown = """{"dailyStyle":"spiral","dailyLayout":"3d","items":[{"key":"temperature","visible":true}]}"""
+        assertEquals(ForecastLayout.DEFAULT, ViewConfigCodec.decode(legacy).hourlyLayout)
+        val unknown =
+            """{"dailyStyle":"spiral","dailyLayout":"3d","hourlyLayout":"4d",
+               "items":[{"key":"temperature","visible":true}]}"""
         assertEquals(DailyStyle.DEFAULT, ViewConfigCodec.decode(unknown).dailyStyle)
         assertEquals(ForecastLayout.DEFAULT, ViewConfigCodec.decode(unknown).dailyLayout)
+        assertEquals(ForecastLayout.DEFAULT, ViewConfigCodec.decode(unknown).hourlyLayout)
     }
 
     @Test
