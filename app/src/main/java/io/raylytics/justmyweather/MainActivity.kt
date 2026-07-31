@@ -1,9 +1,11 @@
 package io.raylytics.justmyweather
 
 import android.Manifest
+import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -15,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -35,6 +38,7 @@ import io.raylytics.justmyweather.ui.home.HomeScreen
 import io.raylytics.justmyweather.ui.home.HomeViewModel
 import io.raylytics.justmyweather.ui.theme.JustMyWeatherTheme
 import io.raylytics.justmyweather.ui.theme.ThemeViewModel
+import io.raylytics.justmyweather.ui.theme.themeResolvesToDark
 import io.raylytics.justmyweather.view.ThemeConfig
 
 /** The screens this app has. A plain enum + state switch is all the navigation
@@ -121,6 +125,20 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             val themeConfig by themeViewModel.config.collectAsStateWithLifecycle()
+            // The bars sit on the app-painted background, and the user can
+            // force a mood against the system setting — so bar icon contrast
+            // must follow the app's resolved mood, not the system default
+            // that the argless enableEdgeToEdge() above assumes.
+            val dark = themeResolvesToDark(themeConfig)
+            LaunchedEffect(dark) {
+                val bars =
+                    if (dark) {
+                        SystemBarStyle.dark(Color.TRANSPARENT)
+                    } else {
+                        SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT)
+                    }
+                enableEdgeToEdge(statusBarStyle = bars, navigationBarStyle = bars)
+            }
             JustMyWeatherTheme(themeConfig) {
                 // Surface Compose testTags as resource-ids so UI tests (Maestro)
                 // can target controls that carry no stable text, like switches.

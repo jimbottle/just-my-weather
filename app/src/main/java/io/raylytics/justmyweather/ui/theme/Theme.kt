@@ -49,19 +49,25 @@ fun JustMyWeatherTheme(
     config: ThemeConfig = ThemeConfig.DEFAULT,
     content: @Composable () -> Unit,
 ) {
-    val dark =
-        when (config.mood) {
-            ThemeMood.SYSTEM -> isSystemInDarkTheme()
-            ThemeMood.LIGHT -> false
-            ThemeMood.DARK -> true
-        }
-    val base = if (dark) DarkColors else LightColors
+    val base = if (themeResolvesToDark(config)) DarkColors else LightColors
     MaterialTheme(
         colorScheme = base.copy(primary = accentColor(config.accent)),
         typography = appTypography(fontFamily(config.type)),
         content = content,
     )
 }
+
+/** Whether [config] resolves to the dark palette right now. Exposed (not just
+ * internal to [JustMyWeatherTheme]) because the system-bar icon style must
+ * follow the same resolution — the user can force a mood against the system
+ * setting, and the bars sit on the app-painted background. */
+@Composable
+fun themeResolvesToDark(config: ThemeConfig): Boolean =
+    when (config.mood) {
+        ThemeMood.SYSTEM -> isSystemInDarkTheme()
+        ThemeMood.LIGHT -> false
+        ThemeMood.DARK -> true
+    }
 
 private fun accentColor(accent: AccentChoice): Color =
     when (accent) {
