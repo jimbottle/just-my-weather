@@ -190,6 +190,12 @@ class HomeViewModelTest {
         assertEquals(2, h.transport.dailyFetches)
         assertNotNull(h.vm.ready().daily)
         assertNull(h.vm.ready().forecastError)
+
+        // The other half of the same-chip contract: once data is loaded,
+        // tapping the selected chip again must NOT re-hit the API.
+        h.vm.setMode(ViewMode.DAILY)
+        advanceUntilIdle()
+        assertEquals(2, h.transport.dailyFetches)
     }
 
     @Test
