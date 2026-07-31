@@ -145,6 +145,40 @@ class NwsClientTest {
     }
 
     @Test
+    fun `getDailyForecast parses named half-day periods and drops nameless ones`() = runTest {
+        val (client, transport) =
+            client(
+                HttpResult(
+                    200,
+                    """
+                    {"properties":{"periods":[
+                      {"name":"Tonight","isDaytime":false,"temperature":18,"temperatureUnit":"C",
+                       "shortForecast":"Partly Cloudy",
+                       "probabilityOfPrecipitation":{"unitCode":"wmoUnit:percent","value":30}},
+                      {"name":"Friday","isDaytime":true,"temperature":85,"temperatureUnit":"F",
+                       "shortForecast":"Sunny"},
+                      {"temperature":70,"temperatureUnit":"F","shortForecast":"No Name"}
+                    ]}}
+                    """.trimIndent(),
+                    null,
+                ),
+            )
+        val daily = client.getDailyForecast("OKX", 33, 35)
+        // The nameless period is dropped — the name is the framing.
+        assertEquals(2, daily.size)
+        assertEquals("Tonight", daily[0].name)
+        assertEquals(false, daily[0].isDaytime)
+        // 18°C → 64.4°F, and the precip chance and summary come through.
+        assertEquals(64.4, daily[0].temperatureF!!, 1e-6)
+        assertEquals(30.0, daily[0].precipProbabilityPercent!!, 1e-6)
+        assertEquals("Partly Cloudy", daily[0].shortForecast)
+        assertEquals("Friday", daily[1].name)
+        assertEquals(true, daily[1].isDaytime)
+        // …and it hits the daily endpoint, not the hourly one.
+        assertTrue(transport.requested.last().endsWith("/gridpoints/OKX/33,35/forecast"))
+    }
+
+    @Test
     fun `resolveLocation derives zone id from forecastZone url`() = runTest {
         val (client, _) =
             client(

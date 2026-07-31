@@ -94,6 +94,26 @@ class NwsClient(
                 temperatureF = temperatureF,
                 windMph = Units.parseWindSpeedString(p.windSpeed),
                 precipProbabilityPercent = p.probabilityOfPrecipitation?.value,
+                shortForecast = p.shortForecast?.takeIf { it.isNotBlank() },
+            )
+        }
+    }
+
+    /** The daily forecast: half-day periods NWS pre-names ("Tonight",
+     * "Friday"), a daytime high or overnight low each. Periods missing a name
+     * are dropped — the name is the whole point of this framing. */
+    suspend fun getDailyForecast(gridId: String, gridX: Int, gridY: Int): List<DailyPeriod> {
+        val body = getJson<NwsForecastResponse>("/gridpoints/$gridId/$gridX,$gridY/forecast")
+        return body.properties?.periods.orEmpty().mapNotNull { p ->
+            val name = p.name?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+            val temperatureF =
+                p.temperature?.let { if (p.temperatureUnit == "C") Units.celsiusToFahrenheit(it) else it }
+            DailyPeriod(
+                name = name,
+                isDaytime = p.isDaytime ?: true,
+                temperatureF = temperatureF,
+                shortForecast = p.shortForecast?.takeIf { it.isNotBlank() },
+                precipProbabilityPercent = p.probabilityOfPrecipitation?.value,
             )
         }
     }

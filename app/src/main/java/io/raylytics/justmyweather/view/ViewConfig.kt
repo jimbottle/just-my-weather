@@ -29,6 +29,9 @@ data class FieldSetting(
 data class ViewConfig(
     val items: List<FieldSetting>,
     val density: Density = Density.DEFAULT,
+    /** Which time framing the home screen opens on; the toggle there can still
+     * switch away for the session. */
+    val defaultMode: ViewMode = ViewMode.DEFAULT,
 ) {
     val visible: List<FieldSetting> get() = items.filter { it.visible }
 
@@ -39,6 +42,8 @@ data class ViewConfig(
         copy(items = items.map { if (it.field == field) it.copy(customLabel = label) else it })
 
     fun setDensity(density: Density): ViewConfig = copy(density = density)
+
+    fun setDefaultMode(mode: ViewMode): ViewConfig = copy(defaultMode = mode)
 
     fun moveUp(index: Int): ViewConfig = swap(index, index - 1)
 
@@ -73,13 +78,17 @@ data class ViewConfig(
          * duplicates, then append any field the list is missing (a newly-added
          * data point) as hidden, in catalog order.
          */
-        fun normalized(settings: List<FieldSetting>, density: Density = Density.DEFAULT): ViewConfig {
+        fun normalized(
+            settings: List<FieldSetting>,
+            density: Density = Density.DEFAULT,
+            defaultMode: ViewMode = ViewMode.DEFAULT,
+        ): ViewConfig {
             val seen = LinkedHashMap<WeatherField, FieldSetting>()
             settings.forEach { setting -> seen.putIfAbsent(setting.field, setting) }
             WeatherField.entries.forEach { field ->
                 seen.putIfAbsent(field, FieldSetting(field, visible = false))
             }
-            return ViewConfig(seen.values.toList(), density)
+            return ViewConfig(seen.values.toList(), density, defaultMode)
         }
     }
 }

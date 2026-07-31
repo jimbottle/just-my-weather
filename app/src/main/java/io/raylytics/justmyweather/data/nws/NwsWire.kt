@@ -110,5 +110,9 @@ data class NwsForecastResponse(
         // NWS gives this as { unitCode: "wmoUnit:percent", value: 40 }.
         val probabilityOfPrecipitation: NwsValue? = null,
         @SerialName("shortForecast") val shortForecast: String? = null,
+        // Only the daily (non-hourly) forecast fills these: half-day periods
+        // named "Tonight"/"Friday", flagged day or night.
+        val name: String? = null,
+        val isDaytime: Boolean? = null,
     )
 }

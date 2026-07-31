@@ -23,6 +23,25 @@ class ViewConfigCodecTest {
     }
 
     @Test
+    fun `round-trips the default view mode`() {
+        val original = ViewConfig.DEFAULT.setDefaultMode(ViewMode.DAILY)
+        val restored = ViewConfigCodec.decode(ViewConfigCodec.encode(original))
+        assertEquals(ViewMode.DAILY, restored.defaultMode)
+    }
+
+    @Test
+    fun `a config saved before view modes existed opens on Now`() {
+        val raw = """{"density":"comfortable","items":[{"key":"temperature","visible":true}]}"""
+        assertEquals(ViewMode.NOW, ViewConfigCodec.decode(raw).defaultMode)
+    }
+
+    @Test
+    fun `an unknown mode key falls back to Now`() {
+        val raw = """{"mode":"biweekly","items":[{"key":"temperature","visible":true}]}"""
+        assertEquals(ViewMode.NOW, ViewConfigCodec.decode(raw).defaultMode)
+    }
+
+    @Test
     fun `a config saved before density existed decodes at the default density`() {
         // The legacy on-disk shape: a bare array of settings, no density wrapper.
         val raw = """[{"key":"temperature","visible":true},{"key":"conditions","visible":true}]"""

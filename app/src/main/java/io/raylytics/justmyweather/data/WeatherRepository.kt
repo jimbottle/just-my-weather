@@ -1,5 +1,6 @@
 package io.raylytics.justmyweather.data
 
+import io.raylytics.justmyweather.data.nws.DailyPeriod
 import io.raylytics.justmyweather.data.nws.ForecastPoint
 import io.raylytics.justmyweather.data.nws.NwsClient
 import io.raylytics.justmyweather.data.nws.PointsLookup
@@ -65,6 +66,13 @@ class WeatherRepository(
     suspend fun loadForecast(location: WeatherLocation): List<ForecastPoint> {
         val point = resolvePoint(location)
         return nws.getHourlyForecast(point.gridId, point.gridX, point.gridY)
+    }
+
+    /** The daily (half-day period) forecast for the home screen's Daily mode.
+     * Same cached point resolution as everything else. */
+    suspend fun loadDailyForecast(location: WeatherLocation): List<DailyPeriod> {
+        val point = resolvePoint(location)
+        return nws.getDailyForecast(point.gridId, point.gridX, point.gridY)
     }
 
     private suspend fun resolvePoint(location: WeatherLocation): PointsLookup {

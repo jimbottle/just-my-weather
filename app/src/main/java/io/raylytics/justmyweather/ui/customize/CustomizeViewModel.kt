@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import io.raylytics.justmyweather.data.ViewConfigRepository
 import io.raylytics.justmyweather.view.Density
 import io.raylytics.justmyweather.view.ViewConfig
+import io.raylytics.justmyweather.view.ViewMode
 import io.raylytics.justmyweather.view.WeatherField
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -32,6 +33,8 @@ class CustomizeViewModel(
     fun moveDown(index: Int) = edit { it.moveDown(index) }
 
     fun setDensity(density: Density) = edit { it.setDensity(density) }
+
+    fun setDefaultMode(mode: ViewMode) = edit { it.setDefaultMode(mode) }
 
     private fun edit(transform: (ViewConfig) -> ViewConfig) {
         viewModelScope.launch { repository.save(transform(config.value)) }

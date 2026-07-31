@@ -39,6 +39,7 @@ import io.raylytics.justmyweather.view.ThemeConfig
 import io.raylytics.justmyweather.view.ThemeMood
 import io.raylytics.justmyweather.view.TypeChoice
 import io.raylytics.justmyweather.view.ViewConfig
+import io.raylytics.justmyweather.view.ViewMode
 import io.raylytics.justmyweather.view.WeatherField
 import kotlinx.coroutines.delay
 
@@ -58,6 +59,7 @@ fun CustomizeScreen(
     onMoveUp: (Int) -> Unit,
     onMoveDown: (Int) -> Unit,
     onSetDensity: (Density) -> Unit,
+    onSetDefaultMode: (ViewMode) -> Unit,
     theme: ThemeConfig,
     onThemeChange: (ThemeConfig) -> Unit,
     onDone: () -> Unit,
@@ -84,6 +86,7 @@ fun CustomizeScreen(
             )
 
             DensityPicker(selected = config.density, onSelect = onSetDensity)
+            DefaultModePicker(selected = config.defaultMode, onSelect = onSetDefaultMode)
             HorizontalDivider(
                 color = MaterialTheme.colorScheme.surfaceVariant,
                 modifier = Modifier.padding(vertical = 8.dp),
@@ -170,6 +173,24 @@ private fun DensityPicker(
         // wrap behaviour can't drift between the two.
         ChipRow(
             options = Density.entries,
+            selected = selected,
+            label = { it.label },
+            onSelect = onSelect,
+        )
+    }
+}
+
+/** Which time framing the home screen opens on. The home toggle can still
+ * switch away for the session; this sets where it starts. */
+@Composable
+private fun DefaultModePicker(
+    selected: ViewMode,
+    onSelect: (ViewMode) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 10.dp)) {
+        Text("Opens on", style = MaterialTheme.typography.labelMedium)
+        ChipRow(
+            options = ViewMode.entries,
             selected = selected,
             label = { it.label },
             onSelect = onSelect,

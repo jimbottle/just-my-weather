@@ -26,6 +26,9 @@ object ViewConfigCodec {
         // Defaulted so a config written before density existed (and any future
         // build that omits it) decodes at the shipped middle rather than failing.
         val density: String = Density.DEFAULT.key,
+        // Same defaulting story: configs written before view modes existed
+        // decode to the calm Now glance.
+        val mode: String = ViewMode.DEFAULT.key,
         val items: List<StoredSetting> = emptyList(),
     )
 
@@ -35,6 +38,7 @@ object ViewConfigCodec {
         json.encodeToString(
             StoredConfig(
                 density = config.density.key,
+                mode = config.defaultMode.key,
                 items = config.items.map { StoredSetting(it.field.key, it.visible, it.customLabel) },
             ),
         )
@@ -43,18 +47,18 @@ object ViewConfigCodec {
      * a broken preference must never crash the home view. */
     fun decode(raw: String?): ViewConfig {
         if (raw.isNullOrBlank()) return ViewConfig.DEFAULT
-        // Current shape: an object with density + items.
+        // Current shape: an object with density + mode + items.
         runCatching { json.decodeFromString<StoredConfig>(raw) }.getOrNull()?.let {
-            return build(it.density, it.items)
+            return build(it.density, it.mode, it.items)
         }
         // Legacy shape: a bare array of settings, written before density existed.
         runCatching { json.decodeFromString<List<StoredSetting>>(raw) }.getOrNull()?.let {
-            return build(Density.DEFAULT.key, it)
+            return build(Density.DEFAULT.key, ViewMode.DEFAULT.key, it)
         }
         return ViewConfig.DEFAULT
     }
 
-    private fun build(densityKey: String, items: List<StoredSetting>): ViewConfig {
+    private fun build(densityKey: String, modeKey: String, items: List<StoredSetting>): ViewConfig {
         val settings =
             items.mapNotNull { s ->
                 WeatherField.byKey(s.key)?.let { FieldSetting(it, s.visible, s.label) }
@@ -66,6 +70,7 @@ object ViewConfigCodec {
         // documented contract; fall back to DEFAULT instead.
         if (settings.isEmpty()) return ViewConfig.DEFAULT
         val density = Density.byKey(densityKey) ?: Density.DEFAULT
-        return ViewConfig.normalized(settings, density)
+        val mode = ViewMode.byKey(modeKey) ?: ViewMode.DEFAULT
+        return ViewConfig.normalized(settings, density, mode)
     }
 }

@@ -191,6 +191,7 @@ private fun App(
             HomeScreen(
                 state = state,
                 onRefresh = homeViewModel::refresh,
+                onSetMode = homeViewModel::setMode,
                 onCustomize = { screen = Screen.CUSTOMIZE },
                 onAlerts = {
                     onEnterAlerts()
@@ -210,6 +211,7 @@ private fun App(
                 onMoveUp = customizeViewModel::moveUp,
                 onMoveDown = customizeViewModel::moveDown,
                 onSetDensity = customizeViewModel::setDensity,
+                onSetDefaultMode = customizeViewModel::setDefaultMode,
                 theme = themeConfig,
                 onThemeChange = onThemeChange,
                 onDone = { screen = Screen.HOME },

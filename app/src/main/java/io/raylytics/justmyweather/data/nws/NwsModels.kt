@@ -47,6 +47,20 @@ data class ForecastPoint(
     val windMph: Double?,
     /** Chance of precipitation for the hour, 0–100, or null when NWS omits it. */
     val precipProbabilityPercent: Double? = null,
+    /** Plain-language summary for the hour ("Partly Sunny"), if present. */
+    val shortForecast: String? = null,
+)
+
+/** One half-day of the gridpoint daily forecast: NWS splits days into a
+ * daytime period (the high) and a night period (the low), each pre-named
+ * ("Tonight", "Friday", "Friday Night"). */
+data class DailyPeriod(
+    val name: String,
+    val isDaytime: Boolean,
+    val temperatureF: Double?,
+    val shortForecast: String?,
+    /** Chance of precipitation for the period, 0–100, or null when omitted. */
+    val precipProbabilityPercent: Double? = null,
 )
 
 /** An active NWS hazard alert for a zone (used to coexist with, not duplicate,
