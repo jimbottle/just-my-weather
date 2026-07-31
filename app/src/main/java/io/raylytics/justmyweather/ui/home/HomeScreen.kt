@@ -205,7 +205,9 @@ private fun ModeToggle(
 }
 
 /** The horizontally scrolling forecast window shared by Hourly and Daily:
- * null items = first fetch still in flight; an error shows in place quietly. */
+ * null items = first fetch still in flight; an error shows in place quietly.
+ * Loaded data always wins over an error — a stale message must never cover a
+ * strip we can actually draw. */
 @Composable
 private fun <T> ForecastStrip(
     items: List<T>?,
@@ -213,6 +215,13 @@ private fun <T> ForecastStrip(
     tile: @Composable (T) -> Unit,
 ) {
     when {
+        !items.isNullOrEmpty() ->
+            Row(
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(20.dp),
+            ) {
+                items.forEach { tile(it) }
+            }
         error != null ->
             Text(
                 text = error,
@@ -220,19 +229,19 @@ private fun <T> ForecastStrip(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
             )
-        items == null ->
+        items != null ->
+            // Fetched fine, but NWS had nothing for this framing.
+            Text(
+                text = "No forecast available.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        else ->
             Text(
                 text = "…",
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-        else ->
-            Row(
-                modifier = Modifier.horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(20.dp),
-            ) {
-                items.forEach { tile(it) }
-            }
     }
 }
 

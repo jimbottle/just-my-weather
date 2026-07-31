@@ -67,7 +67,14 @@ class HomeViewModel(
                         mode = mode,
                         hourly = forecasts.hourly,
                         daily = forecasts.daily,
-                        forecastError = forecasts.error,
+                        // Only the visible framing's own error — a Daily
+                        // failure must never mask loaded Hourly data.
+                        forecastError =
+                            when (mode) {
+                                ViewMode.NOW -> null
+                                ViewMode.HOURLY -> forecasts.hourlyError
+                                ViewMode.DAILY -> forecasts.dailyError
+                            },
                     )
             }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUiState.Loading)
@@ -88,10 +95,13 @@ class HomeViewModel(
                 is WeatherLoad.Ready -> current.copy(refreshing = true)
                 else -> WeatherLoad.Loading
             }
-        // Forecasts refetch with the same gesture, so one Refresh means "all of
-        // it is current", not just the visible framing.
-        forecasts.value = ForecastLoad()
         viewModelScope.launch {
+            // Forecasts refetch with the same gesture, so one Refresh means
+            // "all of it is current", not just the visible framing. The clear
+            // happens under the mutex: an in-flight mode fetch holds it across
+            // its network call, so the clear serialises after that write and
+            // pre-refresh data can never be resurrected past the clear.
+            forecastMutex.withLock { forecasts.value = ForecastLoad() }
             val location = currentLocation()
             weather.value =
                 runCatching { repository.load(location) }
@@ -103,9 +113,11 @@ class HomeViewModel(
         }
     }
 
+    /** The mode collector in `init` is the single fetch trigger — calling
+     * ensureForecast here too would double-fetch a failing framing (the
+     * needed-check only dedups once data has landed). */
     fun setMode(mode: ViewMode) {
         chosenMode.value = mode
-        viewModelScope.launch { ensureForecast(mode) }
     }
 
     private suspend fun ensureForecast(mode: ViewMode) {
@@ -122,11 +134,20 @@ class HomeViewModel(
             runCatching {
                 forecasts.value =
                     when (mode) {
-                        ViewMode.HOURLY -> current.copy(hourly = repository.loadForecast(location), error = null)
-                        ViewMode.DAILY -> current.copy(daily = repository.loadDailyForecast(location), error = null)
+                        ViewMode.HOURLY ->
+                            current.copy(hourly = repository.loadForecast(location), hourlyError = null)
+                        ViewMode.DAILY ->
+                            current.copy(daily = repository.loadDailyForecast(location), dailyError = null)
                         ViewMode.NOW -> current
                     }
-            }.onFailure { forecasts.value = current.copy(error = it.toUserMessage()) }
+            }.onFailure { e ->
+                forecasts.value =
+                    when (mode) {
+                        ViewMode.HOURLY -> current.copy(hourlyError = e.toUserMessage())
+                        ViewMode.DAILY -> current.copy(dailyError = e.toUserMessage())
+                        ViewMode.NOW -> current
+                    }
+            }
         }
     }
 
@@ -141,11 +162,14 @@ class HomeViewModel(
         data class Error(val message: String) : WeatherLoad
     }
 
-    /** Forecast half: null per framing until fetched; cleared on refresh. */
+    /** Forecast half: null per framing until fetched; cleared on refresh.
+     * Errors are per-framing so one mode's failure never leaks into another's
+     * loaded strip; a failed framing stays null, so re-entering it retries. */
     private data class ForecastLoad(
         val hourly: List<ForecastPoint>? = null,
+        val hourlyError: String? = null,
         val daily: List<DailyPeriod>? = null,
-        val error: String? = null,
+        val dailyError: String? = null,
     )
 
     private fun Throwable.toUserMessage(): String =
