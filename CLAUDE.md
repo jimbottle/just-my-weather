@@ -174,12 +174,24 @@ else
   # you can no longer kill), then `wait` restores the blocking behaviour the
   # harness's background-run mode expects. The claim loop dies with the
   # emulator, so a failed launch can never leave it stamping a peer's device.
-  "$EMU" -avd "$AVD" -no-snapshot-save -no-audio -no-window & EMU_PID=$!
   # Backgrounding costs the signal propagation a foreground command gets free:
   # without this trap, killing the call (timeout, interrupt, session end) leaves
   # the emulator orphaned — and claimed, so only this now-dead session could
-  # have killed it. Verified: no trap => child survives; trap => it dies with us.
-  trap 'kill "$EMU_PID" 2>/dev/null' INT TERM HUP
+  # ever have killed it. The handler is terminal and bounded: it waits for the
+  # emulator to actually exit before the call returns, and exiting also stops
+  # the claim loop below from setprop-ing a device on its way out.
+  #
+  # Installed BEFORE the launch (the body is evaluated at signal time, so the
+  # not-yet-set PID is fine) — otherwise a signal landing in between is lost.
+  # Verified: `emulator` EXECS into qemu-system rather than forking it (same
+  # PID), so killing $EMU_PID kills the process that holds the cores; a TERM to
+  # this shell left 0 qemu processes for the AVD.
+  # Residual, accepted: SIGKILL cannot be trapped, so a hard-killed call still
+  # leaves a *claimed* emulator that no later session may touch (a new $ME will
+  # never match the stale claim). Clear it by hand — see the by-hand recovery in
+  # the prose above.
+  trap 'kill "${EMU_PID:-}" 2>/dev/null; wait "${EMU_PID:-}" 2>/dev/null; exit 143' INT TERM HUP
+  "$EMU" -avd "$AVD" -no-snapshot-save -no-audio -no-window & EMU_PID=$!
   for _ in $(seq 120); do
     kill -0 "$EMU_PID" 2>/dev/null || break          # launch died: stop claiming
     s=$(ours | head -1)
