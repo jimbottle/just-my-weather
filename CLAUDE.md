@@ -84,14 +84,26 @@ costing them for the rest of the session. Gradle/Kotlin daemons idle cheaply but
 add up. **Every long-running process you start, you kill before you finish.**
 
 ```bash
-# Start an emulator ONLY for a specific verification, headless:
-$SDK/emulator/emulator -avd Pixel_7_API_35 -no-snapshot-save -no-audio -no-window &
+SDK=$(sed -n 's/^sdk.dir=//p' local.properties)   # or $ANDROID_HOME
+ADB="$SDK/platform-tools/adb"
 
-# ...verify... then ALWAYS, in the same working block:
-adb -s emulator-5554 emu kill        # or: adb devices | awk '/^emulator-/{print $1}' | xargs -I{} adb -s {} emu kill
-./gradlew --stop                     # if a build daemon was started
+# 1. Note which emulators are NOT yours, so you never kill someone else's:
+BEFORE=$("$ADB" devices | awk '/^emulator-/{print $1}')
 
-# Audit before ending a session — both should print 0:
+# 2. Boot headless. Agents: launch this with the harness's background-run mode,
+#    NOT a trailing '&' — a detached process is the kind that gets forgotten.
+"$SDK/emulator/emulator" -avd Pixel_7_API_35 -no-snapshot-save -no-audio -no-window
+
+# 3. Capture YOUR serial: whichever emulator appeared that wasn't there before.
+MINE=$("$ADB" devices | awk '/^emulator-/{print $1}' | grep -vxF "$BEFORE" | head -1)
+"$ADB" -s "$MINE" shell getprop ro.build.version.release   # sanity-check it's the AVD you meant
+
+# 4. ...verify... then ALWAYS, in the same working block, kill ONLY yours:
+"$ADB" -s "$MINE" emu kill
+./gradlew --stop                  # Gradle daemons
+pkill -f KotlinCompileDaemon      # separate JVM; --stop does NOT stop it
+
+# 5. Audit before ending a session — both should print 0:
 ps aux | grep -c "[q]emu-system"
 ps aux | grep -cE "[G]radleDaemon|[K]otlinCompileDaemon"
 ```
@@ -100,13 +112,20 @@ Rules that follow from this:
 
 - **Boot per task, not per session.** A headless AVD boots in ~60s; that is
   cheaper than leaving one running for an hour. Never keep one "warm".
-- **One emulator at a time.** If `adb devices` lists more than one, find out
-  whose it is before killing it — another agent session may own it.
-- **Always target a device explicitly** (`adb -s <serial>`, `ANDROID_SERIAL`, or
-  Gradle `-Pandroid.injected.device.serial`). A bare `installDebug` or
-  `adb install` fans out to *every* attached device, including a developer's
-  personal phone and other projects' emulators. Select emulators by checking
-  `ro.build.version.release`, not by assuming a serial — ports get reused.
+- **Kill only what you started.** Never `xargs` a kill across every listed
+  emulator, and never hardcode `emulator-5554` — ports get reused and another
+  agent session may own the device sitting on one. Capture your serial at boot
+  (above) and confirm it with `ro.build.version.release`.
+- **Always target a device explicitly.** A bare `installDebug` or `adb install`
+  fans out to *every* attached device, including a developer's personal phone
+  and other projects' emulators. The unambiguous path is to build and install as
+  two steps: `./gradlew :app:assembleDebug`, then
+  `adb -s "$MINE" install -r app/build/outputs/apk/debug/app-debug.apk`.
+  (`ANDROID_SERIAL` steers the `adb` CLI, but AGP's own install tasks talk to
+  devices via ddmlib, so don't assume it constrains them; the
+  `android.injected.device.serial` property could not be confirmed in the pinned
+  AGP 8.7.3 artifacts, and Gradle silently ignores unknown `-P` flags — an
+  unverified flag gives false confidence, which is how the fan-out happens.)
 - **Prefer the JVM gate.** Unit tests + ktlint + assemble need no device at all;
   reach for an emulator only when the change is genuinely visual or runtime
   (insets, notifications, WorkManager, permissions).
