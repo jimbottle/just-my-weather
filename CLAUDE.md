@@ -84,85 +84,106 @@ costing them for the rest of the session. Gradle/Kotlin daemons idle cheaply but
 add up. **Every long-running process you start, you kill before you finish.**
 
 Ownership is the whole game — other agent sessions and the developer's Android
-Studio own processes that look just like yours. **Ask the emulator which AVD it
-is.** Two verified facts make that sufficient: `adb -s <serial> emu avd name`
-returns the AVD an emulator was booted from, and the emulator refuses to start
-an AVD that is already running, so one AVD means at most one instance. Nothing
-has to be remembered between calls, which is what matters — agent tool calls
-share no shell state, and every scheme built on carrying a snapshot forward
-fails open ("everything is mine") exactly when it matters most.
+Studio own processes that look just like yours, and an AVD name alone cannot
+tell your emulator from a peer session's or from a leftover orphan. So make
+ownership a **fact the emulator carries**: `ours()` finds emulators running this
+project's AVD (`adb -s <serial> emu avd name`, verified), and the session that
+booted one **claims** it with `setprop debug.jmw.owner <session id>` (verified
+settable without root, read back intact, and well inside Android's 91-character
+property limit). Ownership is then read, never inferred — and it needs no local
+state, which matters because agent tool calls share no shell state and every
+carry-forward scheme fails open as "everything is mine".
 
-Two requirements come with that. **This project's AVD is `Pixel_7_API_35` and no
-other project's session may use that name** — then a leaked emulator stays
-identifiable by any later session and can always be cleaned up. And **only one
-session of this project may hold the emulator at a time**: an AVD name cannot
-distinguish two sessions of the *same* project, so a session that finds
-`$AVD` already running must not boot, install, or kill — it stops and
-coordinates. Call 1 enforces that; don't route around it.
+The rules that follow:
 
-Two more rules. A warning that doesn't stop execution is not a guard: `adb -s ""`
-falls back to "the only attached device", so every step that needs a serial is
-*gated*. And **every call re-checks the SDK** — an unusable `adb` makes `mine()`
-silently empty, which would let the audit report "clean" while the emulator
-burns eight cores. The audit is the one step that must never fail open.
+- **This project's AVD is `Pixel_7_API_35`**, and no other project's session may
+  use that name.
+- **Only one session of this project holds it at a time.** Call 1 refuses to
+  boot when the AVD is already up, and calls 2 and 3 each independently refuse
+  to act on an emulator this session doesn't own — the guard is in every call,
+  not just the first, because the calls are self-contained and call 1's warning
+  may sit unread in a background stream.
+- **An unclaimed or foreign-claimed emulator is a human's problem, not the next
+  session's.** You can *identify* an orphan (it runs your AVD but carries no
+  claim, or a stale one) but you cannot tell it from a live peer, so never
+  reclaim one silently — report it and stop.
+- A warning that doesn't stop execution is not a guard: `adb -s ""` falls back
+  to "the only attached device", so every step needing a serial is *gated*. And
+  every call re-checks the SDK, because an unusable `adb` empties `ours()` and
+  would let the audit report "clean" while eight cores burn.
 
 ```bash
 # ── Preamble: run at the top of every call. Nothing carries between calls —
-#    and nothing needs to. local.properties is resolved from the repo root, not
-#    $PWD, so a call issued from a subdirectory can't silently blank the SDK.
+#    and nothing needs to. local.properties resolves from the repo root, not
+#    $PWD, so a call from a subdirectory can't silently blank the SDK.
 ROOT=$(git rev-parse --show-toplevel 2>/dev/null || echo .)
 SDK=$(sed -n 's/^sdk.dir=//p' "$ROOT/local.properties" 2>/dev/null); SDK=${SDK:-$ANDROID_HOME}
 ADB="$SDK/platform-tools/adb"
 AVD=Pixel_7_API_35
-mine() { for s in $("$ADB" devices 2>/dev/null | awk '/^emulator-/ && $2=="device" {print $1}'); do
-           [ "$("$ADB" -s "$s" emu avd name 2>/dev/null | head -1 | tr -d '\r')" = "$AVD" ] \
-             && echo "$s"
-         done; }
+ME=${CLAUDE_CODE_SESSION_ID:-$USER}   # if unset this degrades to per-user: then
+                                      # honour "one session at a time" yourself
+ours()  { for s in $("$ADB" devices 2>/dev/null | awk '/^emulator-/ && $2=="device" {print $1}'); do
+            [ "$("$ADB" -s "$s" emu avd name 2>/dev/null | head -1 | tr -d '\r')" = "$AVD" ] \
+              && echo "$s"
+          done; }
+owner() { "$ADB" -s "$1" shell getprop debug.jmw.owner 2>/dev/null | tr -d '\r'; }
+mine()  { for s in $(ours); do [ "$(owner "$s")" = "$ME" ] && echo "$s"; done; }
 
 # ── Call 1 (background-run mode, never a bare '&'): boot. Alone, because it
 #    does not return until the emulator exits.
 if [ ! -x "$ADB" ]; then
   echo "!! no SDK — set sdk.dir in local.properties or export ANDROID_HOME; STOP"
-elif [ -n "$(mine)" ]; then
-  echo "!! $AVD is ALREADY running — another session of this project holds it.
-        STOP: do not boot, install, or kill. Coordinate before touching it."
+elif [ -n "$(ours)" ]; then
+  echo "!! $AVD is ALREADY running (owner='$(owner $(ours | head -1))'). STOP:
+        do not boot, install, or kill. A peer session or an orphan — a human
+        decides which."
 else
   "$SDK/emulator/emulator" -avd "$AVD" -no-snapshot-save -no-audio -no-window
 fi
 
-# ── Call 2: wait for YOUR emulator, then build and install onto it — or do
-#    nothing at all. A headless AVD needs ~60s, and it is invisible to mine()
-#    until it reaches 'device' state, so poll before calling the boot a failure.
+# ── Call 2: claim YOUR emulator, then build and install onto it — or do nothing.
+#    A headless AVD needs ~60s and is invisible until it reaches 'device' state,
+#    so poll before calling the boot a failure.
 if [ ! -x "$ADB" ]; then
   echo "!! no SDK — STOP"
 else
-  for _ in $(seq 24); do MINE=$(mine | head -1); [ -n "$MINE" ] && break; sleep 5; done
-  if [ -z "$MINE" ]; then
+  for _ in $(seq 24); do S=$(ours | head -1); [ -n "$S" ] && break; sleep 5; done
+  OWNER=$([ -n "$S" ] && owner "$S")
+  if [ -z "$S" ]; then
     echo "!! $AVD never reached 'device' state in 2 min — the boot failed. STOP:
           adb -s '' would target whatever single device is attached."
+  elif [ -n "$OWNER" ] && [ "$OWNER" != "$ME" ]; then
+    echo "!! $AVD is claimed by another session ('$OWNER'). STOP — do not
+          install onto or kill a device you don't own."
   else
-    "$ADB" -s "$MINE" shell getprop ro.build.version.release   # sanity-check the image
+    [ -n "$OWNER" ] || "$ADB" -s "$S" shell setprop debug.jmw.owner "$ME"  # claim it
+    "$ADB" -s "$S" shell getprop ro.build.version.release   # sanity-check the image
     ./gradlew :app:assembleDebug \
-      && "$ADB" -s "$MINE" install -r app/build/outputs/apk/debug/app-debug.apk
+      && "$ADB" -s "$S" install -r app/build/outputs/apk/debug/app-debug.apk
   fi
 fi
 
-# ── Call 3: after verifying, kill yours, wait for it to actually go, then audit.
+# ── Call 3: after verifying, kill what you own, let it go, then audit.
 if [ ! -x "$ADB" ]; then
   echo "!! no SDK — cannot audit; STOP and do NOT assume the machine is clean"
 else
   mine | while read -r s; do "$ADB" -s "$s" emu kill; done
-  # adb keeps listing a dying emulator for a beat; let it go before counting, or
-  # the audit cries wolf and you learn to ignore it.
+  # adb lists a dying emulator for a beat, and its qemu process outlives that,
+  # so settle BOTH before judging — otherwise a clean kill reads as wedged and
+  # you learn to ignore the audit.
   for _ in 1 2 3 4 5 6 7 8 9 10; do [ -z "$(mine)" ] && break; sleep 2; done
-  if [ -n "$(mine)" ]; then
-    echo "!! STILL RUNNING: $(mine | tr '\n' ' ') — re-run this call; if it
+  for _ in 1 2 3 4 5; do ps auxww | grep "[q]emu-system" | grep -qE -- "-avd $AVD( |$)" || break; sleep 2; done
+  LEFT=$(mine); STRAY=$(ours)          # sample once: two samples can disagree
+  if [ -n "$LEFT" ]; then
+    echo "!! STILL RUNNING (yours): $(echo $LEFT) — re-run this call; if it
           persists, kill it by hand."
-  elif ps auxww | grep "[q]emu-system" | grep -q -- "-avd $AVD"; then
-    # Backstop: a wedged or offline emulator drops out of `adb devices` while
-    # its qemu process keeps burning cores, so adb alone can't clear you.
+  elif [ -n "$STRAY" ]; then
+    echo "note: $AVD is running but not claimed by you ($(echo $STRAY)) — leave
+          it alone; a human resolves peer-vs-orphan."
+  elif ps auxww | grep "[q]emu-system" | grep -qE -- "-avd $AVD( |$)"; then
     echo "!! a $AVD qemu process is alive but adb can't see it — wedged. Find
-          it with: ps auxww | grep '[q]emu-system'   then kill that pid."
+          the pid with:  ps auxww | grep '[q]emu-system' | grep -- '-avd $AVD'
+          and kill only a line naming this AVD."
   else
     echo "clean — no $AVD emulator running"
   fi
