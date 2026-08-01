@@ -77,6 +77,42 @@ scripts/hooks/install.sh            # install the pre-commit gate (test + ktlint
 The pre-commit hook runs `:app:testDebugUnitTest :app:ktlintCheck` on any
 Kotlin/resource change. Bypass with `--no-verify` only in emergencies.
 
+## Devices & background processes — leave the machine as you found it
+
+An Android emulator costs ~8 CPU cores while it runs, and a forgotten one keeps
+costing them for the rest of the session. Gradle/Kotlin daemons idle cheaply but
+add up. **Every long-running process you start, you kill before you finish.**
+
+```bash
+# Start an emulator ONLY for a specific verification, headless:
+$SDK/emulator/emulator -avd Pixel_7_API_35 -no-snapshot-save -no-audio -no-window &
+
+# ...verify... then ALWAYS, in the same working block:
+adb -s emulator-5554 emu kill        # or: adb devices | awk '/^emulator-/{print $1}' | xargs -I{} adb -s {} emu kill
+./gradlew --stop                     # if a build daemon was started
+
+# Audit before ending a session — both should print 0:
+ps aux | grep -c "[q]emu-system"
+ps aux | grep -cE "[G]radleDaemon|[K]otlinCompileDaemon"
+```
+
+Rules that follow from this:
+
+- **Boot per task, not per session.** A headless AVD boots in ~60s; that is
+  cheaper than leaving one running for an hour. Never keep one "warm".
+- **One emulator at a time.** If `adb devices` lists more than one, find out
+  whose it is before killing it — another agent session may own it.
+- **Always target a device explicitly** (`adb -s <serial>`, `ANDROID_SERIAL`, or
+  Gradle `-Pandroid.injected.device.serial`). A bare `installDebug` or
+  `adb install` fans out to *every* attached device, including a developer's
+  personal phone and other projects' emulators. Select emulators by checking
+  `ro.build.version.release`, not by assuming a serial — ports get reused.
+- **Prefer the JVM gate.** Unit tests + ktlint + assemble need no device at all;
+  reach for an emulator only when the change is genuinely visual or runtime
+  (insets, notifications, WorkManager, permissions).
+- UI verification runs on **API 35+** (Android 15 enforces edge-to-edge for
+  `targetSdk 35`; API 34 does not, and that gap once shipped a broken layout).
+
 ## Architecture Overview
 
 Single `app` module, Kotlin + Jetpack Compose + Material 3, MVVM. Manual DI (one
