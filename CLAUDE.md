@@ -103,9 +103,11 @@ MINE=$("$ADB" devices | awk '/^emulator-/{print $1}' | grep -vxF "$BEFORE" | hea
 ./gradlew --stop                  # Gradle daemons
 pkill -f KotlinCompileDaemon      # separate JVM; --stop does NOT stop it
 
-# 5. Audit before ending a session — both should print 0:
-ps aux | grep -c "[q]emu-system"
-ps aux | grep -cE "[G]radleDaemon|[K]otlinCompileDaemon"
+# 5. Audit before ending a session. No emulator should survive:
+ps aux | grep -c "[q]emu-system"                       # must be 0
+# Daemons: Android Studio runs its own and it is NOT yours to kill, so exclude
+# it — what's left must be empty.
+ps aux | grep -E "[G]radleDaemon|[K]otlinCompileDaemon" | grep -v "Android Studio"
 ```
 
 Rules that follow from this:
