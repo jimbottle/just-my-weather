@@ -83,74 +83,63 @@ An Android emulator costs ~8 CPU cores while it runs, and a forgotten one keeps
 costing them for the rest of the session. Gradle/Kotlin daemons idle cheaply but
 add up. **Every long-running process you start, you kill before you finish.**
 
-Ownership is the whole game: **snapshot what was already running, and only ever
-touch the difference.** Other agent sessions and the developer's Android Studio
-own processes that look exactly like yours.
+Ownership is the whole game — other agent sessions and the developer's Android
+Studio own processes that look just like yours. **Ask the emulator which AVD it
+is.** Two verified facts make that sufficient: `adb -s <serial> emu avd name`
+returns the AVD an emulator was booted from, and the emulator refuses to start
+an AVD that is already running, so one AVD means at most one instance. Nothing
+has to be remembered between calls, which is what matters — agent tool calls
+share no shell state, and every scheme built on carrying a snapshot forward
+fails open ("everything is mine") exactly when it matters most.
 
-Three constraints shape the commands below. Agent tool calls **share no shell
-state** — a variable set in one call is gone in the next, and an empty snapshot
-silently means "everything is mine", the exact failure this exists to prevent —
-so the snapshot lives in a **file**, and that file is **namespaced per session**
-because concurrent agent sessions on one machine would otherwise overwrite each
-other's. A warning that doesn't stop execution is not a guard: `adb -s ""` falls
-back to "the only attached device", so every step using a serial must be
-*gated*. And the boot never returns while the emulator lives, so it gets a call
-of its own — the snapshot must be written and flushed *before* it.
+The one requirement: **this project's AVD is `Pixel_7_API_35` and no other
+project's session may use that name.** A leaked emulator then stays identifiable
+by any later session, so it can always be cleaned up.
+
+One more rule: a warning that doesn't stop execution is not a guard. `adb -s ""`
+falls back to "the only attached device", so every step that needs a serial is
+*gated*, not merely preceded by an `echo`.
 
 ```bash
-# ── Preamble: run at the TOP OF EVERY CALL. Nothing carries between calls.
+# ── Preamble: run at the top of every call. Nothing carries between calls —
+#    and nothing needs to.
 SDK=$(sed -n 's/^sdk.dir=//p' local.properties 2>/dev/null); SDK=${SDK:-$ANDROID_HOME}
 ADB="$SDK/platform-tools/adb"
-# Per session: with a fixed path, a second session's call 1 would record YOUR
-# emulator as "theirs" — your audit then passes while it runs on forever.
-THEIRS=/tmp/jmw-theirs-emu-${CLAUDE_CODE_SESSION_ID:-$USER}
-live() { "$ADB" devices | awk '/^emulator-/ && $2=="device" {print $1}'; }
-mine() { live | grep -vxF -f "$THEIRS"; }        # valid only once $THEIRS exists
+AVD=Pixel_7_API_35
+mine() { for s in $("$ADB" devices | awk '/^emulator-/ && $2=="device" {print $1}'); do
+           [ "$("$ADB" -s "$s" emu avd name 2>/dev/null | head -1 | tr -d '\r')" = "$AVD" ] \
+             && echo "$s"
+         done; }
 
-# ── Call 1 (foreground, on its own): record who was already here.
+# ── Call 1 (background-run mode, never a bare '&'): boot. Alone, because it
+#    does not return until the emulator exits.
 if [ ! -x "$ADB" ]; then
   echo "!! no SDK — set sdk.dir in local.properties or export ANDROID_HOME; STOP"
-elif [ -f "$THEIRS" ]; then
-  echo "!! snapshot already exists — an earlier run never cleaned up. Check it
-        before overwriting: [$(tr '\n' ' ' < "$THEIRS")]"
 else
-  live > "$THEIRS"; echo "not mine, never touch: [$(tr '\n' ' ' < "$THEIRS")]"
+  "$SDK/emulator/emulator" -avd "$AVD" -no-snapshot-save -no-audio -no-window
 fi
 
-# ── Call 2 (background-run mode, never a bare '&'): boot. Alone, because it
-#    does not return until the emulator exits.
-"$SDK/emulator/emulator" -avd Pixel_7_API_35 -no-snapshot-save -no-audio -no-window
-
-# ── Call 3: identify YOUR emulator, then build and install onto it — or do
-#    nothing. The two failure modes are different: a missing snapshot is
-#    recoverable by re-running call 1; a missing emulator means the boot failed.
-if [ ! -f "$THEIRS" ]; then
-  echo "!! no snapshot — re-run call 1 (recoverable; do NOT guess a serial)"
-elif [ -z "$(mine | head -1)" ]; then
-  echo "!! no new emulator — the boot failed. STOP: adb -s '' targets whatever
-        single device is attached, possibly a personal phone."
+# ── Call 2: build and install onto YOUR emulator — or do nothing at all.
+MINE=$(mine | head -1)
+if [ -z "$MINE" ]; then
+  echo "!! $AVD is not running — the boot failed. STOP: adb -s '' would target
+        whatever single device is attached, possibly a personal phone."
 else
-  MINE=$(mine | head -1)
-  "$ADB" -s "$MINE" shell getprop ro.build.version.release   # confirm the AVD you meant
+  "$ADB" -s "$MINE" shell getprop ro.build.version.release   # sanity-check the image
   ./gradlew :app:assembleDebug \
     && "$ADB" -s "$MINE" install -r app/build/outputs/apk/debug/app-debug.apk
 fi
 
-# ── Call 4: after verifying, kill ONLY yours, wait for it to go, then audit.
-if [ ! -f "$THEIRS" ]; then
-  echo "!! no snapshot — cannot tell yours from another session's; list
-        emulators and resolve by hand rather than killing anything"
+# ── Call 3: after verifying, kill yours, wait for it to actually go, audit.
+mine | while read -r s; do "$ADB" -s "$s" emu kill; done
+# adb keeps listing a dying emulator for a beat; let it go before counting, or
+# the audit cries wolf and you learn to ignore it.
+for _ in 1 2 3 4 5 6 7 8 9 10; do [ -z "$(mine)" ] && break; sleep 2; done
+if [ -z "$(mine)" ]; then
+  echo "clean — no $AVD emulator running"
 else
-  MINE=$(mine | head -1); [ -z "$MINE" ] || "$ADB" -s "$MINE" emu kill
-  # adb keeps listing a dying emulator for a beat; let it actually go before
-  # counting, or the audit cries wolf and you learn to ignore it.
-  for _ in 1 2 3 4 5 6 7 8 9 10; do [ -z "$(mine)" ] && break; sleep 2; done
-  if [ -z "$(mine)" ]; then
-    echo "clean — 0 of mine still running"; rm -f "$THEIRS"   # only now
-  else
-    echo "!! STILL RUNNING after 20s: $(mine | tr '\n' ' ') — kill it by hand.
-          Keeping the snapshot so you can still tell yours from theirs."
-  fi
+  echo "!! STILL RUNNING: $(mine | tr '\n' ' ') — re-run this call; if it
+        persists, kill it by hand."
 fi
 ```
 
@@ -178,12 +167,12 @@ Rules that follow from this:
 
 - **Boot per task, not per session.** A headless AVD boots in ~60s; that is
   cheaper than leaving one running for an hour. Never keep one "warm".
-- **Kill only the emulator you started, identified by diff.** Never `xargs` a
-  kill across every listed emulator and never hardcode `emulator-5554` — ports
-  get reused, and the device on one may be another session's. Ownership comes
-  from the before/after snapshot, never from what a process looks like: an agent
-  building under Studio's bundled JBR is indistinguishable by JDK path, so such
-  a filter both masks your own leak and flags processes that aren't yours.
+- **Kill only your own AVD's emulator.** Never `xargs` a kill across every
+  listed emulator and never hardcode `emulator-5554` — ports get reused, and the
+  device on one may be another session's. Ownership comes from asking the
+  emulator its AVD name, never from what a process looks like from outside: an
+  agent building under Studio's bundled JBR is indistinguishable by JDK path, so
+  such a filter both masks your own leak and flags processes that aren't yours.
 - **Always target a device explicitly.** A bare `installDebug` or `adb install`
   fans out to *every* attached device, including a developer's personal phone
   and other projects' emulators. The unambiguous path is the two-step build and
