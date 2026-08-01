@@ -146,15 +146,21 @@ ours()  { for s in $("$ADB" devices 2>/dev/null | awk '/^emulator-/ && $2=="devi
               && echo "$s"
           done; }
 owner() { [ -n "$1" ] && "$ADB" -s "$1" shell getprop debug.jmw.owner 2>/dev/null | tr -d '\r'; }
-mine()  { [ -n "$ME" ] || return 0                      # empty identity owns nothing
+# Empty identity owns nothing. This returns 0 so `$(mine)` stays usable in for/
+# while loops — it is NOT a permission check, so every call still gates on
+# [ -z "$ME" ] itself rather than reading this function's exit status.
+mine()  { [ -n "$ME" ] || return 0
           for s in $(ours); do [ "$(owner "$s")" = "$ME" ] && echo "$s"; done; }
 echo "identity: ${ME:-<UNSET>}"     # every call prints it: never guess which scheme is live
 
 # ── Call 1 (launch it with the harness's background-run mode): boot AND claim.
 #    Alone, because it does not return until the emulator exits.
 O=$(ours); FIRST=$(echo "$O" | head -1)      # sample once; two samples disagree
-if [ ! -x "$ADB" ] || [ ! -x "$EMU" ]; then
-  echo "!! no SDK — set sdk.dir in local.properties or export ANDROID_HOME; STOP"
+if [ ! -x "$ADB" ]; then
+  echo "!! no adb at $ADB — set sdk.dir in local.properties or ANDROID_HOME; STOP"
+elif [ ! -x "$EMU" ]; then
+  echo "!! no emulator at $EMU — the SDK path is fine but the 'emulator'
+        package isn't installed; STOP"
 elif [ -z "$ME" ]; then
   echo "!! CLAUDE_CODE_SESSION_ID unset — an empty identity would match every
         unclaimed emulator, so call 3 would kill a peer's. STOP; set it first."
@@ -169,6 +175,11 @@ else
   # harness's background-run mode expects. The claim loop dies with the
   # emulator, so a failed launch can never leave it stamping a peer's device.
   "$EMU" -avd "$AVD" -no-snapshot-save -no-audio -no-window & EMU_PID=$!
+  # Backgrounding costs the signal propagation a foreground command gets free:
+  # without this trap, killing the call (timeout, interrupt, session end) leaves
+  # the emulator orphaned — and claimed, so only this now-dead session could
+  # have killed it. Verified: no trap => child survives; trap => it dies with us.
+  trap 'kill "$EMU_PID" 2>/dev/null' INT TERM HUP
   for _ in $(seq 120); do
     kill -0 "$EMU_PID" 2>/dev/null || break          # launch died: stop claiming
     s=$(ours | head -1)
@@ -185,19 +196,21 @@ if [ ! -x "$ADB" ] || [ -z "$ME" ]; then
   echo "!! no SDK or no session id — STOP"
 else
   for _ in $(seq 24); do S=$(mine | head -1); [ -n "$S" ] && break; sleep 5; done
-  O=$(ours); FIRST=$(echo "$O" | head -1)    # sample once, as in call 1
   if [ -n "$S" ]; then
     "$ADB" -s "$S" shell getprop ro.build.version.release   # sanity-check the image
     ./gradlew :app:assembleDebug \
       && "$ADB" -s "$S" install -r app/build/outputs/apk/debug/app-debug.apk
-  elif [ -n "$O" ]; then
-    echo "!! $AVD is running but not claimed by you (owner='$(owner "$FIRST")').
-          STOP — never install onto or kill a device you don't own. If you ran
-          call 1 and it reported nothing running, this one IS yours: claim it by
-          hand (see the prose) and re-run."
   else
-    echo "!! $AVD never reached 'device' state in 2 min — the boot failed. STOP:
-          adb -s '' would target whatever single device is attached."
+    O=$(ours); FIRST=$(echo "$O" | head -1)  # only on the failure path; sample once
+    if [ -n "$O" ]; then
+      echo "!! $AVD is running but not claimed by you (owner='$(owner "$FIRST")').
+            STOP — never install onto or kill a device you don't own. If you ran
+            call 1 and it reported nothing running, this one IS yours: claim it
+            by hand (see the prose) and re-run."
+    else
+      echo "!! $AVD never reached 'device' state in 2 min — the boot failed. STOP:
+            adb -s '' would target whatever single device is attached."
+    fi
   fi
 fi
 
