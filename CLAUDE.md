@@ -83,46 +83,77 @@ An Android emulator costs ~8 CPU cores while it runs, and a forgotten one keeps
 costing them for the rest of the session. Gradle/Kotlin daemons idle cheaply but
 add up. **Every long-running process you start, you kill before you finish.**
 
+Ownership is the whole game: **snapshot what was already running, and only ever
+kill the difference.** Other agent sessions and the developer's Android Studio
+own processes that look exactly like yours. Run this as one block, in order —
+`$THEIRS_*` must stay in scope through the cleanup and audit.
+
 ```bash
-SDK=$(sed -n 's/^sdk.dir=//p' local.properties)   # or $ANDROID_HOME
+# 0. Paths. Fail loudly rather than expanding to "/platform-tools/adb".
+SDK=$(sed -n 's/^sdk.dir=//p' local.properties 2>/dev/null); SDK=${SDK:-$ANDROID_HOME}
 ADB="$SDK/platform-tools/adb"
+[ -x "$ADB" ] || echo "!! no SDK — set sdk.dir in local.properties or export ANDROID_HOME"
 
-# 1. Note which emulators are NOT yours, so you never kill someone else's:
-BEFORE=$("$ADB" devices | awk '/^emulator-/{print $1}')
+# 1. Snapshot what is ALREADY running. Everything here belongs to someone else
+#    (another agent session, or Android Studio) and is never yours to kill.
+THEIRS_EMU=$("$ADB" devices | awk '/^emulator-/{print $1}')
+THEIRS_DAEMON=$(pgrep -f 'GradleDaemon|KotlinCompileDaemon' | sort)
 
-# 2. Boot headless. Agents: launch this with the harness's background-run mode,
-#    NOT a trailing '&' — a detached process is the kind that gets forgotten.
+# 2. Boot headless. Agents: use the harness's background-run mode, never a bare
+#    '&' — a detached process is exactly the kind that gets forgotten.
 "$SDK/emulator/emulator" -avd Pixel_7_API_35 -no-snapshot-save -no-audio -no-window
 
-# 3. Capture YOUR serial: whichever emulator appeared that wasn't there before.
-MINE=$("$ADB" devices | awk '/^emulator-/{print $1}' | grep -vxF "$BEFORE" | head -1)
-"$ADB" -s "$MINE" shell getprop ro.build.version.release   # sanity-check it's the AVD you meant
+# 3. Your serial is the emulator that APPEARED. Guard the empty case: `adb -s ""`
+#    falls back to "the only device", which is how fan-out starts.
+MINE=$("$ADB" devices | awk '/^emulator-/{print $1}' \
+        | grep -vxF -f <(printf '%s\n' "$THEIRS_EMU") | head -1)
+[ -n "$MINE" ] || echo "!! no new emulator appeared — did the boot fail?"
+"$ADB" -s "$MINE" shell getprop ro.build.version.release   # confirm it's the AVD you meant
 
-# 4. ...verify... then ALWAYS, in the same working block, kill ONLY yours:
+# 4. Build, then install — two explicit steps. Never a bare installDebug.
+./gradlew :app:assembleDebug
+"$ADB" -s "$MINE" install -r app/build/outputs/apk/debug/app-debug.apk
+
+# 5. ...verify... then ALWAYS, in this same block, clean up ONLY what you started.
 "$ADB" -s "$MINE" emu kill
-./gradlew --stop                  # Gradle daemons
-pkill -f KotlinCompileDaemon      # separate JVM; --stop does NOT stop it
+NEW_DAEMONS=$(pgrep -f 'GradleDaemon|KotlinCompileDaemon' | sort \
+               | comm -13 <(printf '%s\n' "$THEIRS_DAEMON") -)
+[ -z "$NEW_DAEMONS" ] || kill $NEW_DAEMONS
 
-# 5. Audit before ending a session. No emulator should survive:
-ps aux | grep -c "[q]emu-system"                       # must be 0
-# Daemons: Android Studio runs its own and it is NOT yours to kill, so exclude
-# it — what's left must be empty.
-ps aux | grep -E "[G]radleDaemon|[K]otlinCompileDaemon" | grep -v "Android Studio"
+# 6. Audit before you finish — both must print 0. Count only what is still
+#    YOURS: another session's emulator and Studio's daemon are legitimately
+#    running, and must not fail your audit or you'll learn to ignore it.
+"$ADB" devices | awk '/^emulator-/{print $1}' \
+  | grep -vxF -f <(printf '%s\n' "$THEIRS_EMU") | wc -l
+pgrep -f '[G]radleDaemon|[K]otlinCompileDaemon' | sort \
+  | comm -13 <(printf '%s\n' "$THEIRS_DAEMON") - | wc -l
 ```
+
+Two shell details the audit depends on: use `pgrep`, not `ps aux | grep` — `ps`
+truncates to terminal width on a tty and silently drops daemon matches, because
+the class name trails a very long classpath (verified: 3 daemons via a pipe, 2
+via an 80-column terminal). And bracket the pattern (`[G]radleDaemon`) so
+`pgrep -f` doesn't match the very shell running the audit, whose command line
+contains the pattern text.
 
 Rules that follow from this:
 
 - **Boot per task, not per session.** A headless AVD boots in ~60s; that is
   cheaper than leaving one running for an hour. Never keep one "warm".
-- **Kill only what you started.** Never `xargs` a kill across every listed
-  emulator, and never hardcode `emulator-5554` — ports get reused and another
-  agent session may own the device sitting on one. Capture your serial at boot
-  (above) and confirm it with `ro.build.version.release`.
+- **Kill only what you started, by diff.** Never `xargs` a kill across every
+  listed emulator, never hardcode `emulator-5554` (ports get reused), and never
+  use blanket `./gradlew --stop` or `pkill -f KotlinCompileDaemon` — those also
+  kill Android Studio's daemons and cost the developer their warm build. Identify
+  ownership by the before/after diff above, not by inspecting a process's JDK
+  path: an agent building under Studio's bundled JBR is indistinguishable that
+  way, so a path filter both masks your own leak and flags daemons that aren't
+  yours.
 - **Always target a device explicitly.** A bare `installDebug` or `adb install`
   fans out to *every* attached device, including a developer's personal phone
-  and other projects' emulators. The unambiguous path is to build and install as
-  two steps: `./gradlew :app:assembleDebug`, then
-  `adb -s "$MINE" install -r app/build/outputs/apk/debug/app-debug.apk`.
+  and other projects' emulators. The unambiguous path is the two-step build and
+  install in step 4 above (`./gradlew :app:assembleDebug`, then
+  `adb -s <the serial captured in step 3> install -r
+  app/build/outputs/apk/debug/app-debug.apk`).
   (`ANDROID_SERIAL` steers the `adb` CLI, but AGP's own install tasks talk to
   devices via ddmlib, so don't assume it constrains them; the
   `android.injected.device.serial` property could not be confirmed in the pinned
