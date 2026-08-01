@@ -84,75 +84,90 @@ costing them for the rest of the session. Gradle/Kotlin daemons idle cheaply but
 add up. **Every long-running process you start, you kill before you finish.**
 
 Ownership is the whole game: **snapshot what was already running, and only ever
-kill the difference.** Other agent sessions and the developer's Android Studio
-own processes that look exactly like yours. Run this as one block, in order —
-`$THEIRS_*` must stay in scope through the cleanup and audit.
+touch the difference.** Other agent sessions and the developer's Android Studio
+own processes that look exactly like yours.
+
+Two constraints shape the commands below. Agent tool calls **share no shell
+state** — a variable set in one call is gone in the next, and an empty
+`$THEIRS` silently means "everything is mine", the exact failure this exists to
+prevent — so the snapshot lives in a **file**. And a warning that doesn't stop
+execution is not a guard: `adb -s ""` falls back to "the only attached device",
+so every step that uses a serial must be *gated*, not merely preceded by an
+`echo`.
 
 ```bash
-# 0. Paths. Fail loudly rather than expanding to "/platform-tools/adb".
+# ── Preamble: run at the TOP OF EVERY CALL. Nothing carries between calls.
 SDK=$(sed -n 's/^sdk.dir=//p' local.properties 2>/dev/null); SDK=${SDK:-$ANDROID_HOME}
-ADB="$SDK/platform-tools/adb"
-[ -x "$ADB" ] || echo "!! no SDK — set sdk.dir in local.properties or export ANDROID_HOME"
+ADB="$SDK/platform-tools/adb"; THEIRS=/tmp/jmw-theirs-emu
+live() { "$ADB" devices | awk '/^emulator-/ && $2=="device" {print $1}'; }
+mine() { [ -f "$THEIRS" ] || { echo "!! no snapshot — do call 1 first" >&2; return 1; }
+         live | grep -vxF -f "$THEIRS"; }
 
-# 1. Snapshot what is ALREADY running. Everything here belongs to someone else
-#    (another agent session, or Android Studio) and is never yours to kill.
-THEIRS_EMU=$("$ADB" devices | awk '/^emulator-/{print $1}')
-THEIRS_DAEMON=$(pgrep -f 'GradleDaemon|KotlinCompileDaemon' | sort)
+# ── Call 1: record who was already here, then boot.
+if [ ! -x "$ADB" ]; then
+  echo "!! no SDK — set sdk.dir in local.properties or export ANDROID_HOME; STOP"
+else
+  live > "$THEIRS"; echo "not mine, never touch: $(tr '\n' ' ' < "$THEIRS")"
+  # Launch via the harness's background-run mode, never a bare '&'.
+  "$SDK/emulator/emulator" -avd Pixel_7_API_35 -no-snapshot-save -no-audio -no-window
+fi
 
-# 2. Boot headless. Agents: use the harness's background-run mode, never a bare
-#    '&' — a detached process is exactly the kind that gets forgotten.
-"$SDK/emulator/emulator" -avd Pixel_7_API_35 -no-snapshot-save -no-audio -no-window
+# ── Call 2: identify YOUR emulator, then build and install onto it — or do
+#    nothing at all. The else branch is the point: no serial, no commands.
+MINE=$(mine | head -1)
+if [ -z "$MINE" ]; then
+  echo "!! no new emulator appeared — boot failed. STOP: adb -s '' would target
+        whatever single device is attached, which may be a personal phone."
+else
+  "$ADB" -s "$MINE" shell getprop ro.build.version.release   # confirm the AVD you meant
+  ./gradlew :app:assembleDebug \
+    && "$ADB" -s "$MINE" install -r app/build/outputs/apk/debug/app-debug.apk
+fi
 
-# 3. Your serial is the emulator that APPEARED. Guard the empty case: `adb -s ""`
-#    falls back to "the only device", which is how fan-out starts.
-MINE=$("$ADB" devices | awk '/^emulator-/{print $1}' \
-        | grep -vxF -f <(printf '%s\n' "$THEIRS_EMU") | head -1)
-[ -n "$MINE" ] || echo "!! no new emulator appeared — did the boot fail?"
-"$ADB" -s "$MINE" shell getprop ro.build.version.release   # confirm it's the AVD you meant
-
-# 4. Build, then install — two explicit steps. Never a bare installDebug.
-./gradlew :app:assembleDebug
-"$ADB" -s "$MINE" install -r app/build/outputs/apk/debug/app-debug.apk
-
-# 5. ...verify... then ALWAYS, in this same block, clean up ONLY what you started.
-"$ADB" -s "$MINE" emu kill
-NEW_DAEMONS=$(pgrep -f 'GradleDaemon|KotlinCompileDaemon' | sort \
-               | comm -13 <(printf '%s\n' "$THEIRS_DAEMON") -)
-[ -z "$NEW_DAEMONS" ] || kill $NEW_DAEMONS
-
-# 6. Audit before you finish — both must print 0. Count only what is still
-#    YOURS: another session's emulator and Studio's daemon are legitimately
-#    running, and must not fail your audit or you'll learn to ignore it.
-"$ADB" devices | awk '/^emulator-/{print $1}' \
-  | grep -vxF -f <(printf '%s\n' "$THEIRS_EMU") | wc -l
-pgrep -f '[G]radleDaemon|[K]otlinCompileDaemon' | sort \
-  | comm -13 <(printf '%s\n' "$THEIRS_DAEMON") - | wc -l
+# ── Call 3: after verifying, kill ONLY yours, then audit.
+MINE=$(mine | head -1); [ -z "$MINE" ] || "$ADB" -s "$MINE" emu kill
+# adb keeps listing a dying emulator for a beat, so let it actually go before
+# counting — otherwise the audit cries wolf and you learn to ignore it.
+for _ in 1 2 3 4 5; do [ -z "$(mine)" ] && break; sleep 2; done
+echo "still mine (must be 0): $(mine | wc -l | tr -d ' ')"
+rm -f "$THEIRS"
 ```
 
-Two shell details the audit depends on: use `pgrep`, not `ps aux | grep` — `ps`
-truncates to terminal width on a tty and silently drops daemon matches, because
-the class name trails a very long classpath (verified: 3 daemons via a pipe, 2
-via an 80-column terminal). And bracket the pattern (`[G]radleDaemon`) so
-`pgrep -f` doesn't match the very shell running the audit, whose command line
-contains the pattern text.
+**Daemons are deliberately not killed.** Gradle and Kotlin daemons idle near 0%
+CPU and reap themselves on an idle timeout, while every way of killing them is
+wrong: `./gradlew --stop` and `pkill -f KotlinCompileDaemon` also stop Android
+Studio's, costing the developer their warm build; filtering by JDK path
+misjudges ownership in both directions; and a before/after PID diff blames you
+for any daemon that merely *appeared* later — including one Studio spawned for a
+mid-session sync. The emulator is the process worth chasing: it costs ~8 cores,
+where a daemon costs some idle RAM. If you do want to look, `pgrep -f
+'[G]radleDaemon|[K]otlinCompileDaemon'` lists them — informational only.
+
+Two shell details worth knowing, both verified on this machine. Prefer `pgrep`
+over `ps aux | grep`: `ps` truncates to terminal width on a tty and silently
+drops daemon matches, because the class name trails a very long classpath (3
+daemons via a pipe, only 2 through an 80-column terminal). And if you do use
+`ps | grep`, bracket the pattern (`[G]radleDaemon`) so the pipeline doesn't
+match its own shell — `ps auxww | grep` matched 3 processes for a sentinel that
+existed only in the script text, whereas macOS `pgrep -f` matched 0. Don't rely
+on that difference: Linux `pgrep` reads `/proc/*/cmdline` and *does* match the
+invoking shell, so bracket everywhere and never pipe such a list into `kill`.
 
 Rules that follow from this:
 
 - **Boot per task, not per session.** A headless AVD boots in ~60s; that is
   cheaper than leaving one running for an hour. Never keep one "warm".
-- **Kill only what you started, by diff.** Never `xargs` a kill across every
-  listed emulator, never hardcode `emulator-5554` (ports get reused), and never
-  use blanket `./gradlew --stop` or `pkill -f KotlinCompileDaemon` — those also
-  kill Android Studio's daemons and cost the developer their warm build. Identify
-  ownership by the before/after diff above, not by inspecting a process's JDK
-  path: an agent building under Studio's bundled JBR is indistinguishable that
-  way, so a path filter both masks your own leak and flags daemons that aren't
-  yours.
+- **Kill only the emulator you started, identified by diff.** Never `xargs` a
+  kill across every listed emulator and never hardcode `emulator-5554` — ports
+  get reused, and the device on one may be another session's. Ownership comes
+  from the before/after snapshot, never from what a process looks like: an agent
+  building under Studio's bundled JBR is indistinguishable by JDK path, so such
+  a filter both masks your own leak and flags processes that aren't yours.
 - **Always target a device explicitly.** A bare `installDebug` or `adb install`
   fans out to *every* attached device, including a developer's personal phone
   and other projects' emulators. The unambiguous path is the two-step build and
-  install in step 4 above (`./gradlew :app:assembleDebug`, then
-  `adb -s <the serial captured in step 3> install -r
+  install in call 2 above (`./gradlew :app:assembleDebug`, then
+  `adb -s <the serial from mine()> install -r
   app/build/outputs/apk/debug/app-debug.apk`).
   (`ANDROID_SERIAL` steers the `adb` CLI, but AGP's own install tasks talk to
   devices via ddmlib, so don't assume it constrains them; the
