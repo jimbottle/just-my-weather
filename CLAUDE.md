@@ -87,50 +87,71 @@ Ownership is the whole game: **snapshot what was already running, and only ever
 touch the difference.** Other agent sessions and the developer's Android Studio
 own processes that look exactly like yours.
 
-Two constraints shape the commands below. Agent tool calls **share no shell
-state** — a variable set in one call is gone in the next, and an empty
-`$THEIRS` silently means "everything is mine", the exact failure this exists to
-prevent — so the snapshot lives in a **file**. And a warning that doesn't stop
-execution is not a guard: `adb -s ""` falls back to "the only attached device",
-so every step that uses a serial must be *gated*, not merely preceded by an
-`echo`.
+Three constraints shape the commands below. Agent tool calls **share no shell
+state** — a variable set in one call is gone in the next, and an empty snapshot
+silently means "everything is mine", the exact failure this exists to prevent —
+so the snapshot lives in a **file**, and that file is **namespaced per session**
+because concurrent agent sessions on one machine would otherwise overwrite each
+other's. A warning that doesn't stop execution is not a guard: `adb -s ""` falls
+back to "the only attached device", so every step using a serial must be
+*gated*. And the boot never returns while the emulator lives, so it gets a call
+of its own — the snapshot must be written and flushed *before* it.
 
 ```bash
 # ── Preamble: run at the TOP OF EVERY CALL. Nothing carries between calls.
 SDK=$(sed -n 's/^sdk.dir=//p' local.properties 2>/dev/null); SDK=${SDK:-$ANDROID_HOME}
-ADB="$SDK/platform-tools/adb"; THEIRS=/tmp/jmw-theirs-emu
+ADB="$SDK/platform-tools/adb"
+# Per session: with a fixed path, a second session's call 1 would record YOUR
+# emulator as "theirs" — your audit then passes while it runs on forever.
+THEIRS=/tmp/jmw-theirs-emu-${CLAUDE_CODE_SESSION_ID:-$USER}
 live() { "$ADB" devices | awk '/^emulator-/ && $2=="device" {print $1}'; }
-mine() { [ -f "$THEIRS" ] || { echo "!! no snapshot — do call 1 first" >&2; return 1; }
-         live | grep -vxF -f "$THEIRS"; }
+mine() { live | grep -vxF -f "$THEIRS"; }        # valid only once $THEIRS exists
 
-# ── Call 1: record who was already here, then boot.
+# ── Call 1 (foreground, on its own): record who was already here.
 if [ ! -x "$ADB" ]; then
   echo "!! no SDK — set sdk.dir in local.properties or export ANDROID_HOME; STOP"
+elif [ -f "$THEIRS" ]; then
+  echo "!! snapshot already exists — an earlier run never cleaned up. Check it
+        before overwriting: [$(tr '\n' ' ' < "$THEIRS")]"
 else
-  live > "$THEIRS"; echo "not mine, never touch: $(tr '\n' ' ' < "$THEIRS")"
-  # Launch via the harness's background-run mode, never a bare '&'.
-  "$SDK/emulator/emulator" -avd Pixel_7_API_35 -no-snapshot-save -no-audio -no-window
+  live > "$THEIRS"; echo "not mine, never touch: [$(tr '\n' ' ' < "$THEIRS")]"
 fi
 
-# ── Call 2: identify YOUR emulator, then build and install onto it — or do
-#    nothing at all. The else branch is the point: no serial, no commands.
-MINE=$(mine | head -1)
-if [ -z "$MINE" ]; then
-  echo "!! no new emulator appeared — boot failed. STOP: adb -s '' would target
-        whatever single device is attached, which may be a personal phone."
+# ── Call 2 (background-run mode, never a bare '&'): boot. Alone, because it
+#    does not return until the emulator exits.
+"$SDK/emulator/emulator" -avd Pixel_7_API_35 -no-snapshot-save -no-audio -no-window
+
+# ── Call 3: identify YOUR emulator, then build and install onto it — or do
+#    nothing. The two failure modes are different: a missing snapshot is
+#    recoverable by re-running call 1; a missing emulator means the boot failed.
+if [ ! -f "$THEIRS" ]; then
+  echo "!! no snapshot — re-run call 1 (recoverable; do NOT guess a serial)"
+elif [ -z "$(mine | head -1)" ]; then
+  echo "!! no new emulator — the boot failed. STOP: adb -s '' targets whatever
+        single device is attached, possibly a personal phone."
 else
+  MINE=$(mine | head -1)
   "$ADB" -s "$MINE" shell getprop ro.build.version.release   # confirm the AVD you meant
   ./gradlew :app:assembleDebug \
     && "$ADB" -s "$MINE" install -r app/build/outputs/apk/debug/app-debug.apk
 fi
 
-# ── Call 3: after verifying, kill ONLY yours, then audit.
-MINE=$(mine | head -1); [ -z "$MINE" ] || "$ADB" -s "$MINE" emu kill
-# adb keeps listing a dying emulator for a beat, so let it actually go before
-# counting — otherwise the audit cries wolf and you learn to ignore it.
-for _ in 1 2 3 4 5; do [ -z "$(mine)" ] && break; sleep 2; done
-echo "still mine (must be 0): $(mine | wc -l | tr -d ' ')"
-rm -f "$THEIRS"
+# ── Call 4: after verifying, kill ONLY yours, wait for it to go, then audit.
+if [ ! -f "$THEIRS" ]; then
+  echo "!! no snapshot — cannot tell yours from another session's; list
+        emulators and resolve by hand rather than killing anything"
+else
+  MINE=$(mine | head -1); [ -z "$MINE" ] || "$ADB" -s "$MINE" emu kill
+  # adb keeps listing a dying emulator for a beat; let it actually go before
+  # counting, or the audit cries wolf and you learn to ignore it.
+  for _ in 1 2 3 4 5 6 7 8 9 10; do [ -z "$(mine)" ] && break; sleep 2; done
+  if [ -z "$(mine)" ]; then
+    echo "clean — 0 of mine still running"; rm -f "$THEIRS"   # only now
+  else
+    echo "!! STILL RUNNING after 20s: $(mine | tr '\n' ' ') — kill it by hand.
+          Keeping the snapshot so you can still tell yours from theirs."
+  fi
+fi
 ```
 
 **Daemons are deliberately not killed.** Gradle and Kotlin daemons idle near 0%
