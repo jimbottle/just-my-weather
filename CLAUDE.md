@@ -92,21 +92,29 @@ has to be remembered between calls, which is what matters — agent tool calls
 share no shell state, and every scheme built on carrying a snapshot forward
 fails open ("everything is mine") exactly when it matters most.
 
-The one requirement: **this project's AVD is `Pixel_7_API_35` and no other
-project's session may use that name.** A leaked emulator then stays identifiable
-by any later session, so it can always be cleaned up.
+Two requirements come with that. **This project's AVD is `Pixel_7_API_35` and no
+other project's session may use that name** — then a leaked emulator stays
+identifiable by any later session and can always be cleaned up. And **only one
+session of this project may hold the emulator at a time**: an AVD name cannot
+distinguish two sessions of the *same* project, so a session that finds
+`$AVD` already running must not boot, install, or kill — it stops and
+coordinates. Call 1 enforces that; don't route around it.
 
-One more rule: a warning that doesn't stop execution is not a guard. `adb -s ""`
+Two more rules. A warning that doesn't stop execution is not a guard: `adb -s ""`
 falls back to "the only attached device", so every step that needs a serial is
-*gated*, not merely preceded by an `echo`.
+*gated*. And **every call re-checks the SDK** — an unusable `adb` makes `mine()`
+silently empty, which would let the audit report "clean" while the emulator
+burns eight cores. The audit is the one step that must never fail open.
 
 ```bash
 # ── Preamble: run at the top of every call. Nothing carries between calls —
-#    and nothing needs to.
-SDK=$(sed -n 's/^sdk.dir=//p' local.properties 2>/dev/null); SDK=${SDK:-$ANDROID_HOME}
+#    and nothing needs to. local.properties is resolved from the repo root, not
+#    $PWD, so a call issued from a subdirectory can't silently blank the SDK.
+ROOT=$(git rev-parse --show-toplevel 2>/dev/null || echo .)
+SDK=$(sed -n 's/^sdk.dir=//p' "$ROOT/local.properties" 2>/dev/null); SDK=${SDK:-$ANDROID_HOME}
 ADB="$SDK/platform-tools/adb"
 AVD=Pixel_7_API_35
-mine() { for s in $("$ADB" devices | awk '/^emulator-/ && $2=="device" {print $1}'); do
+mine() { for s in $("$ADB" devices 2>/dev/null | awk '/^emulator-/ && $2=="device" {print $1}'); do
            [ "$("$ADB" -s "$s" emu avd name 2>/dev/null | head -1 | tr -d '\r')" = "$AVD" ] \
              && echo "$s"
          done; }
@@ -115,31 +123,49 @@ mine() { for s in $("$ADB" devices | awk '/^emulator-/ && $2=="device" {print $1
 #    does not return until the emulator exits.
 if [ ! -x "$ADB" ]; then
   echo "!! no SDK — set sdk.dir in local.properties or export ANDROID_HOME; STOP"
+elif [ -n "$(mine)" ]; then
+  echo "!! $AVD is ALREADY running — another session of this project holds it.
+        STOP: do not boot, install, or kill. Coordinate before touching it."
 else
   "$SDK/emulator/emulator" -avd "$AVD" -no-snapshot-save -no-audio -no-window
 fi
 
-# ── Call 2: build and install onto YOUR emulator — or do nothing at all.
-MINE=$(mine | head -1)
-if [ -z "$MINE" ]; then
-  echo "!! $AVD is not running — the boot failed. STOP: adb -s '' would target
-        whatever single device is attached, possibly a personal phone."
+# ── Call 2: wait for YOUR emulator, then build and install onto it — or do
+#    nothing at all. A headless AVD needs ~60s, and it is invisible to mine()
+#    until it reaches 'device' state, so poll before calling the boot a failure.
+if [ ! -x "$ADB" ]; then
+  echo "!! no SDK — STOP"
 else
-  "$ADB" -s "$MINE" shell getprop ro.build.version.release   # sanity-check the image
-  ./gradlew :app:assembleDebug \
-    && "$ADB" -s "$MINE" install -r app/build/outputs/apk/debug/app-debug.apk
+  for _ in $(seq 24); do MINE=$(mine | head -1); [ -n "$MINE" ] && break; sleep 5; done
+  if [ -z "$MINE" ]; then
+    echo "!! $AVD never reached 'device' state in 2 min — the boot failed. STOP:
+          adb -s '' would target whatever single device is attached."
+  else
+    "$ADB" -s "$MINE" shell getprop ro.build.version.release   # sanity-check the image
+    ./gradlew :app:assembleDebug \
+      && "$ADB" -s "$MINE" install -r app/build/outputs/apk/debug/app-debug.apk
+  fi
 fi
 
-# ── Call 3: after verifying, kill yours, wait for it to actually go, audit.
-mine | while read -r s; do "$ADB" -s "$s" emu kill; done
-# adb keeps listing a dying emulator for a beat; let it go before counting, or
-# the audit cries wolf and you learn to ignore it.
-for _ in 1 2 3 4 5 6 7 8 9 10; do [ -z "$(mine)" ] && break; sleep 2; done
-if [ -z "$(mine)" ]; then
-  echo "clean — no $AVD emulator running"
+# ── Call 3: after verifying, kill yours, wait for it to actually go, then audit.
+if [ ! -x "$ADB" ]; then
+  echo "!! no SDK — cannot audit; STOP and do NOT assume the machine is clean"
 else
-  echo "!! STILL RUNNING: $(mine | tr '\n' ' ') — re-run this call; if it
-        persists, kill it by hand."
+  mine | while read -r s; do "$ADB" -s "$s" emu kill; done
+  # adb keeps listing a dying emulator for a beat; let it go before counting, or
+  # the audit cries wolf and you learn to ignore it.
+  for _ in 1 2 3 4 5 6 7 8 9 10; do [ -z "$(mine)" ] && break; sleep 2; done
+  if [ -n "$(mine)" ]; then
+    echo "!! STILL RUNNING: $(mine | tr '\n' ' ') — re-run this call; if it
+          persists, kill it by hand."
+  elif ps auxww | grep "[q]emu-system" | grep -q -- "-avd $AVD"; then
+    # Backstop: a wedged or offline emulator drops out of `adb devices` while
+    # its qemu process keeps burning cores, so adb alone can't clear you.
+    echo "!! a $AVD qemu process is alive but adb can't see it — wedged. Find
+          it with: ps auxww | grep '[q]emu-system'   then kill that pid."
+  else
+    echo "clean — no $AVD emulator running"
+  fi
 fi
 ```
 
