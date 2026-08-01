@@ -109,8 +109,9 @@ The rules that follow:
   soon as adb answers, in the same call that launches it. That matters twice
   over: an unclaimed emulator could be claimed out from under you by a peer, and
   — worse — one you booted but never claimed is one *you* can no longer kill,
-  since `mine()` wouldn't match it. A sub-second window remains between adb
-  answering and the claim landing; it cannot be closed with these tools (the
+  since `mine()` wouldn't match it. A window of up to one poll interval (~1 s;
+  the `setprop` itself is ~22 ms) remains between adb answering and the claim
+  landing; it cannot be closed with these tools (the
   emulator's `-prop` flag accepts only `qemu.*` names and even those never
   surface via `getprop` — both verified), which is exactly why call 1 refuses to
   boot into a running AVD. Don't run two sessions through call 1 at once.
@@ -134,37 +135,47 @@ ROOT=$(git rev-parse --show-toplevel 2>/dev/null || echo .)
 SDK=$(sed -n 's/^sdk.dir=//p' "$ROOT/local.properties" 2>/dev/null); SDK=${SDK:-$ANDROID_HOME}
 ADB="$SDK/platform-tools/adb"
 AVD=Pixel_7_API_35
-# Identity. An unset session id would make every same-user session look like
-# every other, so each one's mine() would match a peer's emulator and call 3
-# would kill it — a hard stop is safer than that silent degradation.
+EMU="$SDK/emulator/emulator"
+# Identity. This MUST be non-empty: an unclaimed emulator's owner reads as the
+# empty string, so an empty $ME would make mine() match every unclaimed
+# emulator on the machine — including a peer's freshly booted one — and call 3
+# would kill it. mine() therefore refuses outright rather than trusting callers.
 ME=$CLAUDE_CODE_SESSION_ID
 ours()  { for s in $("$ADB" devices 2>/dev/null | awk '/^emulator-/ && $2=="device" {print $1}'); do
             [ "$("$ADB" -s "$s" emu avd name 2>/dev/null | head -1 | tr -d '\r')" = "$AVD" ] \
               && echo "$s"
           done; }
 owner() { [ -n "$1" ] && "$ADB" -s "$1" shell getprop debug.jmw.owner 2>/dev/null | tr -d '\r'; }
-mine()  { for s in $(ours); do [ "$(owner "$s")" = "$ME" ] && echo "$s"; done; }
+mine()  { [ -n "$ME" ] || return 0                      # empty identity owns nothing
+          for s in $(ours); do [ "$(owner "$s")" = "$ME" ] && echo "$s"; done; }
 echo "identity: ${ME:-<UNSET>}"     # every call prints it: never guess which scheme is live
 
-# ── Call 1 (background-run mode, never a bare '&'): boot AND claim. Alone,
-#    because the emulator does not return until it exits.
+# ── Call 1 (launch it with the harness's background-run mode): boot AND claim.
+#    Alone, because it does not return until the emulator exits.
 O=$(ours); FIRST=$(echo "$O" | head -1)      # sample once; two samples disagree
-if [ ! -x "$ADB" ]; then
+if [ ! -x "$ADB" ] || [ ! -x "$EMU" ]; then
   echo "!! no SDK — set sdk.dir in local.properties or export ANDROID_HOME; STOP"
 elif [ -z "$ME" ]; then
-  echo "!! CLAUDE_CODE_SESSION_ID unset — ownership would degrade to per-user and
-        a peer's emulator would look like yours. STOP; set it first."
+  echo "!! CLAUDE_CODE_SESSION_ID unset — an empty identity would match every
+        unclaimed emulator, so call 3 would kill a peer's. STOP; set it first."
 elif [ -n "$O" ]; then
   echo "!! $AVD is ALREADY running (owner='$(owner "$FIRST")'). STOP: do not
         boot, install, or kill. A peer session or an orphan — a human decides."
 else
-  # Claim as soon as adb answers, alongside the blocking emulator process: an
-  # emulator you booted but never claimed is one you can no longer kill.
-  ( for _ in $(seq 60); do s=$(ours | head -1)
-      [ -n "$s" ] && { "$ADB" -s "$s" shell setprop debug.jmw.owner "$ME"; break; }
-      sleep 2
-    done ) &
-  "$SDK/emulator/emulator" -avd "$AVD" -no-snapshot-save -no-audio -no-window
+  # The '&' here is deliberate and scoped — it is not the forbidden "detach the
+  # emulator" pattern. The emulator is backgrounded only so this call can claim
+  # it the moment adb answers (an emulator you booted but never claimed is one
+  # you can no longer kill), then `wait` restores the blocking behaviour the
+  # harness's background-run mode expects. The claim loop dies with the
+  # emulator, so a failed launch can never leave it stamping a peer's device.
+  "$EMU" -avd "$AVD" -no-snapshot-save -no-audio -no-window & EMU_PID=$!
+  for _ in $(seq 120); do
+    kill -0 "$EMU_PID" 2>/dev/null || break          # launch died: stop claiming
+    s=$(ours | head -1)
+    [ -n "$s" ] && { "$ADB" -s "$s" shell setprop debug.jmw.owner "$ME"; break; }
+    sleep 1
+  done
+  wait "$EMU_PID"
 fi
 
 # ── Call 2: build and install onto YOUR emulator — or do nothing at all. A
@@ -174,12 +185,13 @@ if [ ! -x "$ADB" ] || [ -z "$ME" ]; then
   echo "!! no SDK or no session id — STOP"
 else
   for _ in $(seq 24); do S=$(mine | head -1); [ -n "$S" ] && break; sleep 5; done
+  O=$(ours); FIRST=$(echo "$O" | head -1)    # sample once, as in call 1
   if [ -n "$S" ]; then
     "$ADB" -s "$S" shell getprop ro.build.version.release   # sanity-check the image
     ./gradlew :app:assembleDebug \
       && "$ADB" -s "$S" install -r app/build/outputs/apk/debug/app-debug.apk
-  elif [ -n "$(ours)" ]; then
-    echo "!! $AVD is running but not claimed by you (owner='$(owner "$(ours | head -1)")').
+  elif [ -n "$O" ]; then
+    echo "!! $AVD is running but not claimed by you (owner='$(owner "$FIRST")').
           STOP — never install onto or kill a device you don't own. If you ran
           call 1 and it reported nothing running, this one IS yours: claim it by
           hand (see the prose) and re-run."
@@ -190,8 +202,10 @@ else
 fi
 
 # ── Call 3: after verifying, kill what you own, let it go, then audit.
-if [ ! -x "$ADB" ]; then
-  echo "!! no SDK — cannot audit; STOP and do NOT assume the machine is clean"
+if [ ! -x "$ADB" ] || [ -z "$ME" ]; then
+  echo "!! no SDK or no session id — cannot audit; STOP and do NOT assume the
+        machine is clean. (This is the call that kills, so it is the one that
+        must never run with an identity that matches unclaimed emulators.)"
 else
   mine | while read -r s; do "$ADB" -s "$s" emu kill; done
   # adb lists a dying emulator for a beat, and its qemu process outlives that,
