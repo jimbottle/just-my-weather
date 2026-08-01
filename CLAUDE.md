@@ -168,29 +168,48 @@ elif [ -n "$O" ]; then
   echo "!! $AVD is ALREADY running (owner='$(owner "$FIRST")'). STOP: do not
         boot, install, or kill. A peer session or an orphan — a human decides."
 else
-  # The '&' here is deliberate and scoped — it is not the forbidden "detach the
-  # emulator" pattern. The emulator is backgrounded only so this call can claim
-  # it the moment adb answers (an emulator you booted but never claimed is one
-  # you can no longer kill), then `wait` restores the blocking behaviour the
-  # harness's background-run mode expects. The claim loop dies with the
-  # emulator, so a failed launch can never leave it stamping a peer's device.
-  # Backgrounding costs the signal propagation a foreground command gets free:
-  # without this trap, killing the call (timeout, interrupt, session end) leaves
-  # the emulator orphaned — and claimed, so only this now-dead session could
-  # ever have killed it. The handler is terminal and bounded: it waits for the
-  # emulator to actually exit before the call returns, and exiting also stops
-  # the claim loop below from setprop-ing a device on its way out.
+  # One account of the whole arrangement, in order:
   #
-  # Installed BEFORE the launch (the body is evaluated at signal time, so the
-  # not-yet-set PID is fine) — otherwise a signal landing in between is lost.
-  # Verified: `emulator` EXECS into qemu-system rather than forking it (same
-  # PID), so killing $EMU_PID kills the process that holds the cores; a TERM to
-  # this shell left 0 qemu processes for the AVD.
+  # 1. The '&' is deliberate and scoped — NOT the forbidden "detach and forget"
+  #    pattern. The emulator is backgrounded only so this call can claim it the
+  #    moment adb answers (an emulator you booted but never claimed is one you
+  #    can no longer kill). The `wait` at the end restores the blocking
+  #    behaviour the harness's background-run mode expects.
+  # 2. The claim loop below stops on either exit path: if the launch dies its
+  #    `kill -0` test breaks the loop; if a signal arrives the trap's `exit`
+  #    ends the script, so it can't setprop a device on its way out.
+  # 3. Backgrounding costs the signal propagation a foreground command gets for
+  #    free, hence the trap: without it, killing the call (timeout, interrupt,
+  #    session end) orphans the emulator — and it's claimed, so only this
+  #    now-dead session could ever have killed it.
+  # 4. The trap is installed BEFORE the launch (its body is evaluated at signal
+  #    time, so naming the not-yet-set PID is fine), and it ESCALATES rather
+  #    than blocking: TERM, up to 10s to exit cleanly, then KILL. A plain
+  #    `wait` here would hang forever on an emulator that ignores TERM.
+  #
+  # Verified: `emulator` EXECS into qemu-system rather than forking it (launcher
+  # and qemu share one PID), so killing $EMU_PID reaches the process holding the
+  # cores; a TERM to this shell left 0 qemu processes for the AVD.
+  #
   # Residual, accepted: SIGKILL cannot be trapped, so a hard-killed call still
-  # leaves a *claimed* emulator that no later session may touch (a new $ME will
-  # never match the stale claim). Clear it by hand — see the by-hand recovery in
-  # the prose above.
-  trap 'kill "${EMU_PID:-}" 2>/dev/null; wait "${EMU_PID:-}" 2>/dev/null; exit 143' INT TERM HUP
+  # leaves a *claimed* emulator that no later session may touch (a new $ME never
+  # matches the stale claim). Clear it by hand — see the recovery in the prose.
+  stop_emu() {
+    if [ -n "${EMU_PID:-}" ]; then
+      kill "$EMU_PID" 2>/dev/null
+      for _ in 1 2 3 4 5 6 7 8 9 10; do kill -0 "$EMU_PID" 2>/dev/null || break; sleep 1; done
+      kill -9 "$EMU_PID" 2>/dev/null
+    else
+      # A signal can land in the instant between the fork and the EMU_PID
+      # assignment. Then there is no PID to kill, so fall back to the AVD —
+      # matched against qemu-system lines only, never a bare pattern, which
+      # would also match this very shell's command line.
+      for p in $(ps auxww | grep "[q]emu-system" | grep -E -- "-avd $AVD( |$)" | awk '{print $2}'); do
+        kill "$p" 2>/dev/null
+      done
+    fi
+  }
+  trap 'stop_emu; exit 143' INT TERM HUP
   "$EMU" -avd "$AVD" -no-snapshot-save -no-audio -no-window & EMU_PID=$!
   for _ in $(seq 120); do
     kill -0 "$EMU_PID" 2>/dev/null || break          # launch died: stop claiming
