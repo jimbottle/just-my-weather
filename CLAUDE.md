@@ -326,6 +326,10 @@ Rules that follow from this:
   `android.injected.device.serial` property could not be confirmed in the pinned
   AGP 8.7.3 artifacts, and Gradle silently ignores unknown `-P` flags — an
   unverified flag gives false confidence, which is how the fan-out happens.)
+  **Maestro needs its own flag: `maestro --device <serial> test .maestro/`.**
+  It ignores `ANDROID_SERIAL` and silently picks a device when several are
+  attached — verified the hard way, running a suite against another session's
+  emulator and an older build, which reported the new testTags as missing.
 - **Prefer the JVM gate.** Unit tests + ktlint + assemble need no device at all;
   reach for an emulator only when the change is genuinely visual or runtime
   (insets, notifications, WorkManager, permissions).

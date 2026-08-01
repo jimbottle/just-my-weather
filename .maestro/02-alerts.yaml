@@ -1,0 +1,71 @@
+# Personal alerts: build a rule, toggle it, remove it. This is the screen with
+# the most state, and every control it needs is targeted by testTag — the
+# switches and the value field carry no stable text, so text/relative selectors
+# can't reach them (an earlier manual pass had to fall back to coordinate taps).
+#
+# Notification permission is granted up front so no system dialog interrupts
+# the run. The rule is never expected to fire here; this covers the editing
+# loop, not delivery (delivery needs a live NWS threshold crossing).
+appId: io.raylytics.justmyweather
+---
+- launchApp:
+    clearState: true
+    permissions:
+      all: allow
+
+- extendedWaitUntil:
+    visible: "Refresh"
+    timeout: 60000
+- tapOn: "Alerts"
+
+# Entering Alerts is where the app asks for POST_NOTIFICATIONS (API 33+) — that
+# is the moment the user is opting in, and launchApp's blanket grant does not
+# cover it. Whether the dialog appears depends on whether a previous grant
+# survived `clearState` (observed: it does), so this must tolerate both: settle
+# first so a dialog that renders a beat late isn't raced, then tap it only if
+# it is actually there.
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    text: "Allow"
+    optional: true
+
+- extendedWaitUntil:
+    visible: "Add an alert"
+    timeout: 10000
+
+# A fresh install has no rules and says so.
+- assertVisible:
+    text: "No alerts yet.*"
+
+# Build one: the default subject/comparison plus a threshold. "Add" stays
+# disabled until the value parses, so a successful tap proves the enabling too.
+- tapOn:
+    id: "thresholdValue"
+- inputText: "40"
+- hideKeyboard
+- tapOn:
+    id: "addRule"
+- extendedWaitUntil:
+    visible: "Temperature below 40.*"
+    timeout: 10000
+
+# The rule's own switch and quiet hours are independent toggles.
+- tapOn:
+    id: "toggleRule"
+- tapOn:
+    id: "quietHours"
+- assertVisible: "Deliver silently.*"
+
+# Removing the last rule returns the calm empty state.
+- tapOn:
+    id: "removeRule"
+- extendedWaitUntil:
+    visible: "No alerts yet.*"
+    timeout: 10000
+
+# Back to the glance, still rendering weather.
+- tapOn: "Done"
+- extendedWaitUntil:
+    visible: "Refresh"
+    timeout: 30000

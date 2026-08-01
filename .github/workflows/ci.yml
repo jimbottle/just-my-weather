@@ -43,3 +43,64 @@ jobs:
           name: unit-test-report
           path: app/build/reports/tests/
           if-no-files-found: ignore
+
+  # Separate job so the fast gate above still reports in ~3 minutes: booting an
+  # emulator costs several more. UI regressions used to ship silently because
+  # the Maestro flows only ever ran by hand.
+  ui:
+    name: Maestro UI flows
+    runs-on: ubuntu-latest
+    # The flows hit the live NWS API, so a network blip is a flaky red that
+    # says nothing about the code. Gate merges on `gate`, treat this as signal.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build the debug APK
+        run: ./gradlew :app:assembleDebug --no-daemon --stacktrace
+
+      - name: Install Maestro
+        run: |
+          curl -Ls https://get.maestro.mobile.dev | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+
+      # KVM is what makes an x86_64 emulator usable on a CI runner.
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      # API 35: Android 15 enforces edge-to-edge for targetSdk 35, and an
+      # API 34 image would not have caught the inset bug that shipped once.
+      - name: Run Maestro flows
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          ram-size: 4096M
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: |
+            adb install -r app/build/outputs/apk/debug/app-debug.apk
+            maestro test .maestro/
+
+      - name: Upload Maestro output on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: maestro-debug
+          path: ~/.maestro/tests/
+          if-no-files-found: ignore
