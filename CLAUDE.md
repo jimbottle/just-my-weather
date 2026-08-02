@@ -151,8 +151,10 @@ owner() { [ -n "$1" ] && "$ADB" -s "$1" shell getprop debug.jmw.owner 2>/dev/nul
 # [ -z "$ME" ] itself rather than reading this function's exit status.
 mine()  { [ -n "$ME" ] || return 0
           for s in $(ours); do [ "$(owner "$s")" = "$ME" ] && echo "$s"; done; }
-# Stop a set of PIDs and confirm they are gone: TERM, up to 10s to exit
-# cleanly, then KILL whatever is left. Bounded — never blocks indefinitely.
+# Stop a set of PIDs: TERM, up to 10s to exit cleanly, then KILL what is left.
+# Bounded — never blocks indefinitely — and it REPORTS rather than assuming: a
+# PID that survives KILL (uninterruptible sleep, EPERM) must not look identical
+# to a clean stop, or the audit inherits a lie.
 stop_pids() { [ -n "$1" ] || return 0
   kill $1 2>/dev/null
   for _ in 1 2 3 4 5 6 7 8 9 10; do
@@ -160,20 +162,29 @@ stop_pids() { [ -n "$1" ] || return 0
     [ -n "$left" ] || return 0
     sleep 1
   done
-  for p in $left; do kill -0 "$p" 2>/dev/null && kill -9 "$p" 2>/dev/null; done; }
+  for p in $left; do kill -0 "$p" 2>/dev/null && kill -9 "$p" 2>/dev/null; done
+  sleep 1
+  for p in $left; do kill -0 "$p" 2>/dev/null \
+    && echo "!! survived KILL: $p — $AVD may still be running"; done; }
 # Used by call 1's trap. Defined here, with the other helpers, so the trap can
 # never outlive its handler if the block is edited or partially copied.
 stop_emu() {
-  if [ -n "${EMU_PID:-}" ]; then stop_pids "$EMU_PID"
-  else
-    # A signal can land in the instant between the fork and the EMU_PID
-    # assignment. Scope the search to THIS shell's own children — a peer
-    # session's emulator is never a child of ours, so it can't be caught.
-    k=""; for p in $(pgrep -P $$ 2>/dev/null); do
-      ps -o command= -p "$p" 2>/dev/null | grep -qE -- "-avd $AVD( |$)" && k="$k $p"
-    done
-    stop_pids "$k"
-  fi; }
+  if [ -n "${EMU_PID:-}" ]; then stop_pids "$EMU_PID"; return; fi
+  # A signal can land in the instant between the fork and the EMU_PID
+  # assignment. Scope to THIS shell's own children — a peer session's emulator
+  # is never a child of ours, so it can't be caught. `ps -ww` because a
+  # truncated line would drop the -avd argument, and here a missed match means
+  # an orphan, not a cosmetic miss.
+  kids=$(pgrep -P $$ 2>/dev/null)
+  k=""; for p in $kids; do
+    ps -ww -o command= -p "$p" 2>/dev/null | grep -qE -- "-avd $AVD( |$)" && k="$k $p"
+  done
+  # In most of that instant the child has forked but not yet exec'd, so it still
+  # carries THIS shell's argv and the -avd match misses. Call 1 backgrounds
+  # exactly one child and is only reachable when ours() was just empty, so
+  # falling back to every child is correct here rather than merely convenient.
+  [ -n "$k" ] || { k=$kids; [ -n "$k" ] && echo "note: no -avd match (pre-exec); stopping own children"; }
+  stop_pids "$k"; }
 echo "identity: ${ME:-<UNSET>}"     # every call prints it: never guess which scheme is live
 
 # ── Call 1 (launch it with the harness's background-run mode): boot AND claim.
@@ -208,7 +219,8 @@ else
   # 4. The trap is installed BEFORE the launch (its body is evaluated at signal
   #    time, so naming the not-yet-set PID is fine). Both of stop_emu's paths
   #    escalate through the same bounded stop_pids — TERM, up to 10s, then KILL
-  #    — so neither can hang, and neither leaves a survivor behind. A plain
+  #    — so neither can hang, and a survivor is reported rather than assumed
+  #    away. A plain
   #    `wait` here would block forever on an emulator that ignores TERM.
   #
   # Verified: `emulator` EXECS into qemu-system rather than forking it (launcher

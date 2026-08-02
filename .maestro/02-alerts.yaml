@@ -3,9 +3,10 @@
 # switches and the value field carry no stable text, so text/relative selectors
 # can't reach them (an earlier manual pass had to fall back to coordinate taps).
 #
-# Notification permission is granted up front so no system dialog interrupts
-# the run. The rule is never expected to fire here; this covers the editing
-# loop, not delivery (delivery needs a live NWS threshold crossing).
+# Location is granted up front; the POST_NOTIFICATIONS prompt is NOT covered by
+# that and is handled inline below. The rule is never expected to fire here:
+# this covers the editing loop, not delivery (delivery needs a live NWS
+# threshold crossing).
 appId: io.raylytics.justmyweather
 ---
 - launchApp:
@@ -38,26 +39,58 @@ appId: io.raylytics.justmyweather
 - assertVisible:
     text: "No alerts yet.*"
 
-# Build one: the default subject/comparison plus a threshold. "Add" stays
-# disabled until the value parses, so a successful tap proves the enabling too.
+# Build one: the default subject/comparison plus a threshold. Assert the Add
+# button is genuinely disabled first — Maestro will happily "tap" a disabled
+# Compose button and report success, so without this the enabling is untested.
+- assertVisible:
+    id: "addRule"
+    enabled: false
 - tapOn:
     id: "thresholdValue"
 - inputText: "40"
 - hideKeyboard
+- assertVisible:
+    id: "addRule"
+    enabled: true
 - tapOn:
     id: "addRule"
 - extendedWaitUntil:
     visible: "Temperature below 40.*"
     timeout: 10000
 
-# The rule's own switch and quiet hours are independent toggles.
+# Toggles: assert the CHECKED STATE either side of each tap. The descriptive
+# line under "Quiet hours" renders unconditionally, so asserting on it would
+# pass even if the switch were wired to nothing.
+- assertVisible:
+    id: "toggleRule"
+    checked: true
 - tapOn:
     id: "toggleRule"
+- assertVisible:
+    id: "toggleRule"
+    checked: false
+
+# Quiet hours sits below the fold once a rule row exists, and CI runs a
+# different device profile than local, so scroll to it rather than assuming
+# it's on screen.
+- scrollUntilVisible:
+    element:
+      id: "quietHours"
+    direction: DOWN
+- assertVisible:
+    id: "quietHours"
+    checked: false
 - tapOn:
     id: "quietHours"
-- assertVisible: "Deliver silently.*"
+- assertVisible:
+    id: "quietHours"
+    checked: true
 
 # Removing the last rule returns the calm empty state.
+- scrollUntilVisible:
+    element:
+      id: "removeRule"
+    direction: UP
 - tapOn:
     id: "removeRule"
 - extendedWaitUntil:
