@@ -126,10 +126,11 @@ jobs:
           arch: x86_64
           profile: pixel_6
           ram-size: 4096M
-          cores: 4          # a starved emulator ANRs the launcher, which then
-                            # covers the app and fails every flow at "is the
-                            # app up?" — observed, with the ANR dialog captured
-                            # in the maestro-debug artifact.
+          # 3, not 4: these runners have 4 vCPUs, and handing every one to qemu
+          # starves maestro/adb during the phase where they drive the UI —
+          # relocating the starvation rather than fixing it. (The launcher ANR
+          # that motivated this is handled deterministically in the script.)
+          cores: 3
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
           # ONE line: this action runs `script:` one line per `sh -c`, so
@@ -141,8 +142,12 @@ jobs:
         # Keep the artifact when the step failed AND when a retry rescued a
         # failed first pass — otherwise the retry, which makes that the common
         # failure shape, would quietly erase the evidence of recurring
-        # flakiness. if-no-files-found: ignore makes a no-op upload harmless.
-        if: always() && steps.maestro.outcome != 'skipped'
+        # flakiness. Keyed on the marker the script actually writes, so a clean
+        # pass uploads nothing (Maestro populates ~/.maestro/tests on success
+        # too, so an unconditional upload is noise, not a no-op).
+        if: >-
+          always() && (steps.maestro.outcome == 'failure'
+          || hashFiles(format('{0}/maestro-retried', runner.temp)) != '')
         uses: actions/upload-artifact@v4
         with:
           name: maestro-debug

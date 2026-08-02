@@ -14,7 +14,11 @@ set -euo pipefail
 
 # Paths below are repo-relative; don't depend on where this was invoked from,
 # or a local run from a subdirectory reports a missing APK that is really there.
-cd "$(git rev-parse --show-toplevel)"
+# Assignment form on purpose: inside `cd "$(...)"` the substitution's exit
+# status is discarded, so a missing git or a non-work-tree would leave `cd ""`
+# as a silent no-op and we'd carry on from the wrong directory.
+ROOT=$(git rev-parse --show-toplevel)
+cd "$ROOT"
 
 APK=app/build/outputs/apk/debug/app-debug.apk
 [ -f "$APK" ] || { echo "::error::missing $APK — build it first"; exit 1; }
@@ -42,20 +46,35 @@ if [ -z "$SERIAL" ]; then
 fi
 echo "device: $SERIAL"
 
-adb -s "$SERIAL" install -r "$APK"
+# Readiness, bounded and loud. In CI the emulator-runner action has already
+# waited for boot before invoking this script, so this is really for local runs
+# — but an unbounded `until` would turn a wedged device into a silent hang that
+# only ends at the job timeout, instead of a named error here.
+booted=""
+for _ in $(seq 60); do
+  [ "$(adb -s "$SERIAL" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ] \
+    && { booted=1; break; }
+  sleep 2
+done
+[ -n "$booted" ] || { echo "::error::$SERIAL never reported sys.boot_completed"; exit 1; }
 
-# Let the system settle before driving the UI. A freshly booted CI emulator is
-# still starting launcher/system services, and if the launcher ANRs its dialog
-# covers the app — every flow then fails at "is the app up?", which reads like
-# a product bug and isn't one.
-adb -s "$SERIAL" wait-for-device
-until [ "$(adb -s "$SERIAL" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ]; do sleep 2; done
-sleep 10
+# THE mitigation for the launcher ANR that once covered the app and failed every
+# flow at "is the app up?". Deterministic, unlike waiting: sys.boot_completed is
+# set early and doesn't correlate with the ANR at all, and a fixed sleep is a
+# guess that loses the race on a slow day. This suppresses system ANR/crash
+# dialogs outright, so a struggling launcher can never sit on top of the app.
+adb -s "$SERIAL" shell settings put global hide_error_dialogs 1
+
+# Install after the device is quiet: a PackageManager scan plus dexopt is one of
+# the heavier things to ask of a freshly booted system, so it belongs on the
+# settled side of the wait rather than contending with startup.
+adb -s "$SERIAL" install -r "$APK"
 
 # Retry once. The flows hit the live NWS API, so absorb a transient blip here
 # rather than by suppressing the job's result — a real regression fails both
-# passes and the job goes red. The marker lets the workflow keep the debug
-# artifact even when the retry succeeds, so recurring flakiness stays visible.
+# passes and the job goes red. The marker below is READ by the workflow's
+# upload condition, so the debug output of a failed first pass survives even
+# when the retry rescues it — otherwise recurring flakiness is unmeasurable.
 if ! maestro --device "$SERIAL" test .maestro/; then
   echo "::warning::first Maestro pass failed — retrying once"
   : > "${RUNNER_TEMP:-/tmp}/maestro-retried"
