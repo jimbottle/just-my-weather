@@ -39,8 +39,14 @@ appId: io.raylytics.justmyweather
 - assertVisible:
     text: "No alerts yet.*"
 
-# Build one: the default subject/comparison plus a threshold. Assert the Add
-# button is genuinely disabled first — Maestro will happily "tap" a disabled
+# Build one: the default subject/comparison plus a threshold. The Add button
+# sits below three wrapping chip rows, so scroll to it for the same reason the
+# controls further down are scrolled to — CI's profile is not the local one.
+- scrollUntilVisible:
+    element:
+      id: "addRule"
+    direction: DOWN
+# Assert it is genuinely disabled first — Maestro will happily "tap" a disabled
 # Compose button and report success, so without this the enabling is untested.
 - assertVisible:
     id: "addRule"

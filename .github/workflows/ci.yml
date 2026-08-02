@@ -56,11 +56,12 @@ jobs:
   ui:
     name: Maestro UI flows
     runs-on: ubuntu-latest
-    # NOT continue-on-error at job level: that resolves the job to success, so a
-    # failed flow renders green and the regression stays as silent as before.
-    # Only the flow-running step tolerates failure (it hits the live NWS API);
-    # every setup and supply-chain step below reports red. `ui` is simply not a
-    # required check, so a red flow surfaces without blocking merges.
+    # No continue-on-error anywhere. It sets the conclusion to success, which
+    # both renders a failed flow green — the exact silence this job exists to
+    # end — and suppresses the on-failure artifact upload that diagnoses it.
+    # `ui` is simply not a required check, so a red flow is visible without
+    # blocking merges. Live-API flakiness is absorbed at its source by the
+    # retry in the script below, not by hiding the outcome.
     steps:
       - uses: actions/checkout@v4
 
@@ -96,10 +97,11 @@ jobs:
           # Assert, don't echo: if the installer ignores the variable or falls
           # back to latest, the pin was never in effect and we want a red step.
           v="$("$HOME/.maestro/bin/maestro" --version | tr -d '\r' | tail -1)"
-          case "$v" in
-            *"$MAESTRO_VERSION"*) echo "maestro $v (pinned)" ;;
-            *) echo "::error::expected maestro $MAESTRO_VERSION, got '$v'"; exit 1 ;;
-          esac
+          # Exact, not substring: 2.5.0 must not be satisfied by 12.5.0 or
+          # 2.5.0-SNAPSHOT, or the gate stops meaning anything.
+          [ "$v" = "$MAESTRO_VERSION" ] \
+            || { echo "::error::expected maestro $MAESTRO_VERSION, got '$v'"; exit 1; }
+          echo "maestro $v (pinned)"
 
       # KVM is what makes an x86_64 emulator usable on a CI runner.
       - name: Enable KVM
@@ -112,9 +114,7 @@ jobs:
       # API 35: Android 15 enforces edge-to-edge for targetSdk 35, and an
       # API 34 image would not have caught the inset bug that shipped once.
       - name: Run Maestro flows
-        # Only this step tolerates failure — live-API flakiness shouldn't turn
-        # the whole workflow red, but everything above it must.
-        continue-on-error: true
+        id: maestro
         uses: reactivecircus/android-emulator-runner@c9c93e6ba9c4194322e114c40970d5983d9a07cc # v2.38.0
         with:
           api-level: 35
@@ -125,15 +125,26 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
           script: |
+            set -eu
             # One device here, but resolve and pass it explicitly anyway: a bare
             # `adb install` fans out, and Maestro ignores ANDROID_SERIAL. Keeping
-            # the honest form means this is safe to copy.
+            # the honest form means this is safe to copy — including the guard,
+            # since `adb -s ""` silently falls back to "the only device".
             S=$(adb devices | awk '/^emulator-/ && $2=="device" {print $1; exit}')
+            [ -n "$S" ] || { echo "::error::no booted emulator"; exit 1; }
             adb -s "$S" install -r app/build/outputs/apk/debug/app-debug.apk
-            maestro --device "$S" test .maestro/
+            # Retry once: the flows hit the live NWS API, so absorb a transient
+            # blip here rather than by suppressing the result. A real regression
+            # fails both passes and goes red.
+            maestro --device "$S" test .maestro/ || {
+              echo "::warning::first Maestro pass failed — retrying once"
+              maestro --device "$S" test .maestro/
+            }
 
       - name: Upload Maestro output on failure
-        if: failure()
+        # always() so this still runs while the job is failing — that is the
+        # only case the artifact is for.
+        if: always() && steps.maestro.outcome == 'failure'
         uses: actions/upload-artifact@v4
         with:
           name: maestro-debug
