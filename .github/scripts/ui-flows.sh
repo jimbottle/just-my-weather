@@ -164,10 +164,19 @@ fi
 # is what makes cleanup survive an interrupt (Ctrl-C locally, a cancelled CI
 # job) — with -G 16M this file is worth cleaning up — and it replaces the
 # scattered rm -f calls, which every early exit below had to remember.
+#
+# stderr goes to its OWN file, not into the dump. Folding it in with 2>&1 let
+# adb's failure text BE the evidence: `error: device offline` is ~24 bytes, so
+# the dump was non-empty, passed the emptiness gate below, and both greps then
+# found no ANR in what was never a log buffer — green on a check that never
+# read one. Separating the streams removes that at the source, so "non-empty
+# dump" can only mean actual log content, and adb's complaint is still
+# available to print in the diagnostic.
 ANR_DUMP=$(mktemp "${TMPDIR:-/tmp}/maestro-anr-logcat.XXXXXX")
-trap 'rm -f "${ANR_DUMP:-}"' EXIT
+ANR_ERR=$(mktemp "${TMPDIR:-/tmp}/maestro-anr-stderr.XXXXXX")
+trap 'rm -f "${ANR_DUMP:-}" "${ANR_ERR:-}"' EXIT
 
-adb -s "$SERIAL" logcat -d -b all >"$ANR_DUMP" 2>&1 & LOGCAT_PID=$!
+adb -s "$SERIAL" logcat -d -b all >"$ANR_DUMP" 2>"$ANR_ERR" & LOGCAT_PID=$!
 for _ in $(seq 60); do kill -0 "$LOGCAT_PID" 2>/dev/null || break; sleep 1; done
 if kill -0 "$LOGCAT_PID" 2>/dev/null; then
   kill -9 "$LOGCAT_PID" 2>/dev/null || true
@@ -189,13 +198,20 @@ fi
 # A populated dump is still evidence even when the status is non-zero, so check
 # it and say the coverage may be partial. Bounded to tail -50 because at
 # -G 16M the whole file could be megabytes pasted into the CI log.
+#
+# `if`/`fi` rather than `[ -s "$ANR_ERR" ] && ...` for the stderr echoes: a
+# failing `&&` list is a non-zero statement, which set -e would treat as the
+# script's end — a diagnostic block that exits the script when there happens to
+# be nothing to diagnose.
 READ_RC=0
 wait "$LOGCAT_PID" || READ_RC=$?
 if [ ! -s "$ANR_DUMP" ]; then
-  echo "::error::logcat from $SERIAL produced no output (exit $READ_RC) — the ANR/crash check did NOT run (maestro exited $MAESTRO_RC)"
+  echo "::error::logcat from $SERIAL produced no log output (exit $READ_RC) — the ANR/crash check did NOT run (maestro exited $MAESTRO_RC)"
+  if [ -s "$ANR_ERR" ]; then echo "adb said:"; tail -20 "$ANR_ERR"; fi
   exit 1
 elif [ "$READ_RC" -ne 0 ]; then
-  echo "::warning::logcat exited $READ_RC but wrote $(wc -c <"$ANR_DUMP") bytes — checking that partial dump; coverage may be incomplete"
+  echo "::warning::logcat exited $READ_RC but wrote $(wc -c <"$ANR_DUMP") bytes of log — checking that partial dump; coverage may be incomplete"
+  if [ -s "$ANR_ERR" ]; then echo "adb said:"; tail -20 "$ANR_ERR"; fi
   tail -50 "$ANR_DUMP"
 fi
 
