@@ -60,9 +60,17 @@ appId: io.raylytics.justmyweather
     enabled: true
 - tapOn:
     id: "addRule"
-- extendedWaitUntil:
-    visible: "Temperature below 40.*"
-    timeout: 10000
+
+# The new rule row renders ABOVE the form (AlertsScreen puts RuleRow before
+# AddRuleForm), so on any screen short enough for the scroll above to have
+# moved, the view is now parked below it. Scroll back up before asserting on
+# the rule, or these steps fail on the runner's profile but not locally.
+- scrollUntilVisible:
+    element:
+      id: "toggleRule"
+    direction: UP
+- assertVisible:
+    text: "Temperature below 40.*"
 
 # Toggles: assert the CHECKED STATE either side of each tap. The descriptive
 # line under "Quiet hours" renders unconditionally, so asserting on it would
