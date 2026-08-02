@@ -124,22 +124,10 @@ jobs:
           ram-size: 4096M
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
-          script: |
-            set -eu
-            # One device here, but resolve and pass it explicitly anyway: a bare
-            # `adb install` fans out, and Maestro ignores ANDROID_SERIAL. Keeping
-            # the honest form means this is safe to copy — including the guard,
-            # since `adb -s ""` silently falls back to "the only device".
-            S=$(adb devices | awk '/^emulator-/ && $2=="device" {print $1; exit}')
-            [ -n "$S" ] || { echo "::error::no booted emulator"; exit 1; }
-            adb -s "$S" install -r app/build/outputs/apk/debug/app-debug.apk
-            # Retry once: the flows hit the live NWS API, so absorb a transient
-            # blip here rather than by suppressing the result. A real regression
-            # fails both passes and goes red.
-            maestro --device "$S" test .maestro/ || {
-              echo "::warning::first Maestro pass failed — retrying once"
-              maestro --device "$S" test .maestro/
-            }
+          # ONE line: this action runs `script:` one line per `sh -c`, so
+          # shell state does not survive between lines. The logic lives in a
+          # checked-in script, which is also runnable locally.
+          script: bash .github/scripts/ui-flows.sh
 
       - name: Upload Maestro output on failure
         # always() so this still runs while the job is failing — that is the
