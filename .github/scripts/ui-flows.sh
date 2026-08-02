@@ -150,8 +150,13 @@ fi
 # put a watchdog on the read itself — otherwise a device that vanished after
 # Maestro turns this into a silent wait for the job timeout, which is the
 # failure mode the bounded boot poll above exists to avoid.
+#
+# Every "did NOT run" exit below reports $MAESTRO_RC too. The point of
+# capturing it was that the flow result and the diagnostics are separate facts;
+# dropping one of them here would lose the more actionable half — and a device
+# that vanished mid-run is itself a plausible cause of the flow failure.
 if ! adb -s "$SERIAL" get-state >/dev/null 2>&1; then
-  echo "::error::$SERIAL is gone — the ANR/crash check did NOT run"
+  echo "::error::$SERIAL is gone — the ANR/crash check did NOT run (maestro exited $MAESTRO_RC)"
   exit 1
 fi
 # mktemp, not a predictable "$$" path: `>` follows a symlink, so a pre-planted
@@ -166,46 +171,58 @@ adb -s "$SERIAL" logcat -d -b all >"$ANR_DUMP" 2>&1 & LOGCAT_PID=$!
 for _ in $(seq 60); do kill -0 "$LOGCAT_PID" 2>/dev/null || break; sleep 1; done
 if kill -0 "$LOGCAT_PID" 2>/dev/null; then
   kill -9 "$LOGCAT_PID" 2>/dev/null || true
-  echo "::error::logcat read from $SERIAL didn't finish in 60s — the ANR/crash check did NOT run"
+  echo "::error::logcat read from $SERIAL didn't finish in 60s — the ANR/crash check did NOT run (maestro exited $MAESTRO_RC)"
   exit 1
 fi
 
 # A non-zero read is not automatically a dead device: `-b all` also exits
 # non-zero when a single buffer is unreadable, AFTER writing everything else —
 # and that varies by image, while this script is advertised as runnable against
-# whatever device you have. So judge on the dump, not the status: an empty one
-# means the check truly didn't run (fail), a populated one is still evidence
-# (check it, and say the coverage is partial). Bounded to tail -50 because at
+# whatever device you have. So judge on the DUMP, not the status.
+#
+# Emptiness is therefore tested FIRST and independently of $READ_RC. Gating it
+# on a non-zero status (as this did) left the fail-open the rule exists to
+# close: a logcat that exits 0 having written nothing makes both greps below
+# report "no match", and the run is declared clean on no evidence at all. An
+# empty dump means the check did not run, whatever the status says.
+#
+# A populated dump is still evidence even when the status is non-zero, so check
+# it and say the coverage may be partial. Bounded to tail -50 because at
 # -G 16M the whole file could be megabytes pasted into the CI log.
 READ_RC=0
 wait "$LOGCAT_PID" || READ_RC=$?
-if [ "$READ_RC" -ne 0 ] && [ ! -s "$ANR_DUMP" ]; then
-  echo "::error::could not read logcat from $SERIAL — the ANR/crash check did NOT run"
+if [ ! -s "$ANR_DUMP" ]; then
+  echo "::error::logcat from $SERIAL produced no output (exit $READ_RC) — the ANR/crash check did NOT run (maestro exited $MAESTRO_RC)"
   exit 1
 elif [ "$READ_RC" -ne 0 ]; then
   echo "::warning::logcat exited $READ_RC but wrote $(wc -c <"$ANR_DUMP") bytes — checking that partial dump; coverage may be incomplete"
   tail -50 "$ANR_DUMP"
 fi
 
-# grep against a FILE, so there is no pipeline for pipefail to misjudge.
+# Both halves below use ONE shape: grep the FILE once into a variable, test the
+# variable, print a bounded excerpt. Never `grep | grep` or `grep -q` on a
+# pipeline — that is the pipefail race fixed two commits ago, where grep exits
+# at the first match, adb takes a SIGPIPE, and the non-zero pipeline status
+# silently inverts the result. Capturing sidesteps it rather than papering over
+# it, so neither half needs an escape hatch to explain.
+#
+# (`printf | head` still needs `|| true`: head exits early and SIGPIPEs printf,
+# and under pipefail set -e would end the script mid-diagnosis — exiting 141
+# and skipping the other half's report.)
 FOUND=""
-if grep -q "ANR in io.raylytics.justmyweather" "$ANR_DUMP"; then
+
+ANR=$(grep -n "ANR in io.raylytics.justmyweather" "$ANR_DUMP" || true)
+if [ -n "$ANR" ]; then
   echo "::error::the app ANR'd during the run (dialog suppressed; found in logcat)"
-  # `|| true`: head -5 exits early and SIGPIPEs grep, and pipefail would make
-  # set -e end the script here — skipping the crash check below and exiting 141
-  # instead of 1. Same trap as the bug this block fixes, one line further down.
-  grep -n "ANR in io.raylytics.justmyweather" "$ANR_DUMP" | head -5 || true
+  printf '%s\n' "$ANR" | head -5 || true
   FOUND=1
 fi
 
 # hide_error_dialogs suppresses CRASH dialogs as well as ANR ones, so restore
 # this half too: a Java crash after a flow's last assertion would otherwise
-# pass green, and the evidence is already sitting in the dump unread.
-#
-# Captured into a variable rather than piped into a second grep — `grep -A2 |
-# grep -q` is the very pipefail race fixed above. Matched on AndroidRuntime's
-# "Process: <pkg>" header line, which is what scopes this to OUR crash: an
-# unrelated app dying on the device must not redden this job.
+# pass green, and the evidence is already sitting in the dump unread. Matched
+# on AndroidRuntime's "Process: <pkg>" header line, which is what scopes this
+# to OUR crash: an unrelated app dying on the device must not redden this job.
 CRASH=$(grep -A2 "FATAL EXCEPTION" "$ANR_DUMP" || true)
 case "$CRASH" in
   *"Process: io.raylytics.justmyweather"*)
