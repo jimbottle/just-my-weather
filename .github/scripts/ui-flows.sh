@@ -63,20 +63,36 @@ done
 # set early and doesn't correlate with the ANR at all, and a fixed sleep is a
 # guess that loses the race on a slow day. This suppresses system ANR/crash
 # dialogs outright, so a struggling launcher can never sit on top of the app.
+#
+# TRADE-OFF: this is global, not launcher-scoped, so OUR app's ANR dialog is
+# suppressed too — a main-thread stall that used to fail loudly could now be
+# absorbed by Maestro's wait budgets. The logcat check after the run exists to
+# put that failure back.
 adb -s "$SERIAL" shell settings put global hide_error_dialogs 1
 
-# Install after the device is quiet: a PackageManager scan plus dexopt is one of
-# the heavier things to ask of a freshly booted system, so it belongs on the
-# settled side of the wait rather than contending with startup.
+# Install after the readiness check and dialog suppression, so a locally
+# invoked run can't install into a half-booted device. (In CI the action has
+# already waited, so this ordering is belt-and-braces there.)
 adb -s "$SERIAL" install -r "$APK"
 
 # Retry once. The flows hit the live NWS API, so absorb a transient blip here
 # rather than by suppressing the job's result — a real regression fails both
-# passes and the job goes red. The marker below is READ by the workflow's
-# upload condition, so the debug output of a failed first pass survives even
-# when the retry rescues it — otherwise recurring flakiness is unmeasurable.
+# passes and the job goes red. The marker is read by the workflow's upload
+# condition so a failed first pass keeps its evidence even when the retry
+# rescues it. It MUST live in the workspace: hashFiles() only hashes paths
+# under $GITHUB_WORKSPACE and silently yields '' for anything outside it, which
+# is why the previous $RUNNER_TEMP marker was never seen.
+RETRY_MARKER="${GITHUB_WORKSPACE:-$ROOT}/maestro-retried"
 if ! maestro --device "$SERIAL" test .maestro/; then
   echo "::warning::first Maestro pass failed — retrying once"
-  : > "${RUNNER_TEMP:-/tmp}/maestro-retried"
+  : > "$RETRY_MARKER"
+  echo "wrote retry marker: $RETRY_MARKER"
   maestro --device "$SERIAL" test .maestro/
+fi
+
+# hide_error_dialogs means an app-side ANR no longer shows a dialog, so check
+# for it directly — otherwise a real responsiveness regression passes quietly.
+if adb -s "$SERIAL" logcat -d -b crash,main 2>/dev/null | grep -q "ANR in io.raylytics.justmyweather"; then
+  echo "::error::the app ANR'd during the run (dialog suppressed; found in logcat)"
+  exit 1
 fi

@@ -147,7 +147,7 @@ jobs:
         # too, so an unconditional upload is noise, not a no-op).
         if: >-
           always() && (steps.maestro.outcome == 'failure'
-          || hashFiles(format('{0}/maestro-retried', runner.temp)) != '')
+          || hashFiles('maestro-retried') != '')
         uses: actions/upload-artifact@v4
         with:
           name: maestro-debug

@@ -31,3 +31,6 @@ keystore.properties
 .beads-credential-key
 # roborev snapshots
 /.roborev/
+
+# CI retry marker written by .github/scripts/ui-flows.sh
+maestro-retried
