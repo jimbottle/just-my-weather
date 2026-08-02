@@ -109,11 +109,21 @@ adb -s "$SERIAL" logcat -b all -c >/dev/null 2>&1 \
 # on the marker removed.
 RETRY_MARKER="${GITHUB_WORKSPACE:-$ROOT}/maestro-retried"
 rm -f "$RETRY_MARKER"
+
+# Capture the retry's status rather than letting `set -e` end the script here.
+# The diagnostics below are MOST needed when the flows failed: a bare call made
+# a failing retry exit on the spot, so the ANR/crash check ran only when BOTH
+# passes had PASSED — the narrow "absorbed by Maestro's wait budgets" case. The
+# common case was skipped exactly when it mattered, and since
+# hide_error_dialogs removes the dialog, an ANR that genuinely breaks the flows
+# surfaces only as "assertion timed out" — the shape this check exists to
+# explain. The status is re-applied at the end of the script.
+MAESTRO_RC=0
 if ! maestro --device "$SERIAL" test .maestro/; then
   echo "::warning::first Maestro pass failed — retrying once"
   : > "$RETRY_MARKER"
   echo "wrote retry marker: $RETRY_MARKER"
-  maestro --device "$SERIAL" test .maestro/
+  maestro --device "$SERIAL" test .maestro/ || MAESTRO_RC=$?
 fi
 
 # hide_error_dialogs means an app-side ANR no longer shows a dialog, so check
@@ -141,31 +151,72 @@ fi
 # Maestro turns this into a silent wait for the job timeout, which is the
 # failure mode the bounded boot poll above exists to avoid.
 if ! adb -s "$SERIAL" get-state >/dev/null 2>&1; then
-  echo "::error::$SERIAL is gone — the ANR check did NOT run"
+  echo "::error::$SERIAL is gone — the ANR/crash check did NOT run"
   exit 1
 fi
-ANR_DUMP="${TMPDIR:-/tmp}/maestro-anr-logcat.$$"
+# mktemp, not a predictable "$$" path: `>` follows a symlink, so a pre-planted
+# one on a shared /tmp would have this write somewhere else entirely. The trap
+# is what makes cleanup survive an interrupt (Ctrl-C locally, a cancelled CI
+# job) — with -G 16M this file is worth cleaning up — and it replaces the
+# scattered rm -f calls, which every early exit below had to remember.
+ANR_DUMP=$(mktemp "${TMPDIR:-/tmp}/maestro-anr-logcat.XXXXXX")
+trap 'rm -f "${ANR_DUMP:-}"' EXIT
+
 adb -s "$SERIAL" logcat -d -b all >"$ANR_DUMP" 2>&1 & LOGCAT_PID=$!
 for _ in $(seq 60); do kill -0 "$LOGCAT_PID" 2>/dev/null || break; sleep 1; done
 if kill -0 "$LOGCAT_PID" 2>/dev/null; then
   kill -9 "$LOGCAT_PID" 2>/dev/null || true
-  rm -f "$ANR_DUMP"
-  echo "::error::logcat read from $SERIAL didn't finish in 60s — the ANR check did NOT run"
+  echo "::error::logcat read from $SERIAL didn't finish in 60s — the ANR/crash check did NOT run"
   exit 1
 fi
-if ! wait "$LOGCAT_PID"; then
-  echo "::error::could not read logcat from $SERIAL — the ANR check did NOT run"
-  cat "$ANR_DUMP"; rm -f "$ANR_DUMP"
+
+# A non-zero read is not automatically a dead device: `-b all` also exits
+# non-zero when a single buffer is unreadable, AFTER writing everything else —
+# and that varies by image, while this script is advertised as runnable against
+# whatever device you have. So judge on the dump, not the status: an empty one
+# means the check truly didn't run (fail), a populated one is still evidence
+# (check it, and say the coverage is partial). Bounded to tail -50 because at
+# -G 16M the whole file could be megabytes pasted into the CI log.
+READ_RC=0
+wait "$LOGCAT_PID" || READ_RC=$?
+if [ "$READ_RC" -ne 0 ] && [ ! -s "$ANR_DUMP" ]; then
+  echo "::error::could not read logcat from $SERIAL — the ANR/crash check did NOT run"
   exit 1
+elif [ "$READ_RC" -ne 0 ]; then
+  echo "::warning::logcat exited $READ_RC but wrote $(wc -c <"$ANR_DUMP") bytes — checking that partial dump; coverage may be incomplete"
+  tail -50 "$ANR_DUMP"
 fi
+
 # grep against a FILE, so there is no pipeline for pipefail to misjudge.
+FOUND=""
 if grep -q "ANR in io.raylytics.justmyweather" "$ANR_DUMP"; then
   echo "::error::the app ANR'd during the run (dialog suppressed; found in logcat)"
   # `|| true`: head -5 exits early and SIGPIPEs grep, and pipefail would make
-  # set -e end the script here — skipping the cleanup below and exiting 141
+  # set -e end the script here — skipping the crash check below and exiting 141
   # instead of 1. Same trap as the bug this block fixes, one line further down.
   grep -n "ANR in io.raylytics.justmyweather" "$ANR_DUMP" | head -5 || true
-  rm -f "$ANR_DUMP"
-  exit 1
+  FOUND=1
 fi
-rm -f "$ANR_DUMP"
+
+# hide_error_dialogs suppresses CRASH dialogs as well as ANR ones, so restore
+# this half too: a Java crash after a flow's last assertion would otherwise
+# pass green, and the evidence is already sitting in the dump unread.
+#
+# Captured into a variable rather than piped into a second grep — `grep -A2 |
+# grep -q` is the very pipefail race fixed above. Matched on AndroidRuntime's
+# "Process: <pkg>" header line, which is what scopes this to OUR crash: an
+# unrelated app dying on the device must not redden this job.
+CRASH=$(grep -A2 "FATAL EXCEPTION" "$ANR_DUMP" || true)
+case "$CRASH" in
+  *"Process: io.raylytics.justmyweather"*)
+    echo "::error::the app CRASHED during the run (dialog suppressed; found in logcat)"
+    printf '%s\n' "$CRASH" | head -20 || true
+    FOUND=1
+    ;;
+esac
+
+[ -z "$FOUND" ] || exit 1
+
+# Re-apply Maestro's result, which was captured rather than acted on above so
+# these diagnostics could run on the failing path.
+exit "$MAESTRO_RC"
