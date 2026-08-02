@@ -44,6 +44,14 @@ echo "device: $SERIAL"
 
 adb -s "$SERIAL" install -r "$APK"
 
+# Let the system settle before driving the UI. A freshly booted CI emulator is
+# still starting launcher/system services, and if the launcher ANRs its dialog
+# covers the app — every flow then fails at "is the app up?", which reads like
+# a product bug and isn't one.
+adb -s "$SERIAL" wait-for-device
+until [ "$(adb -s "$SERIAL" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ]; do sleep 2; done
+sleep 10
+
 # Retry once. The flows hit the live NWS API, so absorb a transient blip here
 # rather than by suppressing the job's result — a real regression fails both
 # passes and the job goes red. The marker lets the workflow keep the debug

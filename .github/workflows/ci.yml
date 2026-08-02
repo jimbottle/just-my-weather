@@ -126,6 +126,10 @@ jobs:
           arch: x86_64
           profile: pixel_6
           ram-size: 4096M
+          cores: 4          # a starved emulator ANRs the launcher, which then
+                            # covers the app and fails every flow at "is the
+                            # app up?" — observed, with the ANR dialog captured
+                            # in the maestro-debug artifact.
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
           # ONE line: this action runs `script:` one line per `sh -c`, so
