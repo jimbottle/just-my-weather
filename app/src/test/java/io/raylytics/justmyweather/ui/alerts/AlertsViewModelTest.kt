@@ -56,20 +56,20 @@ class AlertsViewModelTest {
 
     @Test
     fun `adding a rule reports one enabled rule and triggers an immediate check`() = runTest(dispatcher) {
-        val changes = mutableListOf<List<AlertRule>>()
+        val changes = mutableListOf<Boolean>()
         var checks = 0
         val vm =
             AlertsViewModel(
                 AlertRulesRepository(FakePreferencesDataStore()),
                 AlertSettingsRepository(FakePreferencesDataStore()),
-                onRulesChanged = { changes += it },
+                onWorkChanged = { hasWork, _ -> changes += hasWork },
                 onRuleActivated = { checks++ },
             )
 
         vm.add(temp, Comparison.BELOW, 40.0)
         advanceUntilIdle()
 
-        assertEquals(1, changes.last().count { it.enabled })
+        assertTrue(changes.last()) // an enabled rule means the worker must run
         assertEquals(1, checks) // adding a rule can newly fire → check now
     }
 
@@ -77,13 +77,13 @@ class AlertsViewModelTest {
     fun `disabling the last enabled rule reports zero enabled and skips the check`() = runTest(dispatcher) {
         val repository = AlertRulesRepository(FakePreferencesDataStore())
         repository.save(listOf(AlertRule("a", temp, Comparison.BELOW, 40.0, enabled = true)))
-        val changes = mutableListOf<List<AlertRule>>()
+        val changes = mutableListOf<Boolean>()
         var checks = 0
         val vm =
             AlertsViewModel(
                 repository,
                 AlertSettingsRepository(FakePreferencesDataStore()),
-                onRulesChanged = { changes += it },
+                onWorkChanged = { hasWork, _ -> changes += hasWork },
                 onRuleActivated = { checks++ },
             )
         // Activate stateIn so rules.value reflects the seeded rule.
@@ -93,7 +93,7 @@ class AlertsViewModelTest {
         vm.toggle("a")
         advanceUntilIdle()
 
-        assertEquals(0, changes.last().count { it.enabled }) // worker should be cancelled
+        assertFalse(changes.last()) // nothing left to poll for // worker should be cancelled
         assertEquals(0, checks) // disabling can't newly fire
         collector.cancel()
     }
@@ -107,7 +107,7 @@ class AlertsViewModelTest {
             AlertsViewModel(
                 repository,
                 AlertSettingsRepository(FakePreferencesDataStore()),
-                onCadenceChanged = { cadences += it },
+                onWorkChanged = { _, minutes -> cadences += minutes },
             )
         // Collect both flows so rules.value and settings.value reflect state.
         val rulesCollector = launch { vm.rules.collect {} }
@@ -129,13 +129,13 @@ class AlertsViewModelTest {
         // no personal rules at all. Before this, sync() was fed only
         // "any enabled rule", so turning safety alerts on cancelled the very
         // worker meant to deliver them.
-        val syncs = mutableListOf<List<AlertRule>>()
+        val syncs = mutableListOf<Boolean>()
         var immediateChecks = 0
         val vm =
             AlertsViewModel(
                 AlertRulesRepository(FakePreferencesDataStore()),
                 AlertSettingsRepository(FakePreferencesDataStore()),
-                onRulesChanged = { syncs += it },
+                onWorkChanged = { hasWork, _ -> syncs += hasWork },
                 onRuleActivated = { immediateChecks++ },
             )
         val rulesCollector = launch { vm.rules.collect {} }
@@ -156,7 +156,7 @@ class AlertsViewModelTest {
     fun `disabling safety alerts re-syncs rather than assuming the worker can stop`() = runTest(dispatcher) {
         // Turning it off must not cancel a worker a live rule still needs, so
         // the callback recomputes from current state instead of deciding here.
-        val syncs = mutableListOf<List<AlertRule>>()
+        val syncs = mutableListOf<Boolean>()
         var immediateChecks = 0
         val repository = AlertRulesRepository(FakePreferencesDataStore())
         repository.save(listOf(AlertRule("a", temp, Comparison.BELOW, 40.0, enabled = true)))
@@ -164,7 +164,7 @@ class AlertsViewModelTest {
             AlertsViewModel(
                 repository,
                 AlertSettingsRepository(FakePreferencesDataStore()),
-                onRulesChanged = { syncs += it },
+                onWorkChanged = { hasWork, _ -> syncs += hasWork },
                 onRuleActivated = { immediateChecks++ },
             )
         val rulesCollector = launch { vm.rules.collect {} }
@@ -176,7 +176,7 @@ class AlertsViewModelTest {
 
         assertFalse(vm.settings.value.safetyNotifications)
         assertEquals(1, syncs.size)
-        assertTrue(syncs.last().any { it.enabled }) // the live rule is still reported
+        assertTrue(syncs.last()) // still true: a live rule needs the worker
         assertEquals(0, immediateChecks) // no point checking immediately when switching off
         rulesCollector.cancel()
         settingsCollector.cancel()
@@ -225,32 +225,68 @@ class AlertsViewModelTest {
     }
 
     @Test
-    fun `changing cadence with no rules persists but does not retune`() = runTest(dispatcher) {
-        val cadences = mutableListOf<Int>()
+    fun `changing cadence always re-syncs, reporting whether anything needs polling`() = runTest(dispatcher) {
+        // This used to assert the opposite — that a cadence change with no
+        // rules reported nothing — and that guard was the bug: a safety-alerts
+        // user has no rules but DOES have a scheduled worker, so their new
+        // cadence never reached WorkManager. The sync is unconditional now and
+        // carries the decision, so the false case cancels rather than being
+        // silently skipped.
+        val calls = mutableListOf<Pair<Boolean, Int>>()
         val vm =
             AlertsViewModel(
                 AlertRulesRepository(FakePreferencesDataStore()),
                 AlertSettingsRepository(FakePreferencesDataStore()),
-                onCadenceChanged = { cadences += it },
+                onWorkChanged = { hasWork, minutes -> calls += hasWork to minutes },
             )
+        val settingsCollector = launch { vm.settings.collect {} }
+        advanceUntilIdle()
 
         vm.setPollCadence(360)
         advanceUntilIdle()
 
-        assertEquals(emptyList<Int>(), cadences) // nothing scheduled to retune
+        assertEquals(listOf(false to 360), calls)
+        settingsCollector.cancel()
+    }
+
+    @Test
+    fun `a safety-alerts user with no rules still retunes the cadence`() = runTest(dispatcher) {
+        // The case the old rules-only guard silently dropped, and the reason
+        // the predicate is now asserted as a boolean: flipping it back to
+        // `rules.any { it.enabled }` fails right here.
+        val calls = mutableListOf<Pair<Boolean, Int>>()
+        val vm =
+            AlertsViewModel(
+                AlertRulesRepository(FakePreferencesDataStore()),
+                AlertSettingsRepository(FakePreferencesDataStore()),
+                onWorkChanged = { hasWork, minutes -> calls += hasWork to minutes },
+            )
+        val settingsCollector = launch { vm.settings.collect {} }
+        advanceUntilIdle()
+
+        vm.setSafetyNotifications(true)
+        advanceUntilIdle()
+        vm.setPollCadence(30)
+        advanceUntilIdle()
+
+        // Both the enable and the cadence change report "yes, keep polling",
+        // and the second carries the new interval.
+        assertEquals(true to 60, calls.first())
+        assertEquals(true to 30, calls.last())
+        settingsCollector.cancel()
     }
 
     @Test
     fun `deleting a rule reports the empty list and skips the check`() = runTest(dispatcher) {
         val repository = AlertRulesRepository(FakePreferencesDataStore())
         repository.save(listOf(AlertRule("a", temp, Comparison.BELOW, 40.0, enabled = true)))
-        val changes = mutableListOf<List<AlertRule>>()
+        val changes = mutableListOf<Boolean>()
         var checks = 0
         val vm =
             AlertsViewModel(
                 repository,
                 AlertSettingsRepository(FakePreferencesDataStore()),
-                onRulesChanged = { changes += it },
+                onWorkChanged = { hasWork, _ -> changes += hasWork },
                 onRuleActivated = { checks++ },
             )
         val collector = launch { vm.rules.collect {} }
@@ -259,7 +295,7 @@ class AlertsViewModelTest {
         vm.delete("a")
         advanceUntilIdle()
 
-        assertEquals(emptyList<AlertRule>(), changes.last())
+        assertFalse(changes.last()) // no rules left, so no reason to poll
         assertEquals(0, checks)
         collector.cancel()
     }

@@ -74,13 +74,25 @@ class AlertNotifier(
      */
     fun notifySafety(alert: ActiveAlert) {
         if (!hasPermission()) return
+        // NWS sometimes sends no headline; the event name is the one thing
+        // always present, so it stands in rather than posting an empty body
+        // and an empty expanded view.
+        val body = alert.headline.ifBlank { alert.event }
         val notification =
             NotificationCompat.Builder(context, SAFETY_CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_launcher_foreground)
                 .setContentTitle(alert.event)
-                .setContentText(alert.headline)
-                .setStyle(NotificationCompat.BigTextStyle().bigText(alert.headline))
+                .setContentText(body)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(body))
                 .setCategory(NotificationCompat.CATEGORY_ALARM)
+                // Channels carry importance only from API 26; minSdk here is
+                // 24, where ensureChannel creates nothing at all. Without
+                // these two lines a tornado warning posts at PRIORITY_DEFAULT
+                // with no sound on 24/25 — silently, which is the exact
+                // opposite of this path's whole purpose. Both are no-ops on
+                // O+, where the channel governs instead.
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setDefaults(NotificationCompat.DEFAULT_SOUND or NotificationCompat.DEFAULT_VIBRATE)
                 .setAutoCancel(true)
                 .build()
         // Stable id per alert so an update replaces rather than stacks.

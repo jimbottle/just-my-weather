@@ -3,6 +3,7 @@ package io.raylytics.justmyweather.ui.alerts
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.raylytics.justmyweather.alerts.AlertRule
+import io.raylytics.justmyweather.alerts.AlertScheduling
 import io.raylytics.justmyweather.alerts.AlertSettings
 import io.raylytics.justmyweather.alerts.AlertSubject
 import io.raylytics.justmyweather.alerts.AlertWindow
@@ -24,14 +25,17 @@ import java.util.UUID
 class AlertsViewModel(
     private val repository: AlertRulesRepository,
     private val settingsRepository: AlertSettingsRepository,
-    /** Called after every change with the new rule list, to (re)schedule or
-     * cancel the background worker so it runs only when rules are live. */
-    private val onRulesChanged: (List<AlertRule>) -> Unit = {},
+    /**
+     * Called whenever the answer to "should the periodic worker be running,
+     * and at what cadence?" may have changed. It receives the decision itself
+     * rather than the rule list: the predicate combines rules AND the safety
+     * setting, and when it lived in the caller nothing could assert it —
+     * flipping it back to a rules-only test left every test green.
+     */
+    private val onWorkChanged: (hasWork: Boolean, pollMinutes: Int) -> Unit = { _, _ -> },
     /** Kicks an immediate alert check. Invoked after a change that could make a
      * rule newly fire, so the user gets feedback now instead of next hour. */
     private val onRuleActivated: () -> Unit = {},
-    /** Called when the poll cadence changes, to retune the periodic worker. */
-    private val onCadenceChanged: (Int) -> Unit = {},
 ) : ViewModel() {
     val rules: StateFlow<List<AlertRule>> =
         repository.rules.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -66,22 +70,28 @@ class AlertsViewModel(
      * Turning safety alerts on has to (re)schedule the worker even when the
      * user has no personal rules — that is the whole point of the setting —
      * and turning it off must not cancel a worker a live rule still needs.
-     * Both directions go through the same onRulesChanged callback the rule
-     * edits use, which recomputes from current state rather than assuming.
      */
     fun setSafetyNotifications(enabled: Boolean) {
         viewModelScope.launch {
-            settingsRepository.save(settings.value.copy(safetyNotifications = enabled))
-            onRulesChanged(rules.value)
+            val next = settings.value.copy(safetyNotifications = enabled)
+            settingsRepository.save(next)
+            // `next`, not settings.value: the StateFlow is a projection of
+            // DataStore and may not have re-emitted yet, so re-reading it here
+            // would decide from the value we just replaced.
+            syncWork(rules.value, next)
             if (enabled) onRuleActivated()
         }
     }
 
     fun setPollCadence(minutes: Int) {
         viewModelScope.launch {
-            settingsRepository.save(settings.value.copy(pollMinutes = minutes))
-            // Retune the worker only while rules are live (else it's not scheduled).
-            if (rules.value.any { it.enabled }) onCadenceChanged(minutes)
+            val next = settings.value.copy(pollMinutes = minutes)
+            settingsRepository.save(next)
+            // Unconditional. This used to retune only while a personal rule was
+            // live — the same stale assumption fixed everywhere else — so a
+            // safety-alerts user with no rules saved a new cadence that never
+            // reached WorkManager until the next process start.
+            syncWork(rules.value, next)
         }
     }
 
@@ -110,8 +120,16 @@ class AlertsViewModel(
             repository.save(next)
             // Every edit re-syncs scheduling (add/enable starts it, removing the
             // last enabled rule stops it); only an activating change checks now.
-            onRulesChanged(next)
+            syncWork(next, settings.value)
             if (check) onRuleActivated()
         }
+    }
+
+    /**
+     * The single place scheduling is decided, from values passed in rather than
+     * re-read, so a caller can never accidentally use pre-save state.
+     */
+    private fun syncWork(rules: List<AlertRule>, settings: AlertSettings) {
+        onWorkChanged(AlertScheduling.hasWork(rules, settings), settings.pollMinutes)
     }
 }

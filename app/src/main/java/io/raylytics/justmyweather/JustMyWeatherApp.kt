@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.Context
 import androidx.datastore.preferences.preferencesDataStore
 import io.raylytics.justmyweather.alerts.AlertNotifier
+import io.raylytics.justmyweather.alerts.AlertScheduling
 import io.raylytics.justmyweather.alerts.AlertWorker
 import io.raylytics.justmyweather.data.AlertRulesRepository
 import io.raylytics.justmyweather.data.AlertSettingsRepository
@@ -70,11 +71,10 @@ class JustMyWeatherApp : Application() {
         // does no background work; a launch check gives any standing rule timely
         // feedback. Reading the rule list is suspending, hence the scope.
         appScope.launch {
-            val hasRules = container.alertRulesRepository.rules.first().any { it.enabled }
+            val rules = container.alertRulesRepository.rules.first()
             val settings = container.alertSettingsRepository.current()
-            // Either reason keeps the worker alive: a live rule, or safety
-            // alerts being switched on.
-            val hasWork = hasRules || settings.safetyNotifications
+            // Same predicate the ViewModel uses, not a second copy of the `||`.
+            val hasWork = AlertScheduling.hasWork(rules, settings)
             AlertWorker.sync(this@JustMyWeatherApp, hasWork, settings.pollMinutes)
             if (hasWork) AlertWorker.runOnce(this@JustMyWeatherApp)
         }

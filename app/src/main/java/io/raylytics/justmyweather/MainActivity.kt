@@ -85,26 +85,13 @@ class MainActivity : ComponentActivity() {
                 AlertsViewModel(
                     container.alertRulesRepository,
                     container.alertSettingsRepository,
-                    // "Is there any reason to poll?" — a live rule OR safety
-                    // alerts being on. Using only the rule list here would let
-                    // a user with no rules switch safety alerts on and have the
-                    // worker cancelled out from under them.
-                    onRulesChanged = { rules ->
-                        AlertWorker.sync(
-                            applicationContext,
-                            rules.any { it.enabled } || alertsViewModel.settings.value.safetyNotifications,
-                            alertsViewModel.settings.value.pollMinutes,
-                        )
+                    // Pass-through: the ViewModel decides whether the worker
+                    // should run (rules OR safety alerts) and at what cadence,
+                    // so the predicate is testable instead of buried here.
+                    onWorkChanged = { hasWork, minutes ->
+                        AlertWorker.sync(applicationContext, hasWork, minutes)
                     },
                     onRuleActivated = { AlertWorker.runOnce(applicationContext) },
-                    onCadenceChanged = { minutes ->
-                        AlertWorker.sync(
-                            applicationContext,
-                            alertsViewModel.rules.value.any { it.enabled } ||
-                                alertsViewModel.settings.value.safetyNotifications,
-                            minutes,
-                        )
-                    },
                 )
             }
         }

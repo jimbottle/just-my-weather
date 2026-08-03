@@ -136,10 +136,15 @@ class HomeViewModel(
             if (loaded is WeatherLoad.Ready) {
                 runCatching { onSnapshotLoaded(loaded.snapshot) }
             }
-            // Alerts are a side dish: a zone that errors, or a location with no
-            // zone, leaves the glance intact and the banner simply absent.
-            // Cleared first so a stale warning can't outlive a location change.
-            safetyAlerts.value = emptyList()
+            // Alerts are a side dish: a fetch that fails leaves the glance
+            // intact and the banner simply absent.
+            //
+            // ONE assignment, no pre-clear. Clearing first blanked the banner
+            // for the whole duration of the network round trip, so refreshing
+            // with a standing tornado warning made it vanish and reappear —
+            // a flicker on the one element whose presence IS the message. It
+            // also bought nothing: this assignment is unconditional, so a
+            // stale warning cannot outlive a location change either way.
             safetyAlerts.value =
                 runCatching { SafetyAlerts.filter(repository.loadActiveAlerts(location)) }
                     .getOrDefault(emptyList())
