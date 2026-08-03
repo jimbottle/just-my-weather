@@ -754,5 +754,30 @@ private val hourFormat = DateTimeFormatter.ofPattern("h a", Locale.getDefault())
 private val weekdayFormat = DateTimeFormatter.ofPattern("EEE", Locale.getDefault())
 private val monthDayFormat = DateTimeFormatter.ofPattern("MMM d", Locale.getDefault())
 
+/**
+ * The time the STATION took the reading — never the time we fetched it.
+ *
+ * This is the answer to "why doesn't the Observed time change when I hit
+ * Refresh?", which is a reasonable thing to ask and not a bug. Refresh really
+ * does re-fetch: nothing caches the observation (only the grid/station lookup
+ * is cached, and OkHttp is built with no HTTP cache). The value simply hasn't
+ * moved yet, for two independent reasons, both measured against the live API
+ * on 2026-08-03:
+ *
+ *  - Stations publish on their own cadence. KLOU/KSDF post every 5 minutes;
+ *    many others are hourly.
+ *  - NWS serves this endpoint with `cache-control: max-age=183, s-maxage=300`,
+ *    so even a station that just reported can be up to ~5 minutes behind.
+ *
+ * At 12:52 PM local the newest record available was 12:40 PM — a 12-minute lag
+ * on their side, with the temperature unchanged across the previous six
+ * observations.
+ *
+ * Substituting the clock here would make a three-hour-old reading claim to be
+ * current the moment someone tapped Refresh, which is the one thing this label
+ * exists to prevent. If the staleness needs to be more legible, show the age
+ * ("12 min ago") rather than replacing the timestamp — see
+ * just-my-weather-i0q.
+ */
 private fun observedLabel(snapshot: WeatherSnapshot): String? =
     snapshot.observedAt?.atZone(ZoneId.systemDefault())?.format(timeFormat)

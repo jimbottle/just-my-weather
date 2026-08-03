@@ -77,6 +77,22 @@ provider, not Google Play Services); without it, the app falls back to a
 sensible default place (picking/saving your own place is planned). Personal
 alerts are evaluated and delivered on-device.
 
+### Why the "Observed" time doesn't move when you refresh
+
+It is the time the weather **station** took the reading, not the time the app
+fetched it. Refresh always re-fetches — nothing caches the observation — but
+the reading itself only changes when the station publishes a new one.
+
+Two things bound that, both measured against the live API on 2026-08-03:
+stations report on their own cadence (Louisville's post every 5 minutes; many
+are hourly), and NWS serves the endpoint with `max-age=183, s-maxage=300`, so
+even a fresh observation can be ~5 minutes behind. At 12:52 PM local the newest
+record available was 12:40 PM.
+
+Showing the fetch time instead would let a three-hour-old reading claim to be
+current the moment you tapped Refresh, which is exactly what this line exists
+to prevent.
+
 ## License
 
 Licensed under the [Apache License 2.0](LICENSE) — fork it, ship it, build on

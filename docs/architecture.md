@@ -46,6 +46,35 @@ shapes never leak past `WeatherRepository`.
 - **`ui/home/`**, **`ui/customize/`**, **`ui/alerts/`** — one view model + one
   screen each. `ui/home/DensitySpec` maps a `Density` to concrete sizes/spacing.
 
+## Freshness
+
+Two different clocks meet on the glance, and conflating them is the most
+common misreading of this app.
+
+- **Observation time** (`WeatherSnapshot.observedAt`) — when a real thermometer
+  at a real station took the reading. This is what the "Observed HH:MM" line
+  shows, and it advances only when the station publishes.
+- **Fetch time** — when the app last asked. Deliberately not displayed.
+
+So "Observed" not changing across a Refresh is normal, not a stale-cache bug.
+`WeatherRepository` caches only the coordinate → grid/station resolution;
+`getObservation` hits `/observations/latest` every time, and `HttpTransport`
+builds its `OkHttpClient` with no HTTP cache. The limits are upstream: station
+cadence (5 minutes at KLOU/KSDF, hourly at many sites) and NWS's own
+`max-age=183, s-maxage=300` on that endpoint.
+
+The rule this encodes: **never substitute the current clock for a missing or
+older observation time.** Doing so renders absent or stale data as freshly
+observed. The same rule is why `Density` no longer hides the timestamp — a
+number whose age is undiscoverable is what made the hero and the forecast strip
+look like they were contradicting each other.
+
+The one deliberate exception is the Gadgetbridge payload, which falls back to
+`now` when a station omits its timestamp entirely: that field serialises to 0
+otherwise, and a watch would render 1970 — worse than "about now" for a
+consumer that keys freshness off it. It is commented as an exception at the
+call site.
+
 ## Principles
 
 - **Pure logic stays pure** so it tests on the JVM; side effects live at the
