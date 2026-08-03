@@ -63,9 +63,14 @@ Both appear as chips on the customize screen automatically.
 
 ## Add a density level
 
-Add a `Density` entry in `view/Density.kt` (set `showsTimestamp` to taste) and a
-branch in `Density.spec()` in `ui/home/DensitySpec.kt` with the hero size and
-spacing. The customize chip row and home view read it from there.
+Add a `Density` entry in `view/Density.kt` and a branch in `Density.spec()` in
+`ui/home/DensitySpec.kt` with the hero size and spacing. The customize chip row
+and home view read it from there.
+
+Density controls size and spacing only — not which facts appear. A level that
+hid a field would make the same fact discoverable at one setting and not
+another, which is how the observation time came to be missing from the calmest
+view while the forecast beside it looked like a contradiction.
 
 ## A new persisted setting
 
