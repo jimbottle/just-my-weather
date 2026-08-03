@@ -146,6 +146,25 @@ jobs:
           # checked-in script, which is also runnable locally.
           script: bash .github/scripts/ui-flows.sh
 
+      # The instrumented tests run inside that same script and BEFORE Maestro,
+      # so a width regression aborts the run under `set -e` — Maestro never
+      # executes, ~/.maestro/tests is empty, and the maestro-debug upload below
+      # is swallowed by if-no-files-found. Without this step the only diagnosis
+      # for a red run is a report path on a destroyed runner, and the same
+      # failure costs the Maestro signal too.
+      #
+      # always(), not failure(): the step above it can succeed while these
+      # fail, and a report that exists is worth keeping either way.
+      - name: Upload instrumented-test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: androidtest-report
+          path: |
+            app/build/reports/androidTests/
+            app/build/outputs/androidTest-results/
+          if-no-files-found: ignore
+
       - name: Upload Maestro output on failure or retry
         # Keep the artifact when the step failed AND when a retry rescued a
         # failed first pass — otherwise the retry, which makes that the common

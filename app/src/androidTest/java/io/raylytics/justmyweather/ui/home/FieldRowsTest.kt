@@ -103,6 +103,12 @@ class FieldRowsTest {
             "label must be capped against the real $narrow row, got ${widthOf(longLabel)}",
             widthOf(longLabel) <= narrow * 0.62f,
         )
-        assertTrue("value must survive at narrow widths, got ${widthOf("72°")}", widthOf("72°") > 0.dp)
+        // The same complement as the wide case, against the REAL row width.
+        // "> 0" would be vacuous here for exactly the reason stated above: the
+        // value is weighted, so it can only fail by being eliminated outright.
+        assertTrue(
+            "value must get the whole remainder at $narrow, got ${widthOf("72°")}",
+            widthOf("72°") >= narrow * (1f - 0.62f),
+        )
     }
 }

@@ -91,7 +91,11 @@ adb -s "$SERIAL" shell settings put global hide_error_dialogs 1
 # than risk driving someone else's.
 ATTACHED=$(adb devices | awk '$2 == "device" { n++ } END { print n + 0 }')
 if [ "$ATTACHED" = "1" ]; then
-  ANDROID_SERIAL="$SERIAL" ./gradlew --quiet :app:connectedDebugAndroidTest
+  # NOT --quiet: it suppresses Gradle's LIFECYCLE output, which is where the
+  # "Test > method FAILED" lines live. Without them a red CI run says only
+  # "see the report" and names a path on a runner that no longer exists.
+  # --console=plain keeps the log readable without the progress bar.
+  ANDROID_SERIAL="$SERIAL" ./gradlew --console=plain :app:connectedDebugAndroidTest
 else
   echo "::warning::skipping connectedDebugAndroidTest — $ATTACHED devices attached and the task cannot be pinned to one"
 fi
