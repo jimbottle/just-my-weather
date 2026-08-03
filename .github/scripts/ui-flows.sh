@@ -172,15 +172,26 @@ fi
 # read one. Separating the streams removes that at the source, so "non-empty
 # dump" can only mean actual log content, and adb's complaint is still
 # available to print in the diagnostic.
+#
+# The trap is armed between the two mktemps, not after both: a full or
+# unwritable $TMPDIR fails the second one, and with the trap installed later
+# set -e would exit having already created the first file and with nothing to
+# remove it — reintroducing the leak the trap exists to prevent. Its body reads
+# ANR_ERR through ${ANR_ERR:-}, so firing before that assignment is harmless.
 ANR_DUMP=$(mktemp "${TMPDIR:-/tmp}/maestro-anr-logcat.XXXXXX")
-ANR_ERR=$(mktemp "${TMPDIR:-/tmp}/maestro-anr-stderr.XXXXXX")
 trap 'rm -f "${ANR_DUMP:-}" "${ANR_ERR:-}"' EXIT
+ANR_ERR=$(mktemp "${TMPDIR:-/tmp}/maestro-anr-stderr.XXXXXX")
 
 adb -s "$SERIAL" logcat -d -b all >"$ANR_DUMP" 2>"$ANR_ERR" & LOGCAT_PID=$!
 for _ in $(seq 60); do kill -0 "$LOGCAT_PID" 2>/dev/null || break; sleep 1; done
 if kill -0 "$LOGCAT_PID" 2>/dev/null; then
   kill -9 "$LOGCAT_PID" 2>/dev/null || true
   echo "::error::logcat read from $SERIAL didn't finish in 60s — the ANR/crash check did NOT run (maestro exited $MAESTRO_RC)"
+  # Whatever adb managed to say before wedging is the only clue to WHY on this
+  # path — a transport error or an adb-server restart notice often precedes the
+  # hang. Before the streams were split this at least landed in the dump; now
+  # it would be discarded exactly where a human most needs the cause.
+  if [ -s "$ANR_ERR" ]; then echo "adb said:"; tail -20 "$ANR_ERR"; fi
   exit 1
 fi
 
