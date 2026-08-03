@@ -47,6 +47,21 @@ class AlertsViewModel(
         viewModelScope.launch { settingsRepository.save(settings.value.copy(quietHoursEnabled = enabled)) }
     }
 
+    /**
+     * Set the quiet window. A zero-length window (start == end) is refused
+     * rather than saved: `isQuietAt` would then match no hour at all, so the
+     * toggle would read "on" while nothing was ever silenced. The UI already
+     * blocks it; this is the second line so a future caller can't reintroduce
+     * the silent no-op.
+     */
+    fun setQuietWindow(startHour: Int, endHour: Int) {
+        if (startHour == endHour) return
+        if (startHour !in 0..23 || endHour !in 0..23) return
+        viewModelScope.launch {
+            settingsRepository.save(settings.value.copy(quietStartHour = startHour, quietEndHour = endHour))
+        }
+    }
+
     fun setPollCadence(minutes: Int) {
         viewModelScope.launch {
             settingsRepository.save(settings.value.copy(pollMinutes = minutes))

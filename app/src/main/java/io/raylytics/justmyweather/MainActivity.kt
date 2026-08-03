@@ -242,6 +242,7 @@ private fun App(
                 onToggle = alertsViewModel::toggle,
                 onDelete = alertsViewModel::delete,
                 onSetQuietHours = alertsViewModel::setQuietHours,
+                onSetQuietWindow = alertsViewModel::setQuietWindow,
                 onSetPollCadence = alertsViewModel::setPollCadence,
                 onDone = { screen = Screen.HOME },
             )

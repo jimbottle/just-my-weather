@@ -122,6 +122,48 @@ class AlertsViewModelTest {
     }
 
     @Test
+    fun `setting a quiet window persists it, including one that wraps midnight`() = runTest(dispatcher) {
+        val vm =
+            AlertsViewModel(
+                AlertRulesRepository(FakePreferencesDataStore()),
+                AlertSettingsRepository(FakePreferencesDataStore()),
+            )
+        val settingsCollector = launch { vm.settings.collect {} }
+        advanceUntilIdle()
+
+        vm.setQuietWindow(23, 6)
+        advanceUntilIdle()
+
+        assertEquals(23, vm.settings.value.quietStartHour)
+        assertEquals(6, vm.settings.value.quietEndHour)
+        settingsCollector.cancel()
+    }
+
+    @Test
+    fun `a zero-length or out-of-range quiet window is refused`() = runTest(dispatcher) {
+        // start == end would make isQuietAt match no hour at all, so the toggle
+        // would read "on" while nothing was ever silenced. The window must stay
+        // at whatever it was rather than persisting a silent no-op.
+        val vm =
+            AlertsViewModel(
+                AlertRulesRepository(FakePreferencesDataStore()),
+                AlertSettingsRepository(FakePreferencesDataStore()),
+            )
+        val settingsCollector = launch { vm.settings.collect {} }
+        advanceUntilIdle()
+        val before = vm.settings.value
+
+        vm.setQuietWindow(9, 9)
+        vm.setQuietWindow(-1, 6)
+        vm.setQuietWindow(22, 24)
+        advanceUntilIdle()
+
+        assertEquals(before.quietStartHour, vm.settings.value.quietStartHour)
+        assertEquals(before.quietEndHour, vm.settings.value.quietEndHour)
+        settingsCollector.cancel()
+    }
+
+    @Test
     fun `changing cadence with no rules persists but does not retune`() = runTest(dispatcher) {
         val cadences = mutableListOf<Int>()
         val vm =

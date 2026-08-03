@@ -1,0 +1,47 @@
+# Quiet hours: the window is editable and the choice persists.
+#
+# The window used to be fixed at 22:00-07:00 with only an on/off switch, so the
+# thing worth asserting is that a chosen window survives leaving the screen —
+# a picker that shows the right number but doesn't persist would look correct
+# on screen and silence the wrong hours at 3am, which nobody would notice.
+#
+# Both hour grids are on screen together, so the chips are addressed by
+# namespaced tags (start_hour_N / end_hour_N); a bare hour_N would match twice.
+appId: io.raylytics.justmyweather
+---
+- launchApp:
+    clearState: true
+    permissions:
+      all: allow
+
+- extendedWaitUntil:
+    visible: "Alerts"
+    timeout: 60000
+- tapOn: "Alerts"
+
+# The default window, shown on the row itself.
+- assertVisible: "Deliver silently 22:00–07:00"
+
+# Open the picker and choose a different window that still wraps midnight.
+- tapOn:
+    id: "quietWindow"
+- assertVisible: "Starts"
+- assertVisible: "Ends"
+- tapOn:
+    id: "start_hour_23"
+- tapOn:
+    id: "end_hour_6"
+- tapOn:
+    id: "saveQuietWindow"
+
+# The row reflects the new window immediately.
+- assertVisible: "Deliver silently 23:00–06:00"
+
+# …and it survives a trip back to the glance and in again, which is what
+# distinguishes a persisted setting from a bit of screen state.
+- tapOn: "Done"
+- extendedWaitUntil:
+    visible: "Alerts"
+    timeout: 20000
+- tapOn: "Alerts"
+- assertVisible: "Deliver silently 23:00–06:00"

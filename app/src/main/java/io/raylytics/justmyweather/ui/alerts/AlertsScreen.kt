@@ -1,5 +1,6 @@
 package io.raylytics.justmyweather.ui.alerts
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -22,12 +24,17 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -53,6 +60,7 @@ fun AlertsScreen(
     onToggle: (String) -> Unit,
     onDelete: (String) -> Unit,
     onSetQuietHours: (Boolean) -> Unit,
+    onSetQuietWindow: (Int, Int) -> Unit,
     onSetPollCadence: (Int) -> Unit,
     onDone: () -> Unit,
     modifier: Modifier = Modifier,
@@ -96,7 +104,11 @@ fun AlertsScreen(
                 color = MaterialTheme.colorScheme.surfaceVariant,
                 modifier = Modifier.padding(vertical = 12.dp),
             )
-            QuietHoursRow(settings = settings, onSetQuietHours = onSetQuietHours)
+            QuietHoursRow(
+                settings = settings,
+                onSetQuietHours = onSetQuietHours,
+                onSetQuietWindow = onSetQuietWindow,
+            )
             CadenceRow(selected = settings.pollMinutes, onSelect = onSetPollCadence)
         }
     }
@@ -126,7 +138,9 @@ private fun CadenceRow(
 private fun QuietHoursRow(
     settings: AlertSettings,
     onSetQuietHours: (Boolean) -> Unit,
+    onSetQuietWindow: (Int, Int) -> Unit,
 ) {
+    var editing by rememberSaveable { mutableStateOf(false) }
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -134,6 +148,12 @@ private fun QuietHoursRow(
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text("Quiet hours", style = MaterialTheme.typography.bodyMedium)
+            // The window is the affordance: tapping the range edits it. In the
+            // accent because it IS interactive — the one place on this screen
+            // where that colour is earned by a line of text.
+            //
+            // Editable whether or not quiet hours are on, so the window can be
+            // set before switching it on rather than only afterwards.
             Text(
                 // Zero-padded 24h clock, e.g. "07:00" — reads as a clean time range.
                 text =
@@ -144,7 +164,11 @@ private fun QuietHoursRow(
                         settings.quietEndHour,
                     ),
                 style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = MaterialTheme.colorScheme.primary,
+                modifier =
+                    Modifier
+                        .clickable { editing = true }
+                        .testTag("quietWindow"),
             )
         }
         Switch(
@@ -152,6 +176,118 @@ private fun QuietHoursRow(
             onCheckedChange = onSetQuietHours,
             modifier = Modifier.testTag("quietHours"),
         )
+    }
+    if (editing) {
+        QuietWindowDialog(
+            startHour = settings.quietStartHour,
+            endHour = settings.quietEndHour,
+            onDismiss = { editing = false },
+            onSave = { start, end ->
+                onSetQuietWindow(start, end)
+                editing = false
+            },
+        )
+    }
+}
+
+/**
+ * Pick the quiet window as two whole hours. Hours, not a full time picker,
+ * because the stored window is hour-granular — offering minutes would let the
+ * user set 22:30 and silently keep 22:00.
+ *
+ * A window that wraps midnight is normal here (22 → 07) and needs no special
+ * handling in the UI; [AlertSettings.isQuietAt] already understands it. The one
+ * combination refused is start == end, which would silence nothing while the
+ * toggle claimed otherwise.
+ */
+@OptIn(ExperimentalComposeUiApi::class)
+@Composable
+private fun QuietWindowDialog(
+    startHour: Int,
+    endHour: Int,
+    onDismiss: () -> Unit,
+    onSave: (Int, Int) -> Unit,
+) {
+    var start by rememberSaveable { mutableIntStateOf(startHour) }
+    var end by rememberSaveable { mutableIntStateOf(endHour) }
+    val valid = start != end
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Quiet hours") },
+        text = {
+            // A Dialog renders in its OWN window, outside the Box in
+            // MainActivity that sets testTagsAsResourceId — so testTags inside
+            // here are invisible to UI tests unless the flag is set again on
+            // this subtree. Found the hard way: the picker looked perfect on
+            // screen while every tag selector reported "element not found".
+            // Any future dialog needs this line too.
+            Column(
+                modifier =
+                    Modifier
+                        .verticalScroll(rememberScrollState())
+                        .semantics { testTagsAsResourceId = true },
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text("Starts", style = MaterialTheme.typography.labelMedium)
+                HourGrid(prefix = "start", selected = start, onSelect = { start = it })
+                Text("Ends", style = MaterialTheme.typography.labelMedium)
+                HourGrid(prefix = "end", selected = end, onSelect = { end = it })
+                Text(
+                    text =
+                        if (valid) {
+                            String.format(Locale.US, "Silent %02d:00–%02d:00", start, end)
+                        } else {
+                            "Start and end can't be the same hour — that would silence nothing."
+                        },
+                    style = MaterialTheme.typography.labelMedium,
+                    color =
+                        if (valid) {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        } else {
+                            MaterialTheme.colorScheme.error
+                        },
+                )
+            }
+        },
+        confirmButton = {
+            // Separate slot from the Column above, hence its own flag.
+            TextButton(
+                onClick = { onSave(start, end) },
+                enabled = valid,
+                modifier =
+                    Modifier
+                        .semantics { testTagsAsResourceId = true }
+                        .testTag("saveQuietWindow"),
+            ) { Text("Save") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}
+
+/**
+ * 24 hour chips, labelled on the same 24h clock as the row they edit.
+ *
+ * [prefix] namespaces the testTags. Both grids are on screen at once, so a bare
+ * "hour_23" would match twice and any selector picking "the first" would
+ * silently drive the wrong one — the same ambiguity that once installed a build
+ * onto the wrong device here.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun HourGrid(
+    prefix: String,
+    selected: Int,
+    onSelect: (Int) -> Unit,
+) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        (0..23).forEach { hour ->
+            FilterChip(
+                selected = hour == selected,
+                onClick = { onSelect(hour) },
+                label = { Text(String.format(Locale.US, "%02d", hour)) },
+                modifier = Modifier.testTag("${prefix}_hour_$hour"),
+            )
+        }
     }
 }
 
