@@ -70,7 +70,17 @@ class FieldRowsTest {
             "label must be capped near 60%, got ${widthOf(longLabel)}",
             widthOf(longLabel) <= 240.dp * 0.62f,
         )
-        assertTrue("value must survive, got ${widthOf("72°")}", widthOf("72°") > 0.dp)
+        // The COMPLEMENT, not `> 0`. A width greater than zero is true by
+        // construction here — the value is weighted, so it always receives
+        // row minus label, and the label can never exceed the cap. Asserting
+        // the actual floor is what catches a change that keeps the label bound
+        // honest while squeezing the value some other way (bounding it, or
+        // dropping weight(1f)), which is the shape of the 50/50 regression
+        // this suite exists to remember.
+        assertTrue(
+            "value must get the whole remainder, got ${widthOf("72°")}",
+            widthOf("72°") >= 240.dp * (1f - 0.62f),
+        )
     }
 
     @Test

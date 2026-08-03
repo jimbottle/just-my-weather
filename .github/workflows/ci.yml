@@ -39,8 +39,16 @@ jobs:
         run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
 
       # The same gate the pre-commit hook runs locally.
+      #
+      # assembleDebugAndroidTest COMPILES the instrumented tests without a
+      # device. Without it nothing type-checks that source set — ktlintCheck
+      # reads the text but never compiles it — so renaming a composable or
+      # changing a constructor would break those tests silently, and they would
+      # already be broken by the time anyone ran them.
       - name: Test, ktlint, and assemble
-        run: ./gradlew :app:testDebugUnitTest :app:ktlintCheck :app:assembleDebug --no-daemon --stacktrace
+        run: >-
+          ./gradlew :app:testDebugUnitTest :app:ktlintCheck :app:assembleDebug
+          :app:assembleDebugAndroidTest --no-daemon --stacktrace
 
       - name: Upload unit-test report on failure
         if: failure()

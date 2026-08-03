@@ -9,7 +9,7 @@ set -e
 # Skip on docs-only commits — no point compiling Kotlin for a README tweak.
 if git diff --cached --name-only | grep -qE '\.(kt|kts|xml|pro|properties)$'; then
     echo "pre-commit: running :app:test + :app:ktlintCheck"
-    ./gradlew --quiet :app:testDebugUnitTest :app:ktlintCheck
+    ./gradlew --quiet :app:testDebugUnitTest :app:ktlintCheck :app:assembleDebugAndroidTest
 else
     echo "pre-commit: no Kotlin/resource changes staged, skipping build gate"
 fi

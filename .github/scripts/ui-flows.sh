@@ -70,6 +70,32 @@ done
 # put that failure back.
 adb -s "$SERIAL" shell settings put global hide_error_dialogs 1
 
+# Instrumented Compose tests, on the emulator that is already booted — no
+# second boot, which is why they live here rather than in the JVM gate.
+#
+# BEFORE the install, not after: AGP UNINSTALLS both the app and the test APK
+# when connected tests finish (verified — `pm list packages` showed the app
+# gone), so running this later left Maestro with nothing to launch and failed
+# all six flows at once. The install below then puts the app back for them. They
+# assert MEASURED widths on the glance's label/value rows; that rule regressed
+# three times while the JVM suite and the Maestro flows all stayed green,
+# because both check that text is present, not how much room it got.
+#
+# Guarded on device count, not just $SERIAL. `connectedDebugAndroidTest` runs
+# on EVERY attached device: AGP drives them through ddmlib, and this project
+# has already had a build land on a developer's phone that way, so the same
+# "never fan out" rule applies here as to `adb install`. ANDROID_SERIAL is
+# exported because it costs nothing, but it is NOT relied on — CLAUDE.md
+# records that AGP's own device selection could not be confirmed to honour it.
+# With anything other than exactly one device attached, skip and say so rather
+# than risk driving someone else's.
+ATTACHED=$(adb devices | awk '$2 == "device" { n++ } END { print n + 0 }')
+if [ "$ATTACHED" = "1" ]; then
+  ANDROID_SERIAL="$SERIAL" ./gradlew --quiet :app:connectedDebugAndroidTest
+else
+  echo "::warning::skipping connectedDebugAndroidTest — $ATTACHED devices attached and the task cannot be pinned to one"
+fi
+
 # Install after the readiness check and dialog suppression, so a locally
 # invoked run can't install into a half-booted device. (In CI the action has
 # already waited, so this ordering is belt-and-braces there.)
