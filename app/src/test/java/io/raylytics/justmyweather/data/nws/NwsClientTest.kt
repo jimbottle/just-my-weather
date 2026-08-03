@@ -2,6 +2,7 @@ package io.raylytics.justmyweather.data.nws
 
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
@@ -36,6 +37,8 @@ class NwsClientTest {
                       "temperature":{"value":20.0,"unitCode":"wmoUnit:degC"},
                       "windSpeed":{"value":10.0,"unitCode":"wmoUnit:km_h-1"},
                       "seaLevelPressure":{"value":101325.0,"unitCode":"wmoUnit:Pa"},
+                      "relativeHumidity":{"value":73.6,"unitCode":"wmoUnit:percent"},
+                      "windDirection":{"value":340.0,"unitCode":"wmoUnit:degree_(angle)"},
                       "textDescription":"Partly Cloudy"
                     }}
                     """.trimIndent(),
@@ -47,6 +50,41 @@ class NwsClientTest {
         assertEquals(6.21371, obs.windMph!!, 1e-4)
         assertEquals(29.92, obs.pressureInHg!!, 0.01)
         assertEquals("Partly Cloudy", obs.conditions)
+        // The unit codes here are the ones the live API actually sends,
+        // checked against api.weather.gov on 2026-08-02. Both pass through
+        // unconverted, so a wrong assumption would be invisible without this.
+        assertEquals(73.6, obs.relativeHumidityPercent!!, 1e-6)
+        assertEquals(340.0, obs.windDirectionDegrees!!, 1e-6)
+    }
+
+    @Test
+    fun `getObservation drops humidity and wind direction on an unexpected unit`() = runTest {
+        // These two are the only source of two exported payload fields and are
+        // passed through rather than converted, so the guard has to drop a
+        // value it can't vouch for. Sending a bare number in an unknown scale
+        // would put a confident wrong humidity on a watch face.
+        val (client, _) =
+            client(
+                HttpResult(
+                    200,
+                    """
+                    {"properties":{
+                      "timestamp":"2026-06-24T18:00:00+00:00",
+                      "temperature":{"value":20.0,"unitCode":"wmoUnit:degC"},
+                      "relativeHumidity":{"value":0.736,"unitCode":"wmoUnit:one"},
+                      "windDirection":{"value":5.93,"unitCode":"wmoUnit:rad"},
+                      "textDescription":"Partly Cloudy"
+                    }}
+                    """.trimIndent(),
+                    null,
+                ),
+            )
+        val obs = client.getObservation("KNYC")
+        assertNull(obs.relativeHumidityPercent)
+        assertNull(obs.windDirectionDegrees)
+        // The rest of the observation still parses — one odd unit must not
+        // cost the reading.
+        assertEquals(68.0, obs.temperatureF!!, 1e-6)
     }
 
     @Test

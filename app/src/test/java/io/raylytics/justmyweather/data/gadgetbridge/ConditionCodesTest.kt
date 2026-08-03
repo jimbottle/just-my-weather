@@ -48,6 +48,21 @@ class ConditionCodesTest {
     }
 
     @Test
+    fun `mixed precipitation is not swallowed by plain snow`() {
+        // The entry for this was dead: "Rain and Snow" contains "snow", and
+        // the bare "snow" entry sat above it, so 616 could never be produced.
+        // Ordering is this file's correctness property, so it gets a test.
+        assertEquals(616, openWeatherMapCodeFor("Rain and Snow"))
+        assertEquals(616, openWeatherMapCodeFor("Light Rain and Snow"))
+        assertEquals(616, openWeatherMapCodeFor("Snow and Rain"))
+        assertEquals(616, openWeatherMapCodeFor("Wintry Mix"))
+        // …and the plain snow cases must still resolve to themselves.
+        assertEquals(601, openWeatherMapCodeFor("Snow"))
+        assertEquals(600, openWeatherMapCodeFor("Light Snow"))
+        assertEquals(602, openWeatherMapCodeFor("Heavy Snow"))
+    }
+
+    @Test
     fun `rain intensities are distinguished`() {
         assertEquals(500, openWeatherMapCodeFor("Light Rain"))
         assertEquals(501, openWeatherMapCodeFor("Rain"))

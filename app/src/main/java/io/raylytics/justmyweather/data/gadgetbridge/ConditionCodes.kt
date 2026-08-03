@@ -44,12 +44,18 @@ private val CONDITION_CODES: List<Pair<String, Int>> =
         "ice pellets" to 611,
         "sleet" to 611,
         "hail" to 611,
+        // Mixed precipitation BEFORE the snow block. "Rain and Snow" contains
+        // "snow", so with these below it the bare entry won and 616 was
+        // unreachable — the exact compound-description collapse this file's
+        // header warns about, missed because the tests covered ordering for
+        // cloud cover and thunderstorms but not for mixes.
+        "rain and snow" to 616,
+        "snow and rain" to 616,
+        "wintry mix" to 616,
         "blizzard" to 602,
         "heavy snow" to 602,
         "light snow" to 600,
         "snow" to 601,
-        "wintry mix" to 616,
-        "rain and snow" to 616,
         // Showers before steady rain: NWS says "Rain Showers" for convective.
         "heavy rain" to 502,
         "light rain" to 500,
