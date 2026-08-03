@@ -3,6 +3,7 @@ package io.raylytics.justmyweather.ui.home
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -27,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.raylytics.justmyweather.data.WeatherSnapshot
 import io.raylytics.justmyweather.data.nws.ActiveAlert
@@ -34,6 +36,7 @@ import io.raylytics.justmyweather.data.nws.DailyPeriod
 import io.raylytics.justmyweather.data.nws.ForecastPoint
 import io.raylytics.justmyweather.view.AlertBannerPosition
 import io.raylytics.justmyweather.view.DailyStyle
+import io.raylytics.justmyweather.view.DisplayValue
 import io.raylytics.justmyweather.view.ForecastLayout
 import io.raylytics.justmyweather.view.RenderedView
 import io.raylytics.justmyweather.view.ViewConfig
@@ -191,6 +194,71 @@ private fun GlanceView(
 }
 
 /**
+ * The label · value rows beneath the hero.
+ *
+ * Extracted and `internal` so the width rule below can be asserted directly:
+ * it has now regressed twice (label starvation, then a hard 50/50 cap) with
+ * nothing automated to catch either, because Maestro sees text but not
+ * measured widths.
+ *
+ * The cap comes from [BoxWithConstraints.maxWidth] — the width this block was
+ * ACTUALLY given — not from [blockMaxWidth], which is only the density's
+ * nominal ceiling. The row is `min(screen - padding, blockMaxWidth)` wide, so
+ * on a narrow screen or at a large display scale a cap computed from the
+ * constant would exceed 60% of the real row; since the label is un-weighted it
+ * would win that space and starve the value it is meant to protect.
+ */
+@Composable
+internal fun FieldRows(
+    rows: List<DisplayValue>,
+    blockMaxWidth: Dp,
+    rowSpacing: Dp,
+    modifier: Modifier = Modifier,
+) {
+    BoxWithConstraints(modifier = modifier.widthIn(max = blockMaxWidth)) {
+        val labelCap = maxWidth * LABEL_WIDTH_SHARE
+        Column(verticalArrangement = Arrangement.spacedBy(rowSpacing)) {
+            rows.forEach { row ->
+                // CAP the label, then give the value everything left over.
+                //
+                // Not weight() on both: a weighted child is measured with
+                // maxWidth = its share, and `fill = false` only relaxes
+                // minWidth — so two equal weights hard-cap EACH side at 50%
+                // even when the other is nearly empty. That was worse than the
+                // problem it fixed: a long NWS condition got half a row and
+                // wrapped further, with the other half blank.
+                //
+                // Un-weighted children are measured first, so the label —
+                // bounded here, and ellipsized at one line — takes only what it
+                // needs up to the cap, and the weighted value then receives ALL
+                // the remainder. A short label leaves the value nearly the whole
+                // row; a runaway custom label (uncapped free text) stops at the
+                // cap instead of starving the value. The label gives way rather
+                // than the value because the user chose the label and knows what
+                // it says.
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(
+                        text = row.label,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.widthIn(max = labelCap),
+                    )
+                    Text(
+                        text = row.value,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        textAlign = TextAlign.End,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
  * Active safety alerts — tornado, severe storm, hurricane, dangerous heat,
  * poor air quality — worst first.
  *
@@ -256,47 +324,12 @@ private fun NowContent(
         )
         // Secondary fields, in the user's order, as quiet label · value rows.
         if (rendered.rows.isNotEmpty()) {
-            Column(
-                modifier = Modifier.widthIn(max = spec.rowMaxWidth).padding(top = spec.sectionSpacing),
-                verticalArrangement = Arrangement.spacedBy(spec.rowSpacing),
-            ) {
-                rendered.rows.forEach { row ->
-                    // CAP the label, then give the value everything left over.
-                    //
-                    // Not weight() on both: a weighted child is measured with
-                    // maxWidth = its share, and `fill = false` only relaxes
-                    // minWidth — so two equal weights hard-cap EACH side at 50%
-                    // even when the other is nearly empty. That was worse than
-                    // the problem it fixed: a long NWS condition got 120dp of a
-                    // 240dp row and wrapped further, with half the row blank.
-                    //
-                    // Un-weighted children are measured first, so the label —
-                    // bounded here, and ellipsized at one line — takes only
-                    // what it needs up to the cap, and the weighted value then
-                    // receives ALL the remainder. A short label leaves the
-                    // value nearly the whole row; a runaway custom label
-                    // (uncapped free text) stops at the cap instead of starving
-                    // the value. The label gives way rather than the value
-                    // because the user chose the label and knows what it says.
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(
-                            text = row.label,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.widthIn(max = spec.rowMaxWidth * LABEL_WIDTH_SHARE),
-                        )
-                        Text(
-                            text = row.value,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onBackground,
-                            textAlign = TextAlign.End,
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
-                }
-            }
+            FieldRows(
+                rows = rendered.rows,
+                blockMaxWidth = spec.rowMaxWidth,
+                rowSpacing = spec.rowSpacing,
+                modifier = Modifier.padding(top = spec.sectionSpacing),
+            )
         }
 
         // Provenance, attached to the reading it describes. The hero is a real
