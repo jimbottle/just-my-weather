@@ -23,6 +23,13 @@ data class DensitySpec(
     val heroStyle: TextStyle,
     val rowSpacing: Dp,
     val sectionSpacing: Dp,
+    /**
+     * How wide the label/value block is allowed to get. Deliberately narrow:
+     * across the full screen the value ends up alone against the right edge,
+     * and a lone right-aligned word in a sparse layout reads as a button —
+     * "Clear" (a sky condition) was mistaken for a Clear/reset control.
+     * Keeping the pair close makes the row read as one fact.
+     */
     val rowMaxWidth: Dp,
 )
 
@@ -36,7 +43,7 @@ fun Density.spec(): DensitySpec {
                 heroStyle = hero.copy(fontSize = 132.sp, lineHeight = 132.sp),
                 rowSpacing = 10.dp,
                 sectionSpacing = 18.dp,
-                rowMaxWidth = 320.dp,
+                rowMaxWidth = 240.dp,
             )
 
         Density.COMFORTABLE ->
@@ -44,7 +51,7 @@ fun Density.spec(): DensitySpec {
                 heroStyle = hero,
                 rowSpacing = 6.dp,
                 sectionSpacing = 8.dp,
-                rowMaxWidth = 320.dp,
+                rowMaxWidth = 240.dp,
             )
 
         Density.COMPACT ->
@@ -52,7 +59,7 @@ fun Density.spec(): DensitySpec {
                 heroStyle = hero.copy(fontSize = 96.sp, lineHeight = 100.sp),
                 rowSpacing = 2.dp,
                 sectionSpacing = 4.dp,
-                rowMaxWidth = 360.dp,
+                rowMaxWidth = 280.dp,
             )
     }
 }

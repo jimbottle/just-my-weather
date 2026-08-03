@@ -323,7 +323,7 @@ private fun HourlyContent(
                             Text(
                                 text = "${group.date.format(weekdayFormat)}, ${group.date.format(monthDayFormat)}",
                                 style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.primary,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(top = 6.dp),
                             )
                         }
@@ -413,10 +413,18 @@ private fun DailyContent(
 @Composable
 private fun DateTile(date: java.time.LocalDate) {
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        // onSurfaceVariant, NOT the accent. The accent marks things you can
+        // press (Refresh, Customize, the mode chips), and a date marker is a
+        // label — in the accent it looked as tappable as the buttons below,
+        // the same misread that made "Clear" seem like a control.
+        //
+        // Not a blanket rule yet: rain-chance percentages still take the
+        // accent as deliberate emphasis. That is a live judgement call rather
+        // than an oversight — worth revisiting if anyone tries to tap one.
         Text(
             text = date.format(weekdayFormat).uppercase(Locale.getDefault()),
             style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.primary,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Text(
             text = date.format(monthDayFormat),
