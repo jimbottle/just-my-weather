@@ -20,4 +20,13 @@ data class WeatherSnapshot(
     val pressureInHg: Double?,
     /** When the reading was taken; null when the station omitted it. */
     val observedAt: Instant?,
+    /**
+     * Carried for the Gadgetbridge export rather than the default glance —
+     * WeatherSpec has fields for both, and sending 0 for an unknown humidity
+     * would render as a confident "0%" on the watch. Defaulted so every other
+     * construction site is unaffected.
+     */
+    val relativeHumidityPercent: Double? = null,
+    /** Wind bearing in degrees clockwise from true north, 0–360. */
+    val windDirectionDegrees: Double? = null,
 )

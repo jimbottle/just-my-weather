@@ -14,6 +14,9 @@ import java.time.format.DateTimeParseException
 object Units {
     private const val PA_PER_INHG = 3386.389
 
+    /** Exact by definition (international mile), so mph→km/h is not an approximation. */
+    private const val MI_TO_KM = 1.609344
+
     /**
      * Shared C→F primitive. The hourly-forecast endpoint sends short unit
      * codes ('C' / 'F') rather than `wmoUnit:degC`, so the forecast parser
@@ -60,6 +63,23 @@ object Units {
         if (unitCode.contains("inHg") || unitCode.contains("in_Hg")) return value
         return null
     }
+
+    /**
+     * Convert to the units Gadgetbridge's WeatherSpec expects: Kelvin for every
+     * temperature, km/h for wind speed. Verified against WeatherSpec.java,
+     * where both are stated in field comments — the JSON carries bare numbers
+     * with no unit code, so getting this wrong shows a plausible-looking but
+     * wrong number on the watch rather than failing.
+     *
+     * These take an already-converted display value rather than a
+     * (value, unitCode) pair like the parsers above, because the snapshot the
+     * exporter reads is already in American units. The F→C→K round trip is
+     * exact in Double — no accumulated rounding — so there is nothing to gain
+     * from re-deriving it from the wire.
+     */
+    fun fahrenheitToKelvin(value: Double): Double = (value - 32.0) * 5.0 / 9.0 + 273.15
+
+    fun mphToKmh(value: Double): Double = value * MI_TO_KM
 
     /**
      * Parse the NWS hourly-forecast wind format ("10 mph", "5 to 10 mph").

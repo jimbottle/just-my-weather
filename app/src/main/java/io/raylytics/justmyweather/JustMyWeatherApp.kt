@@ -8,9 +8,12 @@ import io.raylytics.justmyweather.alerts.AlertWorker
 import io.raylytics.justmyweather.data.AlertRulesRepository
 import io.raylytics.justmyweather.data.AlertSettingsRepository
 import io.raylytics.justmyweather.data.DataStorePointCache
+import io.raylytics.justmyweather.data.GadgetbridgeSettingsRepository
 import io.raylytics.justmyweather.data.ThemeConfigRepository
 import io.raylytics.justmyweather.data.ViewConfigRepository
 import io.raylytics.justmyweather.data.WeatherRepository
+import io.raylytics.justmyweather.data.gadgetbridge.GadgetbridgeBroadcaster
+import io.raylytics.justmyweather.data.gadgetbridge.GadgetbridgeExporter
 import io.raylytics.justmyweather.data.nws.NwsClient
 import io.raylytics.justmyweather.data.nws.OkHttpTransport
 import io.raylytics.justmyweather.location.LocationProvider
@@ -41,6 +44,16 @@ class AppContainer(context: Context) {
     val alertRulesRepository = AlertRulesRepository(appContext.dataStore)
     val alertSettingsRepository = AlertSettingsRepository(appContext.dataStore)
     val alertNotifier = AlertNotifier(appContext)
+
+    // Optional hand-off of each reading to Gadgetbridge, which relays it to a
+    // paired watch. Constructed unconditionally but inert until switched on:
+    // the exporter reads the setting before building anything.
+    val gadgetbridgeSettingsRepository = GadgetbridgeSettingsRepository(appContext.dataStore)
+    val gadgetbridgeExporter =
+        GadgetbridgeExporter(
+            settings = gadgetbridgeSettingsRepository,
+            broadcaster = GadgetbridgeBroadcaster(appContext),
+        )
 }
 
 class JustMyWeatherApp : Application() {

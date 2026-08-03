@@ -70,6 +70,12 @@ data class NwsObservationResponse(
         val seaLevelPressure: NwsValue? = null,
         val barometricPressure: NwsValue? = null,
         val textDescription: String? = null,
+        // Both are in the observation payload but were unparsed until the
+        // Gadgetbridge exporter needed them (WeatherSpec carries humidity and
+        // wind bearing). Defaulted like every field here, so a station that
+        // omits them still parses.
+        val relativeHumidity: NwsValue? = null,
+        val windDirection: NwsValue? = null,
     )
 }
 

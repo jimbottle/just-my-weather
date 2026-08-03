@@ -55,6 +55,8 @@ class MainActivity : ComponentActivity() {
                     container.weatherRepository,
                     container.locationProvider,
                     container.viewConfigRepository,
+                    // No-op unless the user switched the hand-off on.
+                    container.gadgetbridgeExporter::export,
                 )
             }
         }
@@ -62,7 +64,12 @@ class MainActivity : ComponentActivity() {
 
     private val customizeViewModel: CustomizeViewModel by viewModels {
         viewModelFactory {
-            initializer { CustomizeViewModel(container.viewConfigRepository) }
+            initializer {
+                CustomizeViewModel(
+                    container.viewConfigRepository,
+                    container.gadgetbridgeSettingsRepository,
+                )
+            }
         }
     }
 
@@ -204,6 +211,7 @@ private fun App(
             // System back returns to the glance rather than exiting the app.
             BackHandler { screen = Screen.HOME }
             val config by customizeViewModel.config.collectAsStateWithLifecycle()
+            val gadgetbridgeEnabled by customizeViewModel.gadgetbridgeEnabled.collectAsStateWithLifecycle()
             CustomizeScreen(
                 config = config,
                 onToggle = customizeViewModel::toggle,
@@ -217,6 +225,8 @@ private fun App(
                 onSetHourlyLayout = customizeViewModel::setHourlyLayout,
                 theme = themeConfig,
                 onThemeChange = onThemeChange,
+                gadgetbridgeEnabled = gadgetbridgeEnabled,
+                onSetGadgetbridgeEnabled = customizeViewModel::setGadgetbridgeEnabled,
                 onDone = { screen = Screen.HOME },
             )
         }

@@ -20,6 +20,31 @@ class UnitsTest {
     }
 
     @Test
+    fun `fahrenheit to kelvin`() {
+        // Anchors, not round numbers: absolute zero and the triple point pin
+        // both the offset and the scale, so an error in either shows up.
+        assertEquals(273.15, Units.fahrenheitToKelvin(32.0), tol)
+        assertEquals(373.15, Units.fahrenheitToKelvin(212.0), tol)
+        assertEquals(0.0, Units.fahrenheitToKelvin(-459.67), tol)
+        // A realistic reading, since this is what a watch face will show:
+        // 72F is about 22.2C, i.e. ~295.4K. Wrong scale would land near 322.
+        assertEquals(295.372222, Units.fahrenheitToKelvin(72.0), 1e-5)
+    }
+
+    @Test
+    fun `mph to kmh`() {
+        assertEquals(1.609344, Units.mphToKmh(1.0), tol)
+        assertEquals(0.0, Units.mphToKmh(0.0), tol)
+        // Round-trips with the existing km/h -> mph parser, which would catch
+        // an inverted factor. NOT exact, deliberately: toMph carries
+        // almanac-bell's rounded reciprocal (0.621371) and this file documents
+        // that parity as intentional, so the loop lands ~3e-7 short. The
+        // tolerance accepts that rather than "fixing" a constant the port is
+        // supposed to share.
+        assertEquals(10.0, Units.toMph(Units.mphToKmh(10.0), "wmoUnit:km_h-1")!!, 1e-4)
+    }
+
+    @Test
     fun `toFahrenheit honours unit code and nulls`() {
         assertEquals(50.0, Units.toFahrenheit(10.0, "wmoUnit:degC")!!, tol)
         assertEquals(10.0, Units.toFahrenheit(10.0, "wmoUnit:degF")!!, tol)

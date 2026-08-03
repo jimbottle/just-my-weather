@@ -64,6 +64,17 @@ class NwsClient(
             pressureInHg = Units.toInchesOfMercury(slp?.value, slp?.unitCode ?: "")
                 ?: Units.toInchesOfMercury(bp?.value, bp?.unitCode ?: ""),
             conditions = props.textDescription?.takeIf { it.isNotBlank() },
+            // Percent and degrees respectively, both already in the units we
+            // want, so they pass through rather than going via Units. Guarded
+            // anyway: NWS sends `wmoUnit:percent` and `wmoUnit:degree_(angle)`,
+            // and a station reporting something else would otherwise arrive as
+            // a bare number in the wrong scale.
+            relativeHumidityPercent = props.relativeHumidity?.takeIf {
+                it.unitCode?.contains("percent") == true
+            }?.value,
+            windDirectionDegrees = props.windDirection?.takeIf {
+                it.unitCode?.contains("degree") == true
+            }?.value,
         )
     }
 

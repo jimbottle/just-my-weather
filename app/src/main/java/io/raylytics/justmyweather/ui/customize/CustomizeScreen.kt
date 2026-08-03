@@ -71,6 +71,8 @@ fun CustomizeScreen(
     onSetHourlyLayout: (ForecastLayout) -> Unit,
     theme: ThemeConfig,
     onThemeChange: (ThemeConfig) -> Unit,
+    gadgetbridgeEnabled: Boolean,
+    onSetGadgetbridgeEnabled: (Boolean) -> Unit,
     onDone: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -125,8 +127,46 @@ fun CustomizeScreen(
                 }
 
                 ThemePicker(theme = theme, onChange = onThemeChange)
+                GadgetbridgeToggle(enabled = gadgetbridgeEnabled, onChange = onSetGadgetbridgeEnabled)
             }
         }
+    }
+}
+
+/**
+ * Opt-in hand-off of each reading to Gadgetbridge, which relays it to a paired
+ * watch. Last in the list and off by default: it sends data to another app, so
+ * it stays something you go and switch on rather than something you discover
+ * already running.
+ */
+@Composable
+private fun GadgetbridgeToggle(
+    enabled: Boolean,
+    onChange: (Boolean) -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text("Watch", style = MaterialTheme.typography.labelMedium)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("Send to Gadgetbridge", style = MaterialTheme.typography.bodyLarge)
+            Switch(
+                checked = enabled,
+                onCheckedChange = onChange,
+                modifier = Modifier.testTag("gadgetbridge-toggle"),
+            )
+        }
+        Text(
+            text = "Hands each new reading to Gadgetbridge, which passes it to a paired watch. " +
+                "Does nothing if Gadgetbridge isn't installed.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 

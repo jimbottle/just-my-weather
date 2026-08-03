@@ -2,6 +2,7 @@ package io.raylytics.justmyweather.ui.customize
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.raylytics.justmyweather.data.GadgetbridgeSettingsRepository
 import io.raylytics.justmyweather.data.ViewConfigRepository
 import io.raylytics.justmyweather.view.DailyStyle
 import io.raylytics.justmyweather.view.Density
@@ -22,9 +23,22 @@ import kotlinx.coroutines.launch
  */
 class CustomizeViewModel(
     private val repository: ViewConfigRepository,
+    private val gadgetbridgeSettings: GadgetbridgeSettingsRepository,
 ) : ViewModel() {
     val config: StateFlow<ViewConfig> =
         repository.config.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ViewConfig.DEFAULT)
+
+    /**
+     * Kept separate from [config] rather than folded into ViewConfig: that
+     * object describes what the glance looks like, while this is a hand-off to
+     * another app on the phone. Different concern, different store.
+     */
+    val gadgetbridgeEnabled: StateFlow<Boolean> =
+        gadgetbridgeSettings.enabled.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    fun setGadgetbridgeEnabled(value: Boolean) {
+        viewModelScope.launch { gadgetbridgeSettings.setEnabled(value) }
+    }
 
     fun toggle(field: WeatherField) = edit { it.toggle(field) }
 

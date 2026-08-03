@@ -38,6 +38,10 @@ data class CurrentObservation(
     val pressureInHg: Double?,
     /** Plain-language summary from the station ("Mostly Cloudy"), if present. */
     val conditions: String?,
+    /** Relative humidity 0–100, or null when the station omits it. */
+    val relativeHumidityPercent: Double? = null,
+    /** Wind bearing in degrees clockwise from true north, 0–360. */
+    val windDirectionDegrees: Double? = null,
 )
 
 /** One hour of the gridpoint hourly forecast. */

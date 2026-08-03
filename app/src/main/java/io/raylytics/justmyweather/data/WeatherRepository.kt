@@ -55,6 +55,8 @@ class WeatherRepository(
             precipitationIn = obs.precipitationIn,
             pressureInHg = obs.pressureInHg,
             observedAt = obs.observedAt,
+            relativeHumidityPercent = obs.relativeHumidityPercent,
+            windDirectionDegrees = obs.windDirectionDegrees,
         )
     }
 

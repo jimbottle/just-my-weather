@@ -1,0 +1,53 @@
+# Gadgetbridge hand-off: the opt-in toggle exists, defaults to OFF, and its
+# state survives leaving and re-entering the screen.
+#
+# Default-off is the assertion that matters. This setting sends weather to
+# another app on the phone, so "off until asked" is a product promise, not a
+# preference — a regression that flipped the default would be invisible in
+# unit tests and would ship data-sharing nobody switched on.
+#
+# The broadcast itself isn't asserted here: without Gadgetbridge installed
+# there is no receiver, and installing one to prove delivery is beyond a UI
+# flow. The payload is covered exhaustively by GadgetbridgeWeatherTest, and
+# the toggle-to-broadcast wiring by the app's own log line.
+appId: io.raylytics.justmyweather
+---
+- launchApp:
+    clearState: true
+    permissions:
+      all: allow
+
+- extendedWaitUntil:
+    visible: "Customize"
+    timeout: 60000
+- tapOn: "Customize"
+- assertVisible: "Customize view"
+
+# The control lives at the bottom of the scrolling options page.
+- scrollUntilVisible:
+    element: "Send to Gadgetbridge"
+    direction: DOWN
+    timeout: 20000
+- assertVisible: "Send to Gadgetbridge"
+
+# Off by default. The Switch carries no text, so it's targeted by testTag,
+# surfaced as a resource-id by the root semantics modifier in MainActivity.
+- assertVisible:
+    id: "gadgetbridge-toggle"
+    checked: false
+
+# Turning it on sticks across a trip back to the glance and in again.
+- tapOn:
+    id: "gadgetbridge-toggle"
+- assertVisible:
+    id: "gadgetbridge-toggle"
+    checked: true
+- tapOn: "Done"
+- tapOn: "Customize"
+- scrollUntilVisible:
+    element: "Send to Gadgetbridge"
+    direction: DOWN
+    timeout: 20000
+- assertVisible:
+    id: "gadgetbridge-toggle"
+    checked: true

@@ -36,6 +36,13 @@ class HomeViewModel(
     private val repository: WeatherRepository,
     private val locationProvider: LocationProvider,
     configRepository: ViewConfigRepository,
+    /**
+     * Invoked with each freshly loaded snapshot. A plain function rather than a
+     * named collaborator so this ViewModel stays ignorant of who else wants the
+     * data — today that is the optional Gadgetbridge hand-off, wired in
+     * MainActivity. Defaults to doing nothing, which is also what tests want.
+     */
+    private val onSnapshotLoaded: suspend (WeatherSnapshot) -> Unit = {},
 ) : ViewModel() {
     private val weather = MutableStateFlow<WeatherLoad>(WeatherLoad.Loading)
     private val forecasts = MutableStateFlow(ForecastLoad())
@@ -103,12 +110,20 @@ class HomeViewModel(
             // pre-refresh data can never be resurrected past the clear.
             forecastMutex.withLock { forecasts.value = ForecastLoad() }
             val location = currentLocation()
-            weather.value =
+            val loaded =
                 runCatching { repository.load(location) }
                     .fold(
                         onSuccess = { WeatherLoad.Ready(it) },
                         onFailure = { WeatherLoad.Error(it.toUserMessage()) },
                     )
+            weather.value = loaded
+            // Hand off after the UI state is published, and never let a
+            // failure here surface: an export is a side errand, so a watch
+            // that isn't listening must not turn a good reading into an error
+            // screen or skip the forecast fetch below.
+            if (loaded is WeatherLoad.Ready) {
+                runCatching { onSnapshotLoaded(loaded.snapshot) }
+            }
             ensureForecast(mode.value)
         }
     }
