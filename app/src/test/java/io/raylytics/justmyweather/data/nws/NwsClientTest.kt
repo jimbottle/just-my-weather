@@ -2,6 +2,7 @@ package io.raylytics.justmyweather.data.nws
 
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -113,6 +114,23 @@ class NwsClientTest {
     }
 
     @Test
+    fun `getActiveAlertsAt queries by point, not by forecast zone`() = runTest {
+        // Storm-based warnings (tornado, severe thunderstorm, flash flood) are
+        // issued against county zones/polygons, not the forecast zone, so a
+        // zone query silently drops them. Verified live on 2026-08-03: for this
+        // coordinate ?zone=NYZ072 returned only a Flood Watch while ?point=
+        // also returned a Flash Flood Warning. Assert the URL so a refactor
+        // back to zones fails here rather than in a storm.
+        val (client, transport) = client(HttpResult(200, """{"features":[]}""", null))
+        client.getActiveAlertsAt(40.71, -74.01)
+        assertTrue(
+            transport.requested.last().contains("point=40.71,-74.01"),
+            "expected a point query, got ${transport.requested.last()}",
+        )
+        assertFalse(transport.requested.last().contains("zone="))
+    }
+
+    @Test
     fun `getActiveAlerts maps features and skips entries missing id or event`() = runTest {
         val (client, _) =
             client(
@@ -127,7 +145,7 @@ class NwsClientTest {
                     null,
                 ),
             )
-        val alerts = client.getActiveAlerts("NYZ072")
+        val alerts = client.getActiveAlertsAt(40.71, -74.01)
         assertEquals(1, alerts.size)
         assertEquals("A1", alerts[0].id)
         assertEquals("Heat Advisory", alerts[0].event)

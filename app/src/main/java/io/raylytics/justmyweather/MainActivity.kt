@@ -85,10 +85,14 @@ class MainActivity : ComponentActivity() {
                 AlertsViewModel(
                     container.alertRulesRepository,
                     container.alertSettingsRepository,
+                    // "Is there any reason to poll?" — a live rule OR safety
+                    // alerts being on. Using only the rule list here would let
+                    // a user with no rules switch safety alerts on and have the
+                    // worker cancelled out from under them.
                     onRulesChanged = { rules ->
                         AlertWorker.sync(
                             applicationContext,
-                            rules.any { it.enabled },
+                            rules.any { it.enabled } || alertsViewModel.settings.value.safetyNotifications,
                             alertsViewModel.settings.value.pollMinutes,
                         )
                     },
@@ -96,7 +100,8 @@ class MainActivity : ComponentActivity() {
                     onCadenceChanged = { minutes ->
                         AlertWorker.sync(
                             applicationContext,
-                            alertsViewModel.rules.value.any { it.enabled },
+                            alertsViewModel.rules.value.any { it.enabled } ||
+                                alertsViewModel.settings.value.safetyNotifications,
                             minutes,
                         )
                     },
@@ -223,6 +228,7 @@ private fun App(
                 onSetDailyStyle = customizeViewModel::setDailyStyle,
                 onSetDailyLayout = customizeViewModel::setDailyLayout,
                 onSetHourlyLayout = customizeViewModel::setHourlyLayout,
+                onSetAlertBannerPosition = customizeViewModel::setAlertBannerPosition,
                 theme = themeConfig,
                 onThemeChange = onThemeChange,
                 gadgetbridgeEnabled = gadgetbridgeEnabled,
@@ -243,6 +249,7 @@ private fun App(
                 onDelete = alertsViewModel::delete,
                 onSetQuietHours = alertsViewModel::setQuietHours,
                 onSetQuietWindow = alertsViewModel::setQuietWindow,
+                onSetSafetyNotifications = alertsViewModel::setSafetyNotifications,
                 onSetPollCadence = alertsViewModel::setPollCadence,
                 onDone = { screen = Screen.HOME },
             )

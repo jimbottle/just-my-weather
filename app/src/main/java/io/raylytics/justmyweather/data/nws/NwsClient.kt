@@ -78,8 +78,20 @@ class NwsClient(
         )
     }
 
-    suspend fun getActiveAlerts(zoneId: String): List<ActiveAlert> {
-        val body = getJson<NwsAlertsResponse>("/alerts/active?zone=$zoneId")
+    /**
+     * Active alerts covering a coordinate.
+     *
+     * Queried by POINT, not by forecast zone, and that distinction decides
+     * whether tornado warnings ever appear. NWS issues storm-based warnings
+     * — tornado, severe thunderstorm, flash flood — against COUNTY zones
+     * (NYC005) or polygons, while the forecast zone is a different set
+     * (NYZ072). Verified against the live API on 2026-08-03: for 40.71,-74.01
+     * `?zone=NYZ072` returned only a Flood Watch, while `?point=` returned
+     * that AND a Flash Flood Warning whose affectedZones were all county
+     * codes. Asking by zone silently drops the most urgent category there is.
+     */
+    suspend fun getActiveAlertsAt(latitude: Double, longitude: Double): List<ActiveAlert> {
+        val body = getJson<NwsAlertsResponse>("/alerts/active?point=$latitude,$longitude")
         return body.features.mapNotNull { feature ->
             val props = feature.properties
             val alertId = props?.id ?: feature.id ?: return@mapNotNull null

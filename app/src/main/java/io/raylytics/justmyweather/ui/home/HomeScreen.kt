@@ -29,8 +29,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.raylytics.justmyweather.data.WeatherSnapshot
+import io.raylytics.justmyweather.data.nws.ActiveAlert
 import io.raylytics.justmyweather.data.nws.DailyPeriod
 import io.raylytics.justmyweather.data.nws.ForecastPoint
+import io.raylytics.justmyweather.view.AlertBannerPosition
 import io.raylytics.justmyweather.view.DailyStyle
 import io.raylytics.justmyweather.view.ForecastLayout
 import io.raylytics.justmyweather.view.RenderedView
@@ -106,6 +108,13 @@ private fun GlanceView(
         // scrolling, never to clipped, unreachable chips and buttons.
         modifier = Modifier.verticalScroll(rememberScrollState()),
     ) {
+        // Safety alerts lead when the user wants them on top. Absent entirely
+        // on the ordinary day — an empty list renders nothing, so the calm
+        // default stays calm and the banner's presence is itself the signal.
+        if (config.alertBannerPosition == AlertBannerPosition.TOP) {
+            SafetyAlertBanner(alerts = state.safetyAlerts)
+        }
+
         Text(
             text = snapshot.locationLabel.uppercase(Locale.getDefault()),
             style = MaterialTheme.typography.labelMedium,
@@ -164,6 +173,56 @@ private fun GlanceView(
             }
             TextButton(onClick = onCustomize) { Text("Customize") }
             TextButton(onClick = onAlerts) { Text("Alerts") }
+        }
+
+        if (config.alertBannerPosition == AlertBannerPosition.BOTTOM) {
+            SafetyAlertBanner(alerts = state.safetyAlerts)
+        }
+    }
+}
+
+/**
+ * Active safety alerts — tornado, severe storm, hurricane, dangerous heat,
+ * poor air quality — worst first.
+ *
+ * Renders NOTHING when there is nothing to say, which is the point: on almost
+ * every day this composable contributes no pixels, so when it does appear the
+ * appearance itself carries the message. Which alerts qualify is decided in
+ * SafetyAlerts, not here.
+ *
+ * The most severe alert is expanded; the rest are one line each. A screen full
+ * of headlines during a storm is the opposite of useful.
+ */
+@Composable
+private fun SafetyAlertBanner(alerts: List<ActiveAlert>) {
+    if (alerts.isEmpty()) return
+    Surface(
+        color = MaterialTheme.colorScheme.errorContainer,
+        contentColor = MaterialTheme.colorScheme.onErrorContainer,
+        shape = MaterialTheme.shapes.medium,
+        modifier = Modifier.fillMaxWidth().testTag("safetyAlertBanner"),
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            alerts.forEachIndexed { index, alert ->
+                Text(
+                    text = alert.event,
+                    style = MaterialTheme.typography.titleSmall,
+                )
+                // Only the worst one gets its headline: during severe weather
+                // several alerts overlap, and stacking every headline buries
+                // the one that matters under the ones that don't.
+                if (index == 0 && alert.headline.isNotBlank()) {
+                    Text(
+                        text = alert.headline,
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
         }
     }
 }

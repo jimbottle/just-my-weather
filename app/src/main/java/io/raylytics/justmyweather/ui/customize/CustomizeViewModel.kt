@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.raylytics.justmyweather.data.GadgetbridgeSettingsRepository
 import io.raylytics.justmyweather.data.ViewConfigRepository
+import io.raylytics.justmyweather.view.AlertBannerPosition
 import io.raylytics.justmyweather.view.DailyStyle
 import io.raylytics.justmyweather.view.Density
 import io.raylytics.justmyweather.view.ForecastLayout
@@ -57,6 +58,8 @@ class CustomizeViewModel(
     fun setDailyLayout(layout: ForecastLayout) = edit { it.setDailyLayout(layout) }
 
     fun setHourlyLayout(layout: ForecastLayout) = edit { it.setHourlyLayout(layout) }
+
+    fun setAlertBannerPosition(position: AlertBannerPosition) = edit { it.setAlertBannerPosition(position) }
 
     private fun edit(transform: (ViewConfig) -> ViewConfig) {
         viewModelScope.launch { repository.save(transform(config.value)) }

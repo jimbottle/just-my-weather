@@ -62,6 +62,21 @@ class AlertsViewModel(
         }
     }
 
+    /**
+     * Turning safety alerts on has to (re)schedule the worker even when the
+     * user has no personal rules — that is the whole point of the setting —
+     * and turning it off must not cancel a worker a live rule still needs.
+     * Both directions go through the same onRulesChanged callback the rule
+     * edits use, which recomputes from current state rather than assuming.
+     */
+    fun setSafetyNotifications(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsRepository.save(settings.value.copy(safetyNotifications = enabled))
+            onRulesChanged(rules.value)
+            if (enabled) onRuleActivated()
+        }
+    }
+
     fun setPollCadence(minutes: Int) {
         viewModelScope.launch {
             settingsRepository.save(settings.value.copy(pollMinutes = minutes))

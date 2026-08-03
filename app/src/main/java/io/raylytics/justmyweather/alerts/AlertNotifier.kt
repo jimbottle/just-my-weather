@@ -10,6 +10,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import io.raylytics.justmyweather.R
+import io.raylytics.justmyweather.data.nws.ActiveAlert
 
 /**
  * Posts a local notification when a personal alert fires. Two channels: a
@@ -29,6 +30,12 @@ class AlertNotifier(
         manager.createNotificationChannel(
             NotificationChannel(CHANNEL_ID, "Personal alerts", NotificationManager.IMPORTANCE_DEFAULT)
                 .apply { description = "Conditions you asked to be told about" },
+        )
+        // Its own channel at HIGH so the user can tune official hazards
+        // separately from their personal rules in system settings — and so
+        // these are never accidentally muted along with them.
+        manager.createNotificationChannel(
+            NotificationChannel(SAFETY_CHANNEL_ID, "Safety alerts", NotificationManager.IMPORTANCE_HIGH),
         )
         manager.createNotificationChannel(
             NotificationChannel(QUIET_CHANNEL_ID, "Personal alerts (quiet)", NotificationManager.IMPORTANCE_LOW)
@@ -56,6 +63,30 @@ class AlertNotifier(
         NotificationManagerCompat.from(context).notify(rule.id.hashCode(), notification)
     }
 
+    /**
+     * Post an official NWS safety alert.
+     *
+     * Deliberately NOT routed through the quiet-hours channel. Quiet hours
+     * exist so a personal rule ("tell me when it drops below 35") waits until
+     * morning; a tornado warning at 3am is the case where being woken is the
+     * entire point, and silencing it would turn a comfort feature into a
+     * hazard. Personal rules stay hushed; these do not.
+     */
+    fun notifySafety(alert: ActiveAlert) {
+        if (!hasPermission()) return
+        val notification =
+            NotificationCompat.Builder(context, SAFETY_CHANNEL_ID)
+                .setSmallIcon(R.drawable.ic_launcher_foreground)
+                .setContentTitle(alert.event)
+                .setContentText(alert.headline)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(alert.headline))
+                .setCategory(NotificationCompat.CATEGORY_ALARM)
+                .setAutoCancel(true)
+                .build()
+        // Stable id per alert so an update replaces rather than stacks.
+        NotificationManagerCompat.from(context).notify(alert.id.hashCode(), notification)
+    }
+
     private fun hasPermission(): Boolean =
         Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
@@ -64,5 +95,6 @@ class AlertNotifier(
     private companion object {
         const val CHANNEL_ID = "personal_alerts"
         const val QUIET_CHANNEL_ID = "personal_alerts_quiet"
+        const val SAFETY_CHANNEL_ID = "safety_alerts"
     }
 }

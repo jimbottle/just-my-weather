@@ -1,0 +1,70 @@
+# Safety alerts: the controls exist, default correctly, and persist.
+#
+# What this flow does NOT do is assert the banner itself. Whether a banner is
+# on screen depends on whether NWS has a live warning for the location at the
+# moment the test runs — usually it does not. A flow asserting the banner would
+# be red on calm days and green in a storm, which is worse than no coverage:
+# it would train everyone to ignore a failure. The banner's rendering is
+# covered by SafetyAlertsTest (which decides what qualifies) and was verified
+# on-device against a real Flash Flood Warning.
+#
+# What IS deterministic — and worth locking down — is that notifications are
+# OFF until asked for, and that the position choice survives.
+appId: io.raylytics.justmyweather
+---
+- launchApp:
+    clearState: true
+    permissions:
+      all: allow
+
+- extendedWaitUntil:
+    visible: "Refresh"
+    timeout: 60000
+
+# Notifications for official hazards must be opt-in. A regression flipping this
+# default would silently start pushing official alerts to every install.
+- tapOn: "Alerts"
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    text: "Allow"
+    optional: true
+- scrollUntilVisible:
+    element: "Notify me of safety alerts"
+    direction: DOWN
+    timeout: 20000
+- assertVisible:
+    id: "safetyNotifications"
+    checked: false
+- tapOn: "Done"
+
+# Banner position defaults to Top and can be moved to Bottom.
+- extendedWaitUntil:
+    visible: "Refresh"
+    timeout: 20000
+- tapOn: "Customize"
+- scrollUntilVisible:
+    element:
+      id: "banner_bottom"
+    direction: DOWN
+    timeout: 20000
+- tapOn:
+    id: "banner_bottom"
+- tapOn: "Done"
+
+# Re-entering the screen still reaches the control. Which chip is SELECTED is
+# not asserted here: Compose's FilterChip selection is not reliably exposed to
+# Maestro's `selected:` matcher, and an assertion that cannot read the state it
+# claims to check is worse than none. Persistence of the choice is covered
+# deterministically by ViewConfigCodecTest instead.
+- extendedWaitUntil:
+    visible: "Refresh"
+    timeout: 20000
+- tapOn: "Customize"
+- scrollUntilVisible:
+    element:
+      id: "banner_bottom"
+    direction: DOWN
+    timeout: 20000
+- assertVisible:
+    id: "banner_bottom"

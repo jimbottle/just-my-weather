@@ -60,4 +60,25 @@ class AlertSettingsTest {
         assertEquals("1h", AlertSettings.pollLabel(60))
         assertEquals("3h", AlertSettings.pollLabel(180))
     }
+
+    @Test
+    fun `safety notifications default off and survive a round trip`() {
+        // Off by default is a product promise, not a preference: these are
+        // official hazard pushes the user has to ask for.
+        assertFalse(AlertSettings.DEFAULT.safetyNotifications)
+        val on = AlertSettings.DEFAULT.copy(safetyNotifications = true)
+        assertTrue(AlertSettingsCodec.decode(AlertSettingsCodec.encode(on)).safetyNotifications)
+    }
+
+    @Test
+    fun `a settings blob written before safety alerts existed still decodes`() {
+        // Older installs have no such key; it must default rather than throw
+        // or reset every other setting.
+        val legacy = """{"quietHoursEnabled":true,"quietStartHour":23,"quietEndHour":6,"pollMinutes":180}"""
+        val decoded = AlertSettingsCodec.decode(legacy)
+        assertFalse(decoded.safetyNotifications)
+        assertTrue(decoded.quietHoursEnabled)
+        assertEquals(23, decoded.quietStartHour)
+        assertEquals(180, decoded.pollMinutes)
+    }
 }

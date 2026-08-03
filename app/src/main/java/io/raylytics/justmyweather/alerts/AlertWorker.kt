@@ -10,7 +10,9 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import io.raylytics.justmyweather.AppContainer
 import io.raylytics.justmyweather.JustMyWeatherApp
+import io.raylytics.justmyweather.data.AlertRulesRepository
 import io.raylytics.justmyweather.data.WeatherLocation
 import kotlinx.coroutines.flow.first
 import java.io.IOException
@@ -36,8 +38,13 @@ class AlertWorker(
         val repository = container.alertRulesRepository
 
         val rules = repository.rules.first()
+        val settings = container.alertSettingsRepository.current()
+        // Safety alerts are independent of personal rules: someone can want
+        // tornado warnings and no rules at all. The old early return here
+        // would have skipped them entirely.
         if (rules.none { it.enabled }) {
             repository.setFiringIds(emptySet())
+            if (settings.safetyNotifications) notifySafetyAlerts(container, repository)
             return Result.success()
         }
 
@@ -68,10 +75,37 @@ class AlertWorker(
         val context = WeatherContext(snapshot, now, forecast, zone)
         val outcome = AlertTransitions.compute(rules, context, repository.firingIds())
         // Quiet hours hush the delivery (silent channel), they don't drop alerts.
-        val silent = container.alertSettingsRepository.current().isQuietAt(now.atZone(zone).hour)
+        val silent = settings.isQuietAt(now.atZone(zone).hour)
         outcome.toNotify.forEach { container.alertNotifier.notify(it.rule, it.decision, silent) }
         repository.setFiringIds(outcome.nowFiring)
+        if (settings.safetyNotifications) notifySafetyAlerts(container, repository)
         return Result.success()
+    }
+
+    /**
+     * Notify official safety alerts that are NEW since the last tick.
+     *
+     * Same transition idea as personal rules: a tornado warning standing for
+     * six hours should interrupt once, not at every poll. Ids that are no
+     * longer active drop out of the set, so a warning that clears and is
+     * re-issued notifies again — which is correct, that is a new warning.
+     *
+     * Best-effort throughout: a failed fetch leaves the stored set untouched
+     * rather than clearing it, because clearing would make every standing
+     * alert look new on the next successful poll and fire a burst of
+     * notifications for hazards the user was already told about.
+     */
+    private suspend fun notifySafetyAlerts(
+        container: AppContainer,
+        repository: AlertRulesRepository,
+    ) {
+        val location = container.locationProvider.lastKnownLocation() ?: WeatherLocation.DEFAULT
+        val active =
+            runCatching { SafetyAlerts.filter(container.weatherRepository.loadActiveAlerts(location)) }
+                .getOrNull() ?: return
+        val previously = repository.notifiedSafetyIds()
+        active.filter { it.id !in previously }.forEach { container.alertNotifier.notifySafety(it) }
+        repository.setNotifiedSafetyIds(active.map { it.id }.toSet())
     }
 
     companion object {
@@ -79,14 +113,18 @@ class AlertWorker(
         private const val ONCE_NAME = "personal-alerts-once"
 
         /**
-         * Schedule or cancel the periodic check to match whether any rule is live
-         * and the user's chosen [pollMinutes] cadence. Called on launch and after
-         * every rule/cadence change, so a quiet install (no enabled rules) does
-         * zero background work rather than waking only to no-op. The worker still
-         * self-guards as a safety net.
+         * Schedule or cancel the periodic check. [hasWork] must be true when
+         * ANY reason to poll exists — an enabled personal rule OR safety-alert
+         * notifications — so a quiet install does zero background work while a
+         * user who wants only tornado warnings still gets them.
+         *
+         * Taking a single computed flag rather than the rule list is
+         * deliberate: it was `hasEnabledRules`, and safety notifications with
+         * no personal rules would have cancelled the very worker that delivers
+         * them. The worker still self-guards as a safety net.
          */
-        fun sync(context: Context, hasEnabledRules: Boolean, pollMinutes: Int) {
-            if (hasEnabledRules) schedule(context, pollMinutes) else cancel(context)
+        fun sync(context: Context, hasWork: Boolean, pollMinutes: Int) {
+            if (hasWork) schedule(context, pollMinutes) else cancel(context)
         }
 
         /** UPDATE (not KEEP) so re-scheduling on launch preserves the existing

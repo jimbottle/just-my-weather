@@ -37,6 +37,8 @@ data class ViewConfig(
     val dailyStyle: DailyStyle = DailyStyle.DEFAULT,
     val dailyLayout: ForecastLayout = ForecastLayout.DEFAULT,
     val hourlyLayout: ForecastLayout = ForecastLayout.DEFAULT,
+    /** Where a safety-alert banner sits on the days there is one. */
+    val alertBannerPosition: AlertBannerPosition = AlertBannerPosition.DEFAULT,
 ) {
     val visible: List<FieldSetting> get() = items.filter { it.visible }
 
@@ -55,6 +57,9 @@ data class ViewConfig(
     fun setDailyLayout(layout: ForecastLayout): ViewConfig = copy(dailyLayout = layout)
 
     fun setHourlyLayout(layout: ForecastLayout): ViewConfig = copy(hourlyLayout = layout)
+
+    fun setAlertBannerPosition(position: AlertBannerPosition): ViewConfig =
+        copy(alertBannerPosition = position)
 
     fun moveUp(index: Int): ViewConfig = swap(index, index - 1)
 
@@ -96,13 +101,22 @@ data class ViewConfig(
             dailyStyle: DailyStyle = DailyStyle.DEFAULT,
             dailyLayout: ForecastLayout = ForecastLayout.DEFAULT,
             hourlyLayout: ForecastLayout = ForecastLayout.DEFAULT,
+            alertBannerPosition: AlertBannerPosition = AlertBannerPosition.DEFAULT,
         ): ViewConfig {
             val seen = LinkedHashMap<WeatherField, FieldSetting>()
             settings.forEach { setting -> seen.putIfAbsent(setting.field, setting) }
             WeatherField.entries.forEach { field ->
                 seen.putIfAbsent(field, FieldSetting(field, visible = false))
             }
-            return ViewConfig(seen.values.toList(), density, defaultMode, dailyStyle, dailyLayout, hourlyLayout)
+            return ViewConfig(
+                seen.values.toList(),
+                density,
+                defaultMode,
+                dailyStyle,
+                dailyLayout,
+                hourlyLayout,
+                alertBannerPosition,
+            )
         }
     }
 }

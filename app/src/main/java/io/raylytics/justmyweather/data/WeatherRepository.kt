@@ -1,5 +1,6 @@
 package io.raylytics.justmyweather.data
 
+import io.raylytics.justmyweather.data.nws.ActiveAlert
 import io.raylytics.justmyweather.data.nws.DailyPeriod
 import io.raylytics.justmyweather.data.nws.ForecastPoint
 import io.raylytics.justmyweather.data.nws.NwsClient
@@ -69,6 +70,22 @@ class WeatherRepository(
         val point = resolvePoint(location)
         return nws.getHourlyForecast(point.gridId, point.gridX, point.gridY)
     }
+
+    /**
+     * Active NWS alerts for the location's forecast zone, unfiltered.
+     *
+     * Raw on purpose: which of these count as a safety concern is a product
+     * policy that lives in [io.raylytics.justmyweather.alerts.SafetyAlerts],
+     * not a property of the feed. Keeping the judgement out of the data seam
+     * means the rule can change without touching the layer that fetches.
+     *
+     * Goes straight to the coordinate rather than through the cached grid
+     * lookup: alerts are queried by point precisely so county/polygon warnings
+     * (tornado, severe thunderstorm) are not missed, so there is no zone to
+     * resolve and one fewer call to make.
+     */
+    suspend fun loadActiveAlerts(location: WeatherLocation): List<ActiveAlert> =
+        nws.getActiveAlertsAt(location.latitude, location.longitude)
 
     /** The daily (half-day period) forecast for the home screen's Daily mode.
      * Same cached point resolution as everything else. */

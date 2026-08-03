@@ -21,6 +21,8 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
@@ -117,6 +119,65 @@ class AlertsViewModelTest {
 
         assertEquals(listOf(180), cadences) // retuned while a rule is live
         assertEquals(180, vm.settings.value.pollMinutes) // and persisted
+        rulesCollector.cancel()
+        settingsCollector.cancel()
+    }
+
+    @Test
+    fun `enabling safety alerts schedules the worker even with no rules`() = runTest(dispatcher) {
+        // The whole point of the setting: someone can want tornado warnings and
+        // no personal rules at all. Before this, sync() was fed only
+        // "any enabled rule", so turning safety alerts on cancelled the very
+        // worker meant to deliver them.
+        val syncs = mutableListOf<List<AlertRule>>()
+        var immediateChecks = 0
+        val vm =
+            AlertsViewModel(
+                AlertRulesRepository(FakePreferencesDataStore()),
+                AlertSettingsRepository(FakePreferencesDataStore()),
+                onRulesChanged = { syncs += it },
+                onRuleActivated = { immediateChecks++ },
+            )
+        val rulesCollector = launch { vm.rules.collect {} }
+        val settingsCollector = launch { vm.settings.collect {} }
+        advanceUntilIdle()
+
+        vm.setSafetyNotifications(true)
+        advanceUntilIdle()
+
+        assertTrue(vm.settings.value.safetyNotifications)
+        assertEquals(1, syncs.size) // the worker was re-synced…
+        assertEquals(1, immediateChecks) // …and checked once right away
+        rulesCollector.cancel()
+        settingsCollector.cancel()
+    }
+
+    @Test
+    fun `disabling safety alerts re-syncs rather than assuming the worker can stop`() = runTest(dispatcher) {
+        // Turning it off must not cancel a worker a live rule still needs, so
+        // the callback recomputes from current state instead of deciding here.
+        val syncs = mutableListOf<List<AlertRule>>()
+        var immediateChecks = 0
+        val repository = AlertRulesRepository(FakePreferencesDataStore())
+        repository.save(listOf(AlertRule("a", temp, Comparison.BELOW, 40.0, enabled = true)))
+        val vm =
+            AlertsViewModel(
+                repository,
+                AlertSettingsRepository(FakePreferencesDataStore()),
+                onRulesChanged = { syncs += it },
+                onRuleActivated = { immediateChecks++ },
+            )
+        val rulesCollector = launch { vm.rules.collect {} }
+        val settingsCollector = launch { vm.settings.collect {} }
+        advanceUntilIdle()
+
+        vm.setSafetyNotifications(false)
+        advanceUntilIdle()
+
+        assertFalse(vm.settings.value.safetyNotifications)
+        assertEquals(1, syncs.size)
+        assertTrue(syncs.last().any { it.enabled }) // the live rule is still reported
+        assertEquals(0, immediateChecks) // no point checking immediately when switching off
         rulesCollector.cancel()
         settingsCollector.cancel()
     }

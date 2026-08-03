@@ -1,6 +1,7 @@
 package io.raylytics.justmyweather.ui.home
 
 import io.raylytics.justmyweather.data.WeatherSnapshot
+import io.raylytics.justmyweather.data.nws.ActiveAlert
 import io.raylytics.justmyweather.data.nws.DailyPeriod
 import io.raylytics.justmyweather.data.nws.ForecastPoint
 import io.raylytics.justmyweather.view.ViewConfig
@@ -29,6 +30,12 @@ sealed interface HomeUiState {
         /** Short message when the selected framing's fetch failed; the Now
          * glance is unaffected. */
         val forecastError: String? = null,
+        /**
+         * Active safety alerts for this location, worst first, already
+         * filtered by SafetyAlerts. Empty on the overwhelming majority of
+         * days — the banner renders only when this isn't.
+         */
+        val safetyAlerts: List<ActiveAlert> = emptyList(),
     ) : HomeUiState
 
     /** Network or NWS failure, with a short plain-language message. */

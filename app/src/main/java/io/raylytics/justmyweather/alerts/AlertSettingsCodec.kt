@@ -18,6 +18,7 @@ object AlertSettingsCodec {
         val quietStartHour: Int = AlertSettings.DEFAULT.quietStartHour,
         val quietEndHour: Int = AlertSettings.DEFAULT.quietEndHour,
         val pollMinutes: Int = AlertSettings.DEFAULT.pollMinutes,
+        val safetyNotifications: Boolean = AlertSettings.DEFAULT.safetyNotifications,
     )
 
     private val json = Json { ignoreUnknownKeys = true }
@@ -29,6 +30,7 @@ object AlertSettingsCodec {
                 settings.quietStartHour,
                 settings.quietEndHour,
                 settings.pollMinutes,
+                settings.safetyNotifications,
             ),
         )
 
@@ -38,6 +40,12 @@ object AlertSettingsCodec {
         // An out-of-range cadence (older/foreign blob) falls back to the default.
         val poll =
             stored.pollMinutes.takeIf { it in AlertSettings.POLL_CHOICES } ?: AlertSettings.DEFAULT.pollMinutes
-        return AlertSettings(stored.quietHoursEnabled, stored.quietStartHour, stored.quietEndHour, poll)
+        return AlertSettings(
+            stored.quietHoursEnabled,
+            stored.quietStartHour,
+            stored.quietEndHour,
+            poll,
+            stored.safetyNotifications,
+        )
     }
 }

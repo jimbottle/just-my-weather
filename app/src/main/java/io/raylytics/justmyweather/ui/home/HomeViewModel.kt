@@ -2,10 +2,12 @@ package io.raylytics.justmyweather.ui.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.raylytics.justmyweather.alerts.SafetyAlerts
 import io.raylytics.justmyweather.data.ViewConfigRepository
 import io.raylytics.justmyweather.data.WeatherLocation
 import io.raylytics.justmyweather.data.WeatherRepository
 import io.raylytics.justmyweather.data.WeatherSnapshot
+import io.raylytics.justmyweather.data.nws.ActiveAlert
 import io.raylytics.justmyweather.data.nws.DailyPeriod
 import io.raylytics.justmyweather.data.nws.ForecastPoint
 import io.raylytics.justmyweather.location.LocationProvider
@@ -47,6 +49,14 @@ class HomeViewModel(
     private val weather = MutableStateFlow<WeatherLoad>(WeatherLoad.Loading)
     private val forecasts = MutableStateFlow(ForecastLoad())
 
+    /**
+     * Active safety alerts, refreshed with the weather. Its own flow rather
+     * than a field on WeatherLoad because a failed alert fetch must not cost
+     * the reading: the glance is still useful without it, and NWS returning an
+     * error for the zone is not a reason to show an error screen.
+     */
+    private val safetyAlerts = MutableStateFlow<List<ActiveAlert>>(emptyList())
+
     /** null = follow the config's default; set once the user taps a chip. */
     private val chosenMode = MutableStateFlow<ViewMode?>(null)
 
@@ -62,7 +72,8 @@ class HomeViewModel(
         }.stateIn(viewModelScope, SharingStarted.Eagerly, ViewMode.DEFAULT)
 
     val state: StateFlow<HomeUiState> =
-        combine(weather, configRepository.config, mode, forecasts) { load, config, mode, forecasts ->
+        combine(weather, configRepository.config, mode, forecasts, safetyAlerts) {
+                load, config, mode, forecasts, alerts ->
             when (load) {
                 is WeatherLoad.Loading -> HomeUiState.Loading
                 is WeatherLoad.Error -> HomeUiState.Error(load.message)
@@ -82,6 +93,7 @@ class HomeViewModel(
                                 ViewMode.HOURLY -> forecasts.hourlyError
                                 ViewMode.DAILY -> forecasts.dailyError
                             },
+                        safetyAlerts = alerts,
                     )
             }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUiState.Loading)
@@ -124,6 +136,13 @@ class HomeViewModel(
             if (loaded is WeatherLoad.Ready) {
                 runCatching { onSnapshotLoaded(loaded.snapshot) }
             }
+            // Alerts are a side dish: a zone that errors, or a location with no
+            // zone, leaves the glance intact and the banner simply absent.
+            // Cleared first so a stale warning can't outlive a location change.
+            safetyAlerts.value = emptyList()
+            safetyAlerts.value =
+                runCatching { SafetyAlerts.filter(repository.loadActiveAlerts(location)) }
+                    .getOrDefault(emptyList())
             ensureForecast(mode.value)
         }
     }

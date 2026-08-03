@@ -29,6 +29,18 @@ class AlertRulesRepository(
 
     suspend fun firingIds(): Set<String> = dataStore.data.first()[FIRING].orEmpty()
 
+    /**
+     * Safety-alert ids already notified, so a warning standing for six hours
+     * notifies once rather than at every poll. Same transition idea as
+     * [firingIds]; kept separate because official alerts and personal rules
+     * come and go independently.
+     */
+    suspend fun notifiedSafetyIds(): Set<String> = dataStore.data.first()[SAFETY_NOTIFIED].orEmpty()
+
+    suspend fun setNotifiedSafetyIds(ids: Set<String>) {
+        dataStore.edit { prefs -> prefs[SAFETY_NOTIFIED] = ids }
+    }
+
     suspend fun setFiringIds(ids: Set<String>) {
         dataStore.edit { prefs -> prefs[FIRING] = ids }
     }
@@ -36,5 +48,6 @@ class AlertRulesRepository(
     private companion object {
         val RULES = stringPreferencesKey("alert_rules")
         val FIRING = stringSetPreferencesKey("alert_firing_ids")
+        val SAFETY_NOTIFIED = stringSetPreferencesKey("safety_notified_ids")
     }
 }

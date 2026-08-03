@@ -19,6 +19,14 @@ data class AlertSettings(
     /** How often the background alert check runs, in minutes. Constrained to
      * [POLL_CHOICES]; WorkManager's own floor is 15 minutes. */
     val pollMinutes: Int = 60,
+    /**
+     * Whether official NWS safety alerts (tornado, severe storm, hurricane,
+     * dangerous heat, poor air quality) also post notifications. OFF by
+     * default: the banner on the glance is passive, but a notification
+     * interrupts, and official-hazard pushing is something to opt into rather
+     * than discover.
+     */
+    val safetyNotifications: Boolean = false,
 ) {
     /**
      * Whether [hour] (local, 0–23) is inside the quiet window. Handles a window

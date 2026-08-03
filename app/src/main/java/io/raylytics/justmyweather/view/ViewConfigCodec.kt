@@ -32,6 +32,9 @@ object ViewConfigCodec {
         val dailyStyle: String = DailyStyle.DEFAULT.key,
         val dailyLayout: String = ForecastLayout.DEFAULT.key,
         val hourlyLayout: String = ForecastLayout.DEFAULT.key,
+        // Defaulted like every field here, so a config written before the
+        // safety banner existed still decodes.
+        val alertBannerPosition: String = AlertBannerPosition.DEFAULT.key,
         val items: List<StoredSetting> = emptyList(),
     )
 
@@ -45,6 +48,7 @@ object ViewConfigCodec {
                 dailyStyle = config.dailyStyle.key,
                 dailyLayout = config.dailyLayout.key,
                 hourlyLayout = config.hourlyLayout.key,
+                alertBannerPosition = config.alertBannerPosition.key,
                 items = config.items.map { StoredSetting(it.field.key, it.visible, it.customLabel) },
             ),
         )
@@ -83,6 +87,15 @@ object ViewConfigCodec {
         val dailyStyle = DailyStyle.byKey(stored.dailyStyle) ?: DailyStyle.DEFAULT
         val dailyLayout = ForecastLayout.byKey(stored.dailyLayout) ?: ForecastLayout.DEFAULT
         val hourlyLayout = ForecastLayout.byKey(stored.hourlyLayout) ?: ForecastLayout.DEFAULT
-        return ViewConfig.normalized(settings, density, mode, dailyStyle, dailyLayout, hourlyLayout)
+        val bannerPosition = AlertBannerPosition.byKey(stored.alertBannerPosition) ?: AlertBannerPosition.DEFAULT
+        return ViewConfig.normalized(
+            settings,
+            density,
+            mode,
+            dailyStyle,
+            dailyLayout,
+            hourlyLayout,
+            bannerPosition,
+        )
     }
 }

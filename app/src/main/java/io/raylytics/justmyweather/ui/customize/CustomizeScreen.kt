@@ -37,6 +37,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import io.raylytics.justmyweather.ui.theme.accentColor
 import io.raylytics.justmyweather.view.AccentChoice
+import io.raylytics.justmyweather.view.AlertBannerPosition
 import io.raylytics.justmyweather.view.DailyStyle
 import io.raylytics.justmyweather.view.Density
 import io.raylytics.justmyweather.view.FieldSetting
@@ -69,6 +70,7 @@ fun CustomizeScreen(
     onSetDailyStyle: (DailyStyle) -> Unit,
     onSetDailyLayout: (ForecastLayout) -> Unit,
     onSetHourlyLayout: (ForecastLayout) -> Unit,
+    onSetAlertBannerPosition: (AlertBannerPosition) -> Unit,
     theme: ThemeConfig,
     onThemeChange: (ThemeConfig) -> Unit,
     gadgetbridgeEnabled: Boolean,
@@ -127,6 +129,14 @@ fun CustomizeScreen(
                 }
 
                 ThemePicker(theme = theme, onChange = onThemeChange)
+                // Below the field list, with the other set-once settings: the
+                // fields are what people come here to edit, and putting a
+                // rarely-touched picker above them pushed the list off the
+                // first screenful.
+                AlertBannerPicker(
+                    position = config.alertBannerPosition,
+                    onSelect = onSetAlertBannerPosition,
+                )
                 GadgetbridgeToggle(enabled = gadgetbridgeEnabled, onChange = onSetGadgetbridgeEnabled)
             }
         }
@@ -164,6 +174,38 @@ private fun GadgetbridgeToggle(
         Text(
             text = "Hands each new reading to Gadgetbridge, which passes it to a paired watch. " +
                 "Does nothing if Gadgetbridge isn't installed.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+/**
+ * Where a safety-alert banner sits. Worth a control even though most users see
+ * it rarely: when a tornado warning does appear, whether it lands above or
+ * below the temperature is exactly the kind of thing people have a firm
+ * opinion about.
+ */
+@Composable
+private fun AlertBannerPicker(
+    position: AlertBannerPosition,
+    onSelect: (AlertBannerPosition) -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Text("Safety alerts", style = MaterialTheme.typography.labelMedium)
+        ChipRow(
+            options = AlertBannerPosition.entries,
+            selected = position,
+            label = { it.label },
+            onSelect = onSelect,
+            tag = { "banner_${it.key}" },
+        )
+        Text(
+            text = "Tornado, severe storm, hurricane, dangerous heat and air quality warnings. " +
+                "Only shown while one is active.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -233,6 +275,8 @@ private fun <T> ChipRow(
     selected: T,
     label: (T) -> String,
     onSelect: (T) -> Unit,
+    /** Optional stable testTag per chip; chips carry no other stable handle. */
+    tag: ((T) -> String)? = null,
 ) {
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         options.forEach { option ->
@@ -240,6 +284,7 @@ private fun <T> ChipRow(
                 selected = option == selected,
                 onClick = { onSelect(option) },
                 label = { Text(label(option)) },
+                modifier = tag?.let { Modifier.testTag(it(option)) } ?: Modifier,
             )
         }
     }

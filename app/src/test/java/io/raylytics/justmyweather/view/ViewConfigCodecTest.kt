@@ -114,4 +114,23 @@ class ViewConfigCodecTest {
         assertEquals(WeatherField.WIND, config.items.first().field)
         assertEquals(emptyList<WeatherField>(), config.items.map { it.field } - WeatherField.entries.toSet())
     }
+
+    @Test
+    fun `alert banner position round-trips and defaults for older configs`() {
+        // The Maestro flow deliberately does not assert which chip is selected
+        // (Compose chip selection isn't reliably readable there), so the
+        // persistence promise is kept here instead.
+        val moved = ViewConfig.DEFAULT.setAlertBannerPosition(AlertBannerPosition.BOTTOM)
+        assertEquals(
+            AlertBannerPosition.BOTTOM,
+            ViewConfigCodec.decode(ViewConfigCodec.encode(moved)).alertBannerPosition,
+        )
+        // A config written before the banner existed must default to TOP, not
+        // fail to decode and reset every other choice with it.
+        val legacy = ViewConfigCodec.encode(ViewConfig.DEFAULT).replace(
+            """"alertBannerPosition":"top",""",
+            "",
+        )
+        assertEquals(AlertBannerPosition.TOP, ViewConfigCodec.decode(legacy).alertBannerPosition)
+    }
 }

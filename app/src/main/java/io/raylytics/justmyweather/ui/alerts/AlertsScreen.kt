@@ -64,6 +64,7 @@ fun AlertsScreen(
     onDelete: (String) -> Unit,
     onSetQuietHours: (Boolean) -> Unit,
     onSetQuietWindow: (Int, Int) -> Unit,
+    onSetSafetyNotifications: (Boolean) -> Unit,
     onSetPollCadence: (Int) -> Unit,
     onDone: () -> Unit,
     modifier: Modifier = Modifier,
@@ -113,6 +114,10 @@ fun AlertsScreen(
                 onSetQuietWindow = onSetQuietWindow,
             )
             CadenceRow(selected = settings.pollMinutes, onSelect = onSetPollCadence)
+            SafetyAlertsRow(
+                enabled = settings.safetyNotifications,
+                onChange = onSetSafetyNotifications,
+            )
         }
     }
 }
@@ -134,6 +139,43 @@ private fun CadenceRow(
                 )
             }
         }
+    }
+}
+
+/**
+ * Official NWS safety alerts — tornado, severe storm, hurricane, dangerous
+ * heat, poor air quality. Off by default: the banner on the glance is passive,
+ * but a notification interrupts, so this is opted into rather than discovered.
+ *
+ * The copy says these ignore quiet hours, because they do and that is a
+ * surprise worth spending a line on: quiet hours exist so a personal rule
+ * waits until morning, whereas a tornado warning at 3am is precisely when
+ * being woken is the point.
+ */
+@Composable
+private fun SafetyAlertsRow(
+    enabled: Boolean,
+    onChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text("Notify me of safety alerts", style = MaterialTheme.typography.bodyMedium)
+            Text(
+                text = "Tornado, severe storm, hurricane, dangerous heat, air quality. " +
+                    "These ignore quiet hours.",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Switch(
+            checked = enabled,
+            onCheckedChange = onChange,
+            modifier = Modifier.testTag("safetyNotifications"),
+        )
     }
 }
 
