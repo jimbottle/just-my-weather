@@ -4,8 +4,8 @@
 # Location permission is GRANTED up front so no system dialog interrupts the
 # run (the dialog is nondeterministic — Android stops showing it after repeated
 # denials). With or without a device fix the app resolves a US location and
-# fetches live data, so we assert the Ready-state shape (a temperature and an
-# "Updated" time) rather than a specific city.
+# fetches live data, so we assert the Ready-state shape (a temperature and the
+# "Observed" provenance line) rather than a specific city.
 appId: io.raylytics.justmyweather
 ---
 - launchApp:
@@ -22,7 +22,7 @@ appId: io.raylytics.justmyweather
 - assertVisible:
     text: ".*°"
 - assertVisible:
-    text: "Updated.*"
+    text: "Observed.*"
 
 # Refresh: the button flips to the disabled "Refreshing…" label during the
 # re-fetch, so waiting for it to reappear as "Refresh" genuinely spans a fetch

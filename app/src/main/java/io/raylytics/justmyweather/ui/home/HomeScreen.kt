@@ -116,6 +116,22 @@ private fun GlanceView(
         // than replacing it, so the screen answers "right now" AND "ahead".
         NowContent(snapshot = snapshot, config = config)
 
+        // The counterpart to "Observed" above: everything below this line is
+        // model output, not measurement. Only rendered when a forecast framing
+        // is actually on screen — in NOW mode there is nothing to label.
+        if (state.mode != ViewMode.NOW) {
+            Text(
+                text = "Forecast",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                // Extra space ABOVE only, so the label hugs the tiles it heads
+                // instead of floating midway between them and the "Observed"
+                // line. Sitting equidistant, it read as ambiguous which block
+                // it belonged to — which is the whole failure being fixed here.
+                modifier = Modifier.padding(top = 12.dp),
+            )
+        }
+
         when (state.mode) {
             ViewMode.NOW -> Unit // Just the glance: the calm minimum.
             ViewMode.HOURLY ->
@@ -133,16 +149,10 @@ private fun GlanceView(
                 )
         }
 
-        // The "Updated" line is secondary chrome — hidden at the spacious end so
-        // the calmest view really is just the number.
-        observedLabel(snapshot)?.takeIf { config.density.showsTimestamp }?.let { updated ->
-            Text(
-                text = "Updated $updated",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 12.dp),
-            )
-        }
+        // The old "Updated HH:MM" line lived here, below the forecast and
+        // density-gated. It is gone rather than duplicated: the same fact now
+        // sits with the hero as "Observed HH:MM", where it explains the number
+        // it belongs to instead of trailing the whole screen.
 
         ModeToggle(selected = state.mode, onSelect = onSetMode)
 
@@ -198,6 +208,23 @@ private fun NowContent(
                 }
             }
         }
+
+        // Provenance, attached to the reading it describes. The hero is a real
+        // thermometer at a nearby station; the forecast strip below is model
+        // output for a 2.5km grid cell, and the two legitimately disagree —
+        // 75° here against 71° for the same hour is two products, not a bug.
+        // Unlabelled and side by side, that reads as the app contradicting
+        // itself, so each region now says which it is.
+        //
+        // Shown at EVERY density, including Spacious. That end used to hide
+        // the time to be "just the number", but a number whose provenance is
+        // undiscoverable is exactly what made this confusing, and one quiet
+        // line is the smallest thing that fixes it.
+        Text(
+            text = observedLabel(snapshot)?.let { "Observed $it" } ?: "Observed",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 

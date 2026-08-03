@@ -46,3 +46,4 @@
 {"id":"int-740a3569","kind":"field_change","created_at":"2026-08-03T00:50:46.747256Z","actor":"jimbottle","issue_id":"just-my-weather-r8c","extra":{"field":"status","new_value":"closed","old_value":"open","reason":"Closed"}}
 {"id":"int-916ee495","kind":"field_change","created_at":"2026-08-03T00:50:46.947284Z","actor":"jimbottle","issue_id":"just-my-weather-947","extra":{"field":"status","new_value":"closed","old_value":"open","reason":"Closed"}}
 {"id":"int-2f6adc5e","kind":"field_change","created_at":"2026-08-03T00:57:01.151264Z","actor":"jimbottle","issue_id":"just-my-weather-7po","extra":{"field":"status","new_value":"closed","old_value":"open","reason":"Closed"}}
+{"id":"int-0b6eb046","kind":"field_change","created_at":"2026-08-03T01:09:24.08725Z","actor":"jimbottle","issue_id":"just-my-weather-bax","extra":{"field":"status","new_value":"closed","old_value":"in_progress","reason":"Closed"}}
