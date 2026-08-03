@@ -21,6 +21,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -32,7 +33,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.text.input.ImeAction
@@ -165,9 +168,24 @@ private fun QuietHoursRow(
                     ),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.primary,
+                // labelMedium is 13sp on an 18sp line, so a bare clickable Text
+                // is an ~18dp target — well under the 48dp minimum, and sitting
+                // directly under the "Quiet hours" label with nothing between
+                // them. Every other control here (Switch, chips, buttons) gets
+                // Material's minimumInteractiveComponentSize for free; a raw
+                // Text does not, so it is applied by hand. This is the ONLY
+                // route to the picker, so a tap landing a few dp high must not
+                // silently do nothing.
+                //
+                // Role.Button so TalkBack announces a button rather than
+                // generic clickable text. Padding is inside the clickable, so
+                // the touch area grows with it rather than around it.
                 modifier =
                     Modifier
-                        .clickable { editing = true }
+                        .clip(MaterialTheme.shapes.small)
+                        .clickable(role = Role.Button) { editing = true }
+                        .minimumInteractiveComponentSize()
+                        .padding(vertical = 4.dp)
                         .testTag("quietWindow"),
             )
         }

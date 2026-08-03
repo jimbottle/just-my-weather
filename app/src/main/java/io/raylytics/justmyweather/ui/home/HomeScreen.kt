@@ -193,16 +193,36 @@ private fun NowContent(
                 verticalArrangement = Arrangement.spacedBy(spec.rowSpacing),
             ) {
                 rendered.rows.forEach { row ->
+                    // Both children carry weight so the row's width is SHARED.
+                    // Un-weighted, Compose measures them in order and the label
+                    // takes what it wants first — and labels are free text the
+                    // user can type without a length cap, so a long one could
+                    // squeeze the value to near-zero width and hide the very
+                    // fact the row exists to show. `fill = false` keeps a short
+                    // pair from being stretched apart.
+                    //
+                    // The label ellipsizes rather than the value: the user
+                    // chose the label and knows what it says, whereas the value
+                    // is the thing being read. Values still wrap, which matters
+                    // because Conditions is NWS free text ("Thunderstorm Light
+                    // Rain Fog/Mist"), not one of the short formatted numbers —
+                    // narrowing this block shrank its budget, so it degrades to
+                    // a second line instead of being cut off.
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text(
                             text = row.label,
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false),
                         )
                         Text(
                             text = row.value,
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onBackground,
+                            textAlign = TextAlign.End,
+                            modifier = Modifier.weight(1f, fill = false),
                         )
                     }
                 }

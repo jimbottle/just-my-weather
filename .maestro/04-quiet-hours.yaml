@@ -14,10 +14,24 @@ appId: io.raylytics.justmyweather
     permissions:
       all: allow
 
+# Wait on "Refresh", which exists only on the glance. NOT "Alerts": that string
+# is both the home button AND this screen's own title, so waiting on it can
+# match a screen we never left. See the return leg below, where that mattered.
 - extendedWaitUntil:
-    visible: "Alerts"
+    visible: "Refresh"
     timeout: 60000
 - tapOn: "Alerts"
+
+# Entering Alerts is where the app asks for POST_NOTIFICATIONS, which
+# launchApp's blanket grant does NOT cover (see 02-alerts.yaml). Whether the
+# dialog appears depends on whether an earlier grant survived clearState, so
+# settle first and tap only if it is really there — otherwise the system window
+# covers the screen and the assertions below fail for an unrelated reason.
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    text: "Allow"
+    optional: true
 
 # The default window, shown on the row itself.
 - assertVisible: "Deliver silently 22:00–07:00"
@@ -39,9 +53,20 @@ appId: io.raylytics.justmyweather
 
 # …and it survives a trip back to the glance and in again, which is what
 # distinguishes a persisted setting from a bit of screen state.
+#
+# The return leg waits on "Refresh" deliberately. Waiting on "Alerts" would let
+# this whole check pass vacuously: if the "Done" tap missed, "Alerts" would
+# still match this screen's title, the next tap would hit that same title as a
+# no-op, and the final assert would pass against unchanged in-memory state —
+# a persistence test that cannot fail.
 - tapOn: "Done"
 - extendedWaitUntil:
-    visible: "Alerts"
+    visible: "Refresh"
     timeout: 20000
 - tapOn: "Alerts"
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    text: "Allow"
+    optional: true
 - assertVisible: "Deliver silently 23:00–06:00"
