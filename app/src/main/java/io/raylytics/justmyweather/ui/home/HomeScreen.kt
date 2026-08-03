@@ -45,6 +45,15 @@ import java.util.Locale
 import kotlin.math.roundToInt
 
 /**
+ * How much of a label/value row the label may occupy before it ellipsizes.
+ *
+ * Sized so the longest built-in label still fits ("Precip (last hr)" is about
+ * 46% of the narrowest block) while a runaway custom label cannot crowd the
+ * value out. Everything the label does not use goes to the value.
+ */
+private const val LABEL_WIDTH_SHARE = 0.6f
+
+/**
  * The home view. Out of the box it's a calm single glance; once the user edits
  * their config it's whatever they made it — same screen, driven by data. The
  * first visible field is the hero (large), the rest are compact rows. Centred
@@ -252,21 +261,23 @@ private fun NowContent(
                 verticalArrangement = Arrangement.spacedBy(spec.rowSpacing),
             ) {
                 rendered.rows.forEach { row ->
-                    // Both children carry weight so the row's width is SHARED.
-                    // Un-weighted, Compose measures them in order and the label
-                    // takes what it wants first — and labels are free text the
-                    // user can type without a length cap, so a long one could
-                    // squeeze the value to near-zero width and hide the very
-                    // fact the row exists to show. `fill = false` keeps a short
-                    // pair from being stretched apart.
+                    // CAP the label, then give the value everything left over.
                     //
-                    // The label ellipsizes rather than the value: the user
-                    // chose the label and knows what it says, whereas the value
-                    // is the thing being read. Values still wrap, which matters
-                    // because Conditions is NWS free text ("Thunderstorm Light
-                    // Rain Fog/Mist"), not one of the short formatted numbers —
-                    // narrowing this block shrank its budget, so it degrades to
-                    // a second line instead of being cut off.
+                    // Not weight() on both: a weighted child is measured with
+                    // maxWidth = its share, and `fill = false` only relaxes
+                    // minWidth — so two equal weights hard-cap EACH side at 50%
+                    // even when the other is nearly empty. That was worse than
+                    // the problem it fixed: a long NWS condition got 120dp of a
+                    // 240dp row and wrapped further, with half the row blank.
+                    //
+                    // Un-weighted children are measured first, so the label —
+                    // bounded here, and ellipsized at one line — takes only
+                    // what it needs up to the cap, and the weighted value then
+                    // receives ALL the remainder. A short label leaves the
+                    // value nearly the whole row; a runaway custom label
+                    // (uncapped free text) stops at the cap instead of starving
+                    // the value. The label gives way rather than the value
+                    // because the user chose the label and knows what it says.
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text(
                             text = row.label,
@@ -274,14 +285,14 @@ private fun NowContent(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f, fill = false),
+                            modifier = Modifier.widthIn(max = spec.rowMaxWidth * LABEL_WIDTH_SHARE),
                         )
                         Text(
                             text = row.value,
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onBackground,
                             textAlign = TextAlign.End,
-                            modifier = Modifier.weight(1f, fill = false),
+                            modifier = Modifier.weight(1f),
                         )
                     }
                 }
