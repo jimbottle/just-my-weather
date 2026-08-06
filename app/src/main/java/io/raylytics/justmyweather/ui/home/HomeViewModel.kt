@@ -124,6 +124,10 @@ class HomeViewModel(
      * a warm cache the fetch can win. Seeding only over `Loading` means a
      * late-arriving cache read can never replace live data with older data, nor
      * clobber an error the user is looking at.
+     *
+     * Which makes this the *optimistic* path only — it fills the wait when the
+     * fetch is slower than the store. A fetch that fails before this lands
+     * reads the cache itself, in [refresh], so nothing depends on who wins.
      */
     private fun seedFromLastReading() {
         viewModelScope.launch {
@@ -162,9 +166,26 @@ class HomeViewModel(
                     // it instead, the way a failed forecast or alert fetch
                     // already declines to take down the glance.
                     onFailure = { e ->
+                        val message = e.toUserMessage()
                         when (val current = weather.value) {
-                            is WeatherLoad.Ready -> current.copy(refreshing = false, error = e.toUserMessage())
-                            else -> WeatherLoad.Error(e.toUserMessage())
+                            is WeatherLoad.Ready -> current.copy(refreshing = false, error = message)
+                            // Nothing on screen yet — so ask the cache here
+                            // rather than hoping the seed has landed. Offline
+                            // is exactly where it hasn't: a DNS failure with
+                            // no connectivity returns in a millisecond or two,
+                            // while the seed is still opening and parsing the
+                            // store on a cold process. Losing that race used
+                            // to publish the error the seed then declined to
+                            // overwrite, and since the seed runs once, in
+                            // init, the remembered reading stayed unreachable
+                            // for the rest of the session — Retry just
+                            // produced the same error again. Reading it here
+                            // makes the outcome the same whoever wins, and
+                            // survives a retry.
+                            else ->
+                                runCatching { repository.lastReading(location) }.getOrNull()
+                                    ?.let { WeatherLoad.Ready(it, error = message) }
+                                    ?: WeatherLoad.Error(message)
                         }
                     },
                 )

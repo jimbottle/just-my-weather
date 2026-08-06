@@ -343,6 +343,72 @@ class HomeViewModelTest {
         }
 
     @Test
+    fun `a fetch that fails before the seed lands still keeps the reading`() = runTest(dispatcher) {
+        // The offline cold start's real ordering: a DNS failure with no
+        // connectivity returns in a millisecond or two, while the first read
+        // of the store is still opening and parsing a file. The remembered
+        // reading must survive that, or it survives only when it wasn't
+        // needed. Parks the seed's read; later reads run at speed.
+        val gate = CompletableDeferred<Unit>()
+        val slowFirstRead =
+            object : SnapshotCache {
+                private var parked = false
+
+                override suspend fun get(): CachedSnapshot? {
+                    if (!parked) {
+                        parked = true
+                        gate.await()
+                    }
+                    return remembered
+                }
+
+                override suspend fun put(entry: CachedSnapshot) = Unit
+            }
+
+        val h = harness(snapshots = slowFirstRead)
+        h.transport.failObservation = true
+        advanceUntilIdle()
+
+        // The seed is still parked, and the fetch has already failed.
+        assertEquals(64.0, h.vm.ready().snapshot.temperatureF)
+        assertNotNull(h.vm.ready().refreshError)
+
+        // The seed arriving late changes nothing — it declines to write over
+        // a state that is no longer Loading.
+        gate.complete(Unit)
+        advanceUntilIdle()
+        assertEquals(64.0, h.vm.ready().snapshot.temperatureF)
+        assertNotNull(h.vm.ready().refreshError)
+    }
+
+    @Test
+    fun `a reading that appears after the seed ran is still found by a later failure`() = runTest(dispatcher) {
+        // The seed runs once, in init — so a reading that only becomes
+        // available later (the background poll stored one between attempts)
+        // is reachable only if every failure looks for itself. Otherwise one
+        // empty read at startup hides it for the rest of the session.
+        val store =
+            object : SnapshotCache {
+                var available = false
+
+                override suspend fun get(): CachedSnapshot? = remembered.takeIf { available }
+
+                override suspend fun put(entry: CachedSnapshot) = Unit
+            }
+
+        val h = harness(snapshots = store)
+        h.transport.failObservation = true
+        advanceUntilIdle()
+        assertTrue(h.vm.state.value is HomeUiState.Error) // nothing to show yet
+
+        store.available = true
+        h.vm.refresh()
+        advanceUntilIdle()
+        assertEquals(64.0, h.vm.ready().snapshot.temperatureF)
+        assertNotNull(h.vm.ready().refreshError)
+    }
+
+    @Test
     fun `with nothing on screen a failed fetch still shows the error, as before`() = runTest(dispatcher) {
         val h = harness()
         h.transport.failObservation = true
