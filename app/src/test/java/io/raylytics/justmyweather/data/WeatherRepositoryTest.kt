@@ -5,7 +5,9 @@ import io.raylytics.justmyweather.data.nws.HttpTransport
 import io.raylytics.justmyweather.data.nws.NwsClient
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Test
+import java.time.Instant
 
 /**
  * Covers the repository's label-fallback and point-caching behaviour — the
@@ -33,8 +35,12 @@ class WeatherRepositoryTest {
         fun pointsLookups() = requested.count { "/points/" in it && !it.endsWith("/stations") }
     }
 
-    private fun repo(transport: RoutingTransport, cache: PointCache = InMemoryPointCache()) =
-        WeatherRepository(NwsClient(transport = transport), cache)
+    private fun repo(
+        transport: RoutingTransport,
+        cache: PointCache = InMemoryPointCache(),
+        snapshots: SnapshotCache = InMemorySnapshotCache(),
+        now: Instant = Instant.parse("2026-06-24T18:05:00Z"),
+    ) = WeatherRepository(NwsClient(transport = transport), cache, snapshots, clock = { now })
 
     @Test
     fun `blank label is filled from the points relativeLocation`() = runTest {
@@ -75,6 +81,53 @@ class WeatherRepositoryTest {
         val secondStart = RoutingTransport()
         repo(secondStart, cache).load(location)
         assertEquals(0, secondStart.pointsLookups())
+    }
+
+    @Test
+    fun `a successful load is remembered, and a later start reads it back`() = runTest {
+        val snapshots = InMemorySnapshotCache()
+        val location = WeatherLocation(40.71, -74.0, label = "Home")
+        val loaded = repo(RoutingTransport(), snapshots = snapshots).load(location)
+
+        // A fresh repository (a new process) sharing the store paints this
+        // before its own fetch returns.
+        val remembered = repo(RoutingTransport(), snapshots = snapshots).lastReading(location)
+        assertEquals(loaded, remembered)
+    }
+
+    @Test
+    fun `nothing remembered means nothing to paint`() = runTest {
+        assertNull(repo(RoutingTransport()).lastReading(WeatherLocation(40.71, -74.0, label = "Home")))
+    }
+
+    @Test
+    fun `a remembered reading is withheld once it is too old or too far`() = runTest {
+        val snapshots = InMemorySnapshotCache()
+        val location = WeatherLocation(40.71, -74.0, label = "Home")
+        val savedAt = Instant.parse("2026-06-24T18:05:00Z")
+        repo(RoutingTransport(), snapshots = snapshots, now = savedAt).load(location)
+
+        val muchLater = repo(RoutingTransport(), snapshots = snapshots, now = savedAt.plusSeconds(4 * 3600))
+        assertNull(muchLater.lastReading(location))
+
+        val sameMoment = repo(RoutingTransport(), snapshots = snapshots, now = savedAt)
+        assertNull(sameMoment.lastReading(WeatherLocation(38.25, -85.76, label = "Away")))
+    }
+
+    @Test
+    fun `a cache that cannot be read or written never costs the caller its reading`() = runTest {
+        // The store is best-effort: DataStore can throw on a corrupt file, and
+        // a launch-path crash would be a far worse bug than a blank first paint.
+        val broken =
+            object : SnapshotCache {
+                override suspend fun get(): CachedSnapshot? = error("unreadable")
+
+                override suspend fun put(entry: CachedSnapshot) = error("unwritable")
+            }
+        val location = WeatherLocation(40.71, -74.0, label = "Home")
+        val repository = repo(RoutingTransport(), snapshots = broken)
+        assertEquals(68.0, repository.load(location).temperatureF!!, 1e-6)
+        assertNull(repository.lastReading(location))
     }
 
     private companion object {

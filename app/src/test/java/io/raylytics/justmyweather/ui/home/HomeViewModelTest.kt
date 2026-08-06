@@ -3,8 +3,13 @@ package io.raylytics.justmyweather.ui.home
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.emptyPreferences
+import io.raylytics.justmyweather.data.CachedSnapshot
+import io.raylytics.justmyweather.data.InMemorySnapshotCache
+import io.raylytics.justmyweather.data.SnapshotCache
 import io.raylytics.justmyweather.data.ViewConfigRepository
+import io.raylytics.justmyweather.data.WeatherLocation
 import io.raylytics.justmyweather.data.WeatherRepository
+import io.raylytics.justmyweather.data.WeatherSnapshot
 import io.raylytics.justmyweather.data.nws.HttpResult
 import io.raylytics.justmyweather.data.nws.HttpTransport
 import io.raylytics.justmyweather.data.nws.NwsClient
@@ -25,12 +30,15 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.mock
+import java.time.Instant
 
 /**
  * Locks in the view-mode contract: forecasts fetch lazily once per framing,
@@ -61,18 +69,25 @@ class HomeViewModelTest {
     }
 
     /** Routes by endpoint, counts fetches per forecast framing, and can fail
-     * the daily endpoint on demand or park one daily response on a gate so a
-     * test can act while that fetch is genuinely in flight. */
+     * the daily endpoint on demand or park one daily (or observation) response
+     * on a gate so a test can act while that fetch is genuinely in flight. */
     private class RoutingTransport : HttpTransport {
         var hourlyFetches = 0
         var dailyFetches = 0
         var failDaily = false
         var gateDaily: CompletableDeferred<Unit>? = null
+        var gateObservation: CompletableDeferred<Unit>? = null
 
         override suspend fun get(url: String, headers: Map<String, String>): HttpResult {
             val body =
                 when {
-                    "/observations/latest" in url -> OBSERVATION
+                    "/observations/latest" in url -> {
+                        gateObservation?.let { gate ->
+                            gateObservation = null
+                            gate.await()
+                        }
+                        OBSERVATION
+                    }
                     url.endsWith("/stations") -> STATIONS
                     "/points/" in url -> POINTS
                     url.endsWith("/forecast/hourly") -> {
@@ -99,13 +114,21 @@ class HomeViewModelTest {
 
     /** Builds the ViewModel over real repositories; collects [HomeViewModel.state]
      * for the test body so the WhileSubscribed combine actually runs. */
-    private fun TestScope.harness(config: ViewConfig? = null): Harness {
+    private fun TestScope.harness(
+        config: ViewConfig? = null,
+        snapshots: SnapshotCache = InMemorySnapshotCache(),
+    ): Harness {
         val transport = RoutingTransport()
         val configRepository = ViewConfigRepository(FakePreferencesDataStore())
         config?.let { c -> launch { configRepository.save(c) } }
         val vm =
             HomeViewModel(
-                repository = WeatherRepository(NwsClient(transport = transport)),
+                repository =
+                    WeatherRepository(
+                        nws = NwsClient(transport = transport),
+                        snapshotCache = snapshots,
+                        clock = { NOW },
+                    ),
                 locationProvider = mock { on { lastKnownLocation() } doReturn null },
                 configRepository = configRepository,
             )
@@ -236,7 +259,94 @@ class HomeViewModelTest {
         assertEquals(ViewMode.NOW, h.vm.ready().mode)
     }
 
+    @Test
+    fun `the remembered reading fills the first paint until the live one lands`() = runTest(dispatcher) {
+        val snapshots = InMemorySnapshotCache()
+        snapshots.put(remembered)
+
+        val h = harness(snapshots = snapshots)
+        // Park the observation so we're looking at the app exactly as the user
+        // does on launch: the fetch has started and has not come back.
+        h.transport.gateObservation = CompletableDeferred()
+        val gate = h.transport.gateObservation!!
+        advanceUntilIdle()
+
+        // Not "…": the last reading, shown as refreshing because it is.
+        assertEquals(64.0, h.vm.ready().snapshot.temperatureF)
+        assertTrue(h.vm.ready().refreshing)
+
+        gate.complete(Unit)
+        advanceUntilIdle()
+        // The live reading (20°C = 68°F) has taken over, refresh done.
+        assertEquals(68.0, h.vm.ready().snapshot.temperatureF)
+        assertFalse(h.vm.ready().refreshing)
+    }
+
+    @Test
+    fun `a slow cache read never replaces a live reading that already arrived`() = runTest(dispatcher) {
+        // The seed races the fetch it was started alongside, and on a warm
+        // point cache the fetch can win. Force that order: the cache read only
+        // returns after the live reading is already on screen.
+        val gate = CompletableDeferred<Unit>()
+        val slow =
+            object : SnapshotCache {
+                override suspend fun get(): CachedSnapshot? {
+                    gate.await()
+                    return remembered
+                }
+
+                override suspend fun put(entry: CachedSnapshot) = Unit
+            }
+
+        val h = harness(snapshots = slow)
+        advanceUntilIdle()
+        assertEquals(68.0, h.vm.ready().snapshot.temperatureF)
+
+        gate.complete(Unit)
+        advanceUntilIdle()
+        // Still the live reading — the stale one arrived late and was dropped.
+        assertEquals(68.0, h.vm.ready().snapshot.temperatureF)
+        assertFalse(h.vm.ready().refreshing)
+    }
+
+    @Test
+    fun `nothing worth remembering means the quiet placeholder, as before`() = runTest(dispatcher) {
+        val h = harness()
+        h.transport.gateObservation = CompletableDeferred()
+        val gate = h.transport.gateObservation!!
+        advanceUntilIdle()
+
+        assertEquals(HomeUiState.Loading, h.vm.state.value)
+        gate.complete(Unit)
+        advanceUntilIdle()
+        assertEquals(68.0, h.vm.ready().snapshot.temperatureF)
+    }
+
     private companion object {
+        /** Fixed "now" for the repository's freshness rule; [remembered] is
+         * stored at the same instant, so it is unambiguously fresh. */
+        val NOW: Instant = Instant.parse("2026-07-31T12:05:00Z")
+
+        /** A reading for the default location (no permission → DEFAULT), at a
+         * temperature the live fixture never returns, so the assertions can
+         * tell the two apart. */
+        val remembered =
+            CachedSnapshot(
+                snapshot =
+                    WeatherSnapshot(
+                        locationLabel = "Brooklyn, NY",
+                        temperatureF = 64.0,
+                        conditions = "Cloudy",
+                        windMph = null,
+                        precipitationIn = null,
+                        pressureInHg = null,
+                        observedAt = Instant.parse("2026-07-31T11:40:00Z"),
+                    ),
+                latitude = WeatherLocation.DEFAULT.latitude,
+                longitude = WeatherLocation.DEFAULT.longitude,
+                savedAt = NOW,
+            )
+
         const val POINTS =
             """{"properties":{"gridId":"OKX","gridX":33,"gridY":35,
                 "forecastZone":"https://api.weather.gov/zones/forecast/NYZ072",

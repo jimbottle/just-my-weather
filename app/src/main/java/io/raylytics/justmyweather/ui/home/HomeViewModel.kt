@@ -99,12 +99,35 @@ class HomeViewModel(
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUiState.Loading)
 
     init {
+        seedFromLastReading()
         refresh()
         // A mode needs its data the moment it's entered — whether by tap or by
         // the persisted default arriving from DataStore after first paint.
         // (StateFlow already skips duplicate values, so no distinct operator.)
         viewModelScope.launch {
             mode.collect { ensureForecast(it) }
+        }
+    }
+
+    /**
+     * Paint the last remembered reading while the live fetch is in flight, so
+     * opening the app shows weather instead of a "…" for as long as the network
+     * takes. It is marked `refreshing`, which is the literal truth: the fetch
+     * started in the same breath and will overwrite this the moment it lands.
+     *
+     * The repository decides whether a remembered reading is still honest
+     * enough to show (recent, same place) — this only decides *when* to use one.
+     *
+     * `compareAndSet` rather than a plain assignment because this races the
+     * fetch [refresh] just started, and the ordering is not ours to control: on
+     * a warm cache the fetch can win. Seeding only over `Loading` means a
+     * late-arriving cache read can never replace live data with older data, nor
+     * clobber an error the user is looking at.
+     */
+    private fun seedFromLastReading() {
+        viewModelScope.launch {
+            val cached = runCatching { repository.lastReading(currentLocation()) }.getOrNull() ?: return@launch
+            weather.compareAndSet(WeatherLoad.Loading, WeatherLoad.Ready(cached, refreshing = true))
         }
     }
 

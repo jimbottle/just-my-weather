@@ -7,6 +7,7 @@ import io.raylytics.justmyweather.data.nws.NwsClient
 import io.raylytics.justmyweather.data.nws.PointsLookup
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.time.Instant
 
 /** A place to show weather for: a coordinate plus a human label. */
 data class WeatherLocation(
@@ -29,10 +30,17 @@ data class WeatherLocation(
  *
  * Resolution (lat/lon → NWS grid + station) is cached per coordinate because it
  * never changes for a fixed point, while observations are always fetched fresh.
+ * The last successful reading is *remembered* too ([lastReading]) — not to skip
+ * a fetch, which still always happens, but so the first paint of a cold start
+ * isn't blank. Every caller writes to it, the background alert poll included, so
+ * a launch after a poll starts from the poll's reading.
  */
 class WeatherRepository(
     private val nws: NwsClient,
     private val pointCache: PointCache = InMemoryPointCache(),
+    private val snapshotCache: SnapshotCache = InMemorySnapshotCache(),
+    /** Injected so the freshness rule is testable without waiting three hours. */
+    private val clock: () -> Instant = Instant::now,
 ) {
     // Serialises point resolution so two refreshes fired close together (VM
     // init + the location-permission grant) don't both hit the network for the
@@ -48,18 +56,45 @@ class WeatherRepository(
             location.label.ifBlank {
                 point.relativeLocation?.let { "${it.city}, ${it.state}" } ?: "Current location"
             }
-        return WeatherSnapshot(
-            locationLabel = label,
-            temperatureF = obs.temperatureF,
-            conditions = obs.conditions,
-            windMph = obs.windMph,
-            precipitationIn = obs.precipitationIn,
-            pressureInHg = obs.pressureInHg,
-            observedAt = obs.observedAt,
-            relativeHumidityPercent = obs.relativeHumidityPercent,
-            windDirectionDegrees = obs.windDirectionDegrees,
-        )
+        val snapshot =
+            WeatherSnapshot(
+                locationLabel = label,
+                temperatureF = obs.temperatureF,
+                conditions = obs.conditions,
+                windMph = obs.windMph,
+                precipitationIn = obs.precipitationIn,
+                pressureInHg = obs.pressureInHg,
+                observedAt = obs.observedAt,
+                relativeHumidityPercent = obs.relativeHumidityPercent,
+                windDirectionDegrees = obs.windDirectionDegrees,
+            )
+        // Remember it for the next cold start. A failure to persist must never
+        // cost the caller its reading — the worst case is one blank first paint.
+        runCatching {
+            snapshotCache.put(
+                CachedSnapshot(
+                    snapshot = snapshot,
+                    latitude = location.latitude,
+                    longitude = location.longitude,
+                    savedAt = clock(),
+                ),
+            )
+        }
+        return snapshot
     }
+
+    /**
+     * The last reading we stored, if it is still worth showing for [location] —
+     * see [CachedSnapshot.isUsableFor] for what "worth showing" means. Null
+     * whenever there is nothing remembered, it is too old, or it was taken
+     * somewhere else; callers then have nothing to paint until [load] returns,
+     * which is the pre-existing behaviour.
+     */
+    suspend fun lastReading(location: WeatherLocation): WeatherSnapshot? =
+        runCatching { snapshotCache.get() }
+            .getOrNull()
+            ?.takeIf { it.isUsableFor(location, clock()) }
+            ?.snapshot
 
     /**
      * The hourly forecast for a location, for forecast-window alerts. Goes
