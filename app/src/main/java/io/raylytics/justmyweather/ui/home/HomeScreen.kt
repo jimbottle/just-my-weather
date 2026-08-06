@@ -177,6 +177,19 @@ private fun GlanceView(
 
         ModeToggle(selected = state.mode, onSelect = onSetMode)
 
+        // A refresh that failed with a reading already on screen. It sits with
+        // the Refresh button — the control it is about — and in the same quiet
+        // style as a failed forecast fetch, because the glance above is still
+        // good: only its age is in question, and "Observed" already says that.
+        state.refreshError?.let { message ->
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
+        }
+
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             // The button label reflects the refreshing flag, so a re-fetch is an
             // observable state change (and the flag stops being dead state).

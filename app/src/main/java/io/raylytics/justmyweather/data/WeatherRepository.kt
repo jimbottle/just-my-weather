@@ -32,8 +32,8 @@ data class WeatherLocation(
  * never changes for a fixed point, while observations are always fetched fresh.
  * The last successful reading is *remembered* too ([lastReading]) — not to skip
  * a fetch, which still always happens, but so the first paint of a cold start
- * isn't blank. Every caller writes to it, the background alert poll included, so
- * a launch after a poll starts from the poll's reading.
+ * isn't blank. Only readings for a location the caller actually knows are
+ * remembered; see the `remember` parameter on [load].
  */
 class WeatherRepository(
     private val nws: NwsClient,
@@ -47,7 +47,22 @@ class WeatherRepository(
     // same coordinate — the second awaits the lock and finds the cached value.
     private val resolveMutex = Mutex()
 
-    suspend fun load(location: WeatherLocation): WeatherSnapshot {
+    /**
+     * The current conditions for [location].
+     *
+     * [remember] controls whether the result becomes the reading a cold start
+     * paints ([lastReading]). It defaults to true for the foreground, whose
+     * fallback is self-consistent — the home screen shows the default location
+     * and next launch looks the entry up under that same default. The
+     * background alert poll must pass false when it is guessing: it resolves
+     * its own location, and a poll that finds no fix (foreground-only location
+     * permission gives background work nothing on Android 10+, and a fix can
+     * simply be missing after a reboot) falls back to the default and would
+     * otherwise overwrite the user's real entry with a reading from a city they
+     * are nowhere near — which the distance gate then rejects, leaving them
+     * with the blank first paint this cache exists to prevent.
+     */
+    suspend fun load(location: WeatherLocation, remember: Boolean = true): WeatherSnapshot {
         val point = resolvePoint(location)
         val obs = nws.getObservation(point.observationStationId)
         // A GPS fix arrives without a name; reuse the city/state the point
@@ -70,15 +85,17 @@ class WeatherRepository(
             )
         // Remember it for the next cold start. A failure to persist must never
         // cost the caller its reading — the worst case is one blank first paint.
-        runCatching {
-            snapshotCache.put(
-                CachedSnapshot(
-                    snapshot = snapshot,
-                    latitude = location.latitude,
-                    longitude = location.longitude,
-                    savedAt = clock(),
-                ),
-            )
+        if (remember) {
+            runCatching {
+                snapshotCache.put(
+                    CachedSnapshot(
+                        snapshot = snapshot,
+                        latitude = location.latitude,
+                        longitude = location.longitude,
+                        savedAt = clock(),
+                    ),
+                )
+            }
         }
         return snapshot
     }

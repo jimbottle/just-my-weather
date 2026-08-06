@@ -48,10 +48,15 @@ class AlertWorker(
             return Result.success()
         }
 
-        val location = container.locationProvider.lastKnownLocation() ?: WeatherLocation.DEFAULT
+        // Keep the fix itself, not just the resolved location: a poll with no
+        // fix still evaluates rules against the default, but it must not
+        // overwrite the reading the home screen opens on — that entry belongs
+        // to wherever the user actually was. See WeatherRepository.load.
+        val fix = container.locationProvider.lastKnownLocation()
+        val location = fix ?: WeatherLocation.DEFAULT
         val snapshot =
             try {
-                container.weatherRepository.load(location)
+                container.weatherRepository.load(location, remember = fix != null)
             } catch (_: IOException) {
                 return Result.retry() // transient network — try again next backoff
             } catch (_: Exception) {

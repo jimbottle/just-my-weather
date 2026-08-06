@@ -75,6 +75,7 @@ class HomeViewModelTest {
         var hourlyFetches = 0
         var dailyFetches = 0
         var failDaily = false
+        var failObservation = false
         var gateDaily: CompletableDeferred<Unit>? = null
         var gateObservation: CompletableDeferred<Unit>? = null
 
@@ -86,6 +87,7 @@ class HomeViewModelTest {
                             gateObservation = null
                             gate.await()
                         }
+                        if (failObservation) return HttpResult(500, "boom", null)
                         OBSERVATION
                     }
                     url.endsWith("/stations") -> STATIONS
@@ -117,6 +119,7 @@ class HomeViewModelTest {
     private fun TestScope.harness(
         config: ViewConfig? = null,
         snapshots: SnapshotCache = InMemorySnapshotCache(),
+        onSnapshotLoaded: suspend (WeatherSnapshot) -> Unit = {},
     ): Harness {
         val transport = RoutingTransport()
         val configRepository = ViewConfigRepository(FakePreferencesDataStore())
@@ -131,6 +134,7 @@ class HomeViewModelTest {
                     ),
                 locationProvider = mock { on { lastKnownLocation() } doReturn null },
                 configRepository = configRepository,
+                onSnapshotLoaded = onSnapshotLoaded,
             )
         backgroundScope.launch { vm.state.collect {} }
         return Harness(transport, vm)
@@ -307,6 +311,46 @@ class HomeViewModelTest {
         // Still the live reading — the stale one arrived late and was dropped.
         assertEquals(68.0, h.vm.ready().snapshot.temperatureF)
         assertFalse(h.vm.ready().refreshing)
+    }
+
+    @Test
+    fun `a failed fetch keeps the reading on screen rather than replacing it with an error`() =
+        runTest(dispatcher) {
+            val snapshots = InMemorySnapshotCache()
+            snapshots.put(remembered)
+            var exports = 0
+
+            // The offline cold start: the remembered reading is all we have,
+            // and the fetch that would have replaced it fails.
+            val h = harness(snapshots = snapshots, onSnapshotLoaded = { exports++ })
+            h.transport.failObservation = true
+            advanceUntilIdle()
+
+            assertEquals(64.0, h.vm.ready().snapshot.temperatureF)
+            assertNotNull(h.vm.ready().refreshError)
+            assertFalse(h.vm.ready().refreshing)
+            // Nothing new was fetched, so nothing was handed to the watch —
+            // re-exporting the retained reading would look like a new one.
+            assertEquals(0, exports)
+
+            // Retrying clears the message and takes the live reading.
+            h.transport.failObservation = false
+            h.vm.refresh()
+            advanceUntilIdle()
+            assertEquals(68.0, h.vm.ready().snapshot.temperatureF)
+            assertNull(h.vm.ready().refreshError)
+            assertEquals(1, exports)
+        }
+
+    @Test
+    fun `with nothing on screen a failed fetch still shows the error, as before`() = runTest(dispatcher) {
+        val h = harness()
+        h.transport.failObservation = true
+        advanceUntilIdle()
+
+        // No remembered reading to protect, so the error screen is the only
+        // honest thing to show — the pre-existing behaviour, unchanged.
+        assertTrue(h.vm.state.value is HomeUiState.Error)
     }
 
     @Test

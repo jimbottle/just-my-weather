@@ -36,6 +36,14 @@ sealed interface HomeUiState {
          * days — the banner renders only when this isn't.
          */
         val safetyAlerts: List<ActiveAlert> = emptyList(),
+        /**
+         * Set when a refresh failed while this reading was already on screen.
+         * The glance above it is the last reading we know to be true — which
+         * is why the failure is a line beside it rather than the [Error] state
+         * that replaces the whole screen. The "Observed" timestamp is what
+         * tells the user how old that reading now is.
+         */
+        val refreshError: String? = null,
     ) : HomeUiState
 
     /** Network or NWS failure, with a short plain-language message. */

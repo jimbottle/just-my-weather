@@ -115,6 +115,21 @@ class WeatherRepositoryTest {
     }
 
     @Test
+    fun `a load that opts out leaves an existing entry intact`() = runTest {
+        // The background alert poll's case: it falls back to the default
+        // location when it has no fix, and must not overwrite the reading the
+        // user's own launch stored for where they actually are.
+        val snapshots = InMemorySnapshotCache()
+        val home = WeatherLocation(38.25, -85.76, label = "Louisville, KY")
+        val mine = repo(RoutingTransport(), snapshots = snapshots).load(home)
+
+        repo(RoutingTransport(), snapshots = snapshots)
+            .load(WeatherLocation.DEFAULT, remember = false)
+
+        assertEquals(mine, repo(RoutingTransport(), snapshots = snapshots).lastReading(home))
+    }
+
+    @Test
     fun `a cache that cannot be read or written never costs the caller its reading`() = runTest {
         // The store is best-effort: DataStore can throw on a corrupt file, and
         // a launch-path crash would be a far worse bug than a blank first paint.

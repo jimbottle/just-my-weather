@@ -94,6 +94,7 @@ class HomeViewModel(
                                 ViewMode.DAILY -> forecasts.dailyError
                             },
                         safetyAlerts = alerts,
+                        refreshError = load.error,
                     )
             }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUiState.Loading)
@@ -134,7 +135,10 @@ class HomeViewModel(
     fun refresh() {
         weather.value =
             when (val current = weather.value) {
-                is WeatherLoad.Ready -> current.copy(refreshing = true)
+                // The previous failure clears as the retry starts: a message
+                // sitting under a "Refreshing…" button reads as the *current*
+                // attempt having already failed.
+                is WeatherLoad.Ready -> current.copy(refreshing = true, error = null)
                 else -> WeatherLoad.Loading
             }
         viewModelScope.launch {
@@ -145,20 +149,34 @@ class HomeViewModel(
             // pre-refresh data can never be resurrected past the clear.
             forecastMutex.withLock { forecasts.value = ForecastLoad() }
             val location = currentLocation()
-            val loaded =
-                runCatching { repository.load(location) }
-                    .fold(
-                        onSuccess = { WeatherLoad.Ready(it) },
-                        onFailure = { WeatherLoad.Error(it.toUserMessage()) },
-                    )
-            weather.value = loaded
+            val result = runCatching { repository.load(location) }
+            weather.value =
+                result.fold(
+                    onSuccess = { WeatherLoad.Ready(it) },
+                    // A reading already on screen survives a failed fetch. It
+                    // is the last thing we know to be true, and replacing it
+                    // with a full-screen error throws away data the app has in
+                    // hand — worst on an offline cold start, where the
+                    // remembered reading would appear and then flash away into
+                    // an error a second later. The failure is reported next to
+                    // it instead, the way a failed forecast or alert fetch
+                    // already declines to take down the glance.
+                    onFailure = { e ->
+                        when (val current = weather.value) {
+                            is WeatherLoad.Ready -> current.copy(refreshing = false, error = e.toUserMessage())
+                            else -> WeatherLoad.Error(e.toUserMessage())
+                        }
+                    },
+                )
             // Hand off after the UI state is published, and never let a
             // failure here surface: an export is a side errand, so a watch
             // that isn't listening must not turn a good reading into an error
-            // screen or skip the forecast fetch below.
-            if (loaded is WeatherLoad.Ready) {
-                runCatching { onSnapshotLoaded(loaded.snapshot) }
-            }
+            // screen or skip the forecast fetch below. Keyed off the fetch
+            // result, NOT off the published state: a failed fetch can now
+            // leave a Ready state standing, and re-exporting the reading it
+            // retained would send the watch the same reading again as if it
+            // were new.
+            result.onSuccess { runCatching { onSnapshotLoaded(it) } }
             // Alerts are a side dish: a fetch that fails leaves the glance
             // intact and the banner simply absent.
             //
@@ -223,7 +241,13 @@ class HomeViewModel(
     private sealed interface WeatherLoad {
         data object Loading : WeatherLoad
 
-        data class Ready(val snapshot: WeatherSnapshot, val refreshing: Boolean = false) : WeatherLoad
+        /** [error] is a refresh that failed with this reading already on
+         * screen — the reading stays, the message rides alongside it. */
+        data class Ready(
+            val snapshot: WeatherSnapshot,
+            val refreshing: Boolean = false,
+            val error: String? = null,
+        ) : WeatherLoad
 
         data class Error(val message: String) : WeatherLoad
     }
