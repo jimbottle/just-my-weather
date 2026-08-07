@@ -91,7 +91,9 @@ record available was 12:40 PM.
 
 Showing the fetch time instead would let a three-hour-old reading claim to be
 current the moment you tapped Refresh, which is exactly what this line exists
-to prevent.
+to prevent. The age sits beside it instead — "Observed 12:40 PM · 12 min ago" —
+and that half does move, both as the reading ages on screen and when a refresh
+brings back a newer one.
 
 ## License
 

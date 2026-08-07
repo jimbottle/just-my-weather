@@ -22,7 +22,11 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -42,10 +46,13 @@ import io.raylytics.justmyweather.view.RenderedView
 import io.raylytics.justmyweather.view.ViewConfig
 import io.raylytics.justmyweather.view.ViewMode
 import io.raylytics.justmyweather.view.render
+import kotlinx.coroutines.delay
+import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.roundToInt
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * How much of a label/value row the label may occupy before it ellipsizes.
@@ -55,6 +62,9 @@ import kotlin.math.roundToInt
  * value out. Everything the label does not use goes to the value.
  */
 private const val LABEL_WIDTH_SHARE = 0.6f
+
+/** How often the observation age re-reads the clock. See [ObservedLine]. */
+private val AGE_TICK = 30.seconds
 
 /**
  * The home view. Out of the box it's a calm single glance; once the user edits
@@ -356,12 +366,53 @@ private fun NowContent(
         // the time to be "just the number", but a number whose provenance is
         // undiscoverable is exactly what made this confusing, and one quiet
         // line is the smallest thing that fixes it.
-        Text(
-            text = observedLabel(snapshot)?.let { "Observed $it" } ?: "Observed",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        ObservedLine(snapshot)
     }
+}
+
+/**
+ * "Observed 12:40 PM · 12 min ago" — when the station took the reading, and
+ * how long ago that was.
+ *
+ * The age carries what the timestamp cannot. A station that stopped reporting
+ * three hours ago and one that published a minute ago look identical when all
+ * you have is a clock time, and the timestamp deliberately doesn't move on a
+ * re-fetch (see [observedLabel]) — so pressing Refresh changed nothing on
+ * screen and gave no sign the fetch had happened. The age moves. Both halves
+ * stay: replacing the timestamp would lose the fact the label exists to state,
+ * and a separate "checked at" line would re-add chrome and read as two
+ * contradictory times.
+ *
+ * It ticks, because an age computed once at render goes stale while you look
+ * at it — the one failure a line like this cannot afford. Every [AGE_TICK]:
+ * the smallest unit shown is a minute, so the label is never more than half a
+ * unit behind, and a screen left open costs two wakeups a minute rather than
+ * four. Only this line recomposes on a tick, not the whole glance.
+ */
+@Composable
+private fun ObservedLine(snapshot: WeatherSnapshot) {
+    val observedAt = snapshot.observedAt
+    var now by remember { mutableStateOf(Instant.now()) }
+    LaunchedEffect(observedAt) {
+        // Nothing to age when the station omitted its timestamp — don't tick.
+        if (observedAt == null) return@LaunchedEffect
+        while (true) {
+            delay(AGE_TICK)
+            now = Instant.now()
+        }
+    }
+    val time = observedLabel(snapshot)
+    val age = observedAt?.let { ObservationAge.label(it, now) }
+    Text(
+        text =
+            when {
+                time == null -> "Observed"
+                age == null -> "Observed $time"
+                else -> "Observed $time · $age"
+            },
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 }
 
 /** The mode chips. A horizontally scrolling row rather than FlowRow so future
@@ -788,9 +839,9 @@ private val monthDayFormat = DateTimeFormatter.ofPattern("MMM d", Locale.getDefa
  *
  * Substituting the clock here would make a three-hour-old reading claim to be
  * current the moment someone tapped Refresh, which is the one thing this label
- * exists to prevent. If the staleness needs to be more legible, show the age
- * ("12 min ago") rather than replacing the timestamp — see
- * just-my-weather-i0q.
+ * exists to prevent. The staleness is made legible the other way, by [ObservedLine]
+ * printing the age beside this — "Observed 12:40 PM · 12 min ago" — so the
+ * timestamp keeps saying what it means and the age answers "is this current?".
  */
 private fun observedLabel(snapshot: WeatherSnapshot): String? =
     snapshot.observedAt?.atZone(ZoneId.systemDefault())?.format(timeFormat)

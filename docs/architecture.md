@@ -55,8 +55,14 @@ common misreading of this app.
   at a real station took the reading. This is what the "Observed HH:MM" line
   shows, and it advances only when the station publishes.
 - **Fetch time** — when the app last asked. Deliberately not displayed.
+- **Observation age** (`ui/home/ObservationAge`) — the gap between the
+  observation time and now, printed beside the timestamp ("· 12 min ago"). It
+  is derived from the first clock, never the second, so it cannot make an old
+  reading look fetched-just-now. `ObservedLine` re-reads the clock on a timer,
+  because an age rendered once goes stale while the screen is open.
 
-So "Observed" not changing across a Refresh is normal, not a stale-cache bug.
+So the timestamp not changing across a Refresh is normal, not a stale-cache bug
+— and the age beside it is what confirms the fetch happened at all.
 `WeatherRepository` caches only the coordinate → grid/station resolution;
 `getObservation` hits `/observations/latest` every time, and `HttpTransport`
 builds its `OkHttpClient` with no HTTP cache. The limits are upstream: station
