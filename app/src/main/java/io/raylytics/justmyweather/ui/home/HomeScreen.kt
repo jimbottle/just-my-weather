@@ -34,6 +34,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import io.raylytics.justmyweather.data.WeatherSnapshot
 import io.raylytics.justmyweather.data.nws.ActiveAlert
 import io.raylytics.justmyweather.data.nws.DailyPeriod
@@ -63,8 +66,10 @@ import kotlin.time.Duration.Companion.seconds
  */
 private const val LABEL_WIDTH_SHARE = 0.6f
 
-/** How often the observation age re-reads the clock. See [ObservedLine]. */
-private val AGE_TICK = 30.seconds
+/** How often the observation age re-reads the clock. See [ObservedLine].
+ * Internal so the instrumented test steps the clock by exactly one tick
+ * instead of hardcoding a number that could drift from this one. */
+internal val AGE_TICK = 30.seconds
 
 /**
  * The home view. Out of the box it's a calm single glance; once the user edits
@@ -388,17 +393,43 @@ private fun NowContent(
  * the smallest unit shown is a minute, so the label is never more than half a
  * unit behind, and a screen left open costs two wakeups a minute rather than
  * four. Only this line recomposes on a tick, not the whole glance.
+ *
+ * Two details in the loop below are the difference between a ticking age and a
+ * lying one, and neither shows up in a screen you sit and watch:
+ *
+ *  - **It samples before it waits.** Sampling after the delay leaves `now`
+ *    frozen at first composition for a whole tick — and the effect restarts
+ *    whenever `observedAt` changes, including null → non-null when a refresh
+ *    finally brings a station timestamp. `now` would then be minutes older
+ *    than the reading, the gap would run backwards past
+ *    [ObservationAge.FUTURE_TOLERANCE], and the age would vanish for 30
+ *    seconds at the exact moment it was there to confirm the refresh.
+ *  - **It runs only while RESUMED,** so it re-samples on every resume.
+ *    `delay` parks on the monotonic clock, which does not advance across
+ *    deep sleep: a phone left on this screen overnight would wake showing
+ *    "12 min ago" for a reading twelve hours old, and only correct itself
+ *    once the pending delay expired. Stopping while stopped also means a
+ *    backgrounded glance costs nothing.
  */
 @Composable
-private fun ObservedLine(snapshot: WeatherSnapshot) {
+internal fun ObservedLine(
+    snapshot: WeatherSnapshot,
+    /** The wall clock, injectable so a test can decide when "now" is — the
+     * defects this line has had were all in *when* it read the clock, which is
+     * untestable while the read is hard-wired. */
+    clock: () -> Instant = Instant::now,
+) {
     val observedAt = snapshot.observedAt
-    var now by remember { mutableStateOf(Instant.now()) }
-    LaunchedEffect(observedAt) {
+    var now by remember { mutableStateOf(clock()) }
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(observedAt, lifecycle) {
         // Nothing to age when the station omitted its timestamp — don't tick.
         if (observedAt == null) return@LaunchedEffect
-        while (true) {
-            delay(AGE_TICK)
-            now = Instant.now()
+        lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            while (true) {
+                now = clock()
+                delay(AGE_TICK)
+            }
         }
     }
     val time = observedLabel(snapshot)
