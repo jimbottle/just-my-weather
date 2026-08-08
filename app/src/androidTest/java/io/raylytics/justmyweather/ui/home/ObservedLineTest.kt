@@ -1,12 +1,16 @@
 package io.raylytics.justmyweather.ui.home
 
+import androidx.activity.ComponentActivity
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.lifecycle.Lifecycle
 import io.raylytics.justmyweather.data.WeatherSnapshot
 import org.junit.After
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import java.time.Instant
@@ -22,8 +26,11 @@ import java.time.Instant
  * case that already worked.
  */
 class ObservedLineTest {
+    // An activity-backed rule, not createComposeRule(): the ticker is gated on
+    // the host's lifecycle, and without a handle on that there is no way to
+    // leave RESUMED — which is precisely the state the worst defect lives in.
     @get:Rule
-    val compose = createComposeRule()
+    val compose = createAndroidComposeRule<ComponentActivity>()
 
     /**
      * Hand the clock back before teardown. Both tests below pause it and leave
@@ -87,5 +94,48 @@ class ObservedLineTest {
         compose.mainClock.advanceTimeBy(AGE_TICK.inWholeMilliseconds + 1)
         compose.mainClock.advanceTimeByFrame()
         compose.onNodeWithText("2 min ago", substring = true).assertExists()
+    }
+
+    @Test
+    fun theTickerStopsWhileStoppedAndReSamplesOnResume() {
+        // The overnight case, and the only one the other two can't see: they
+        // run continuously RESUMED, so they pass whether or not the loop is
+        // gated on the lifecycle at all.
+        //
+        // Asserted by COUNTING clock reads rather than by reading the label,
+        // because a stopped activity has no window and the semantics tree goes
+        // with it — there is nothing to query in the very state under test.
+        // The count says the same thing more directly anyway: a read is a tick,
+        // so "no reads while stopped" IS "the ticker stopped".
+        compose.mainClock.autoAdvance = false
+        var fakeNow = t0
+        var reads = 0
+        val clock = {
+            reads++
+            fakeNow
+        }
+        compose.setContent { ObservedLine(snapshotAt(observedAt = t0.minusSeconds(60)), clock) }
+        compose.mainClock.advanceTimeByFrame()
+        compose.onNodeWithText("1 min ago", substring = true).assertExists()
+
+        compose.activityRule.scenario.moveToState(Lifecycle.State.CREATED)
+        compose.mainClock.advanceTimeByFrame()
+        val readsWhenStopped = reads
+
+        // An hour passes with the screen off. Stepping several ticks stands in
+        // for what a device does NOT do while asleep: an ungated ticker has a
+        // delay pending, so it would wake, sample, and keep sampling for an app
+        // that is not even on screen.
+        fakeNow = t0.plusSeconds(3600)
+        repeat(4) { compose.mainClock.advanceTimeBy(AGE_TICK.inWholeMilliseconds + 1) }
+        compose.mainClock.advanceTimeByFrame()
+        assertEquals("ticker kept reading the clock while stopped", readsWhenStopped, reads)
+
+        // Coming back re-samples straight away — not after waiting out another
+        // full tick, which is what left a stale age on screen to be read.
+        compose.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
+        compose.mainClock.advanceTimeByFrame()
+        compose.mainClock.advanceTimeByFrame()
+        compose.onNodeWithText("1 hr ago", substring = true).assertIsDisplayed()
     }
 }
