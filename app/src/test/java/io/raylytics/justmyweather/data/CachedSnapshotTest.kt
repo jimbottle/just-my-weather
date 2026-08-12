@@ -34,6 +34,9 @@ class CachedSnapshotTest {
         savedAt = savedAt,
     )
 
+    /** The same entry as it arrives from a station that omits its timestamp. */
+    private fun CachedSnapshot.undated() = copy(snapshot = snapshot.copy(observedAt = null))
+
     @Test
     fun `a reading from minutes ago at the same place is usable`() {
         assertTrue(entry(savedAt = now.minus(Duration.ofMinutes(20))).isUsableFor(here, now))
@@ -51,6 +54,28 @@ class CachedSnapshotTest {
         assertFalse(stale.isUsableFor(here, now))
         // Exactly at the cap still counts — the boundary is inclusive.
         assertTrue(entry(savedAt = now.minus(CachedSnapshot.MAX_AGE)).isUsableFor(here, now))
+    }
+
+    @Test
+    fun `a reading with no observation time gets the tighter cap`() {
+        // Some stations omit the timestamp, and the glance then shows a bare
+        // "Observed" — no time, no age, no signal at all. A reading that
+        // cannot say how old it is has to be recent enough not to need to.
+        val undated = entry(savedAt = now.minus(Duration.ofHours(12))).undated()
+        assertFalse(undated.isUsableFor(here, now))
+        // Well inside the tighter bound it is still worth showing.
+        assertTrue(
+            entry(savedAt = now.minus(Duration.ofMinutes(30))).undated().isUsableFor(here, now),
+        )
+        // And the boundary is the shorter cap, not the general one.
+        assertTrue(
+            entry(savedAt = now.minus(CachedSnapshot.MAX_AGE_WITHOUT_OBSERVATION_TIME))
+                .undated().isUsableFor(here, now),
+        )
+        assertFalse(
+            entry(savedAt = now.minus(CachedSnapshot.MAX_AGE_WITHOUT_OBSERVATION_TIME).minusSeconds(1))
+                .undated().isUsableFor(here, now),
+        )
     }
 
     @Test

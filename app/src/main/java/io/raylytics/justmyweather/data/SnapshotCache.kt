@@ -28,8 +28,10 @@ data class CachedSnapshot(
      *
      * Two independent gates, both about honesty rather than performance:
      *
-     *  - **Age.** Past [MAX_AGE] the reading resembles nothing current and the
-     *     user gets the placeholder instead.
+     *  - **Age.** Past the cap the reading resembles nothing current and the
+     *     user gets the placeholder instead. Which cap depends on whether the
+     *     screen can say how old it is — see [MAX_AGE] and
+     *     [MAX_AGE_WITHOUT_OBSERVATION_TIME].
      *  - **Place.** A remembered reading describes where it was taken. A device
      *     fix drifts by metres between launches, so exact coordinate equality
      *     would reject nearly every genuine hit; [MAX_DEGREES_AWAY] is instead
@@ -41,7 +43,12 @@ data class CachedSnapshot(
      */
     fun isUsableFor(location: WeatherLocation, now: Instant): Boolean {
         val age = Duration.between(savedAt, now)
-        if (age.isNegative || age > MAX_AGE) return false
+        // The generous cap is only earned when the screen can state the age.
+        // A station that omits its observation time leaves the glance showing
+        // a bare "Observed" — a number with no staleness signal at all — so
+        // such a reading has to be current on its own account.
+        val cap = if (snapshot.observedAt == null) MAX_AGE_WITHOUT_OBSERVATION_TIME else MAX_AGE
+        if (age.isNegative || age > cap) return false
         return abs(location.latitude - latitude) <= MAX_DEGREES_AWAY &&
             abs(location.longitude - longitude) <= MAX_DEGREES_AWAY
     }
@@ -64,8 +71,24 @@ data class CachedSnapshot(
          * reading is marked refreshing, and the live fetch replaces it within
          * about a second. Staleness is stated rather than hidden, so the cap
          * only has to exclude readings so old they resemble nothing at all.
+         *
+         * That reasoning is conditional, and [MAX_AGE_WITHOUT_OBSERVATION_TIME]
+         * is the condition failing.
          */
         val MAX_AGE: Duration = Duration.ofHours(24)
+
+        /**
+         * The cap when the reading carries no observation time.
+         *
+         * [WeatherSnapshot.observedAt] is nullable because stations really do
+         * omit it, and the glance has nothing to age from when they do: the
+         * line renders as a bare "Observed", with no timestamp and no age. A
+         * day-old temperature would then paint as the current one with no
+         * signal whatsoever — the exact dishonesty the age label was added to
+         * remove. So a reading that cannot describe its own staleness has to
+         * be recent enough not to need to, and keeps the old three-hour bound.
+         */
+        val MAX_AGE_WITHOUT_OBSERVATION_TIME: Duration = Duration.ofHours(3)
 
         /** ~5.5 km of latitude; less of longitude away from the equator. */
         const val MAX_DEGREES_AWAY: Double = 0.05
