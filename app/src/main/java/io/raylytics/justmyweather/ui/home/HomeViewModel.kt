@@ -10,7 +10,7 @@ import io.raylytics.justmyweather.data.WeatherSnapshot
 import io.raylytics.justmyweather.data.nws.ActiveAlert
 import io.raylytics.justmyweather.data.nws.DailyPeriod
 import io.raylytics.justmyweather.data.nws.ForecastPoint
-import io.raylytics.justmyweather.location.LocationProvider
+import io.raylytics.justmyweather.location.LocationResolver
 import io.raylytics.justmyweather.view.ViewMode
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -31,12 +31,13 @@ import kotlinx.coroutines.sync.withLock
  * default until the ViewModel dies; forecasts for a mode are fetched lazily on
  * first entry and kept until the next [refresh].
  *
- * Location: device fix if granted, otherwise a sensible default so the app is
- * useful with zero setup.
+ * Location: resolved through [LocationResolver], so a moment without a fix
+ * falls back to where we last knew the user to be rather than to a default
+ * city on the other side of the country.
  */
 class HomeViewModel(
     private val repository: WeatherRepository,
-    private val locationProvider: LocationProvider,
+    private val locationResolver: LocationResolver,
     configRepository: ViewConfigRepository,
     /**
      * Invoked with each freshly loaded snapshot. A plain function rather than a
@@ -256,7 +257,9 @@ class HomeViewModel(
         }
     }
 
-    private fun currentLocation(): WeatherLocation = locationProvider.lastKnownLocation() ?: WeatherLocation.DEFAULT
+    /** Where to ask about, resolved through the one seam that remembers a
+     * real fix — never a bare fallback to the built-in default. */
+    private suspend fun currentLocation(): WeatherLocation = locationResolver.resolve()
 
     /** Weather half of the screen state, kept separate from the config half. */
     private sealed interface WeatherLoad {

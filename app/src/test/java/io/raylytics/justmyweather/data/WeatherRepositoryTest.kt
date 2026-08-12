@@ -107,7 +107,14 @@ class WeatherRepositoryTest {
         val savedAt = Instant.parse("2026-06-24T18:05:00Z")
         repo(RoutingTransport(), snapshots = snapshots, now = savedAt).load(location)
 
-        val muchLater = repo(RoutingTransport(), snapshots = snapshots, now = savedAt.plusSeconds(4 * 3600))
+        // Past the cap. Overnight is deliberately INSIDE it — see
+        // CachedSnapshot.MAX_AGE — so this has to reach beyond a full day.
+        val muchLater =
+            repo(
+                RoutingTransport(),
+                snapshots = snapshots,
+                now = savedAt.plus(CachedSnapshot.MAX_AGE).plusSeconds(1),
+            )
         assertNull(muchLater.lastReading(location))
 
         val sameMoment = repo(RoutingTransport(), snapshots = snapshots, now = savedAt)

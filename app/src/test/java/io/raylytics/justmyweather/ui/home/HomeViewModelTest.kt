@@ -4,6 +4,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.emptyPreferences
 import io.raylytics.justmyweather.data.CachedSnapshot
+import io.raylytics.justmyweather.data.InMemoryLastLocationStore
 import io.raylytics.justmyweather.data.InMemorySnapshotCache
 import io.raylytics.justmyweather.data.SnapshotCache
 import io.raylytics.justmyweather.data.ViewConfigRepository
@@ -13,6 +14,8 @@ import io.raylytics.justmyweather.data.WeatherSnapshot
 import io.raylytics.justmyweather.data.nws.HttpResult
 import io.raylytics.justmyweather.data.nws.HttpTransport
 import io.raylytics.justmyweather.data.nws.NwsClient
+import io.raylytics.justmyweather.location.LocationProvider
+import io.raylytics.justmyweather.location.LocationResolver
 import io.raylytics.justmyweather.view.ViewConfig
 import io.raylytics.justmyweather.view.ViewMode
 import kotlinx.coroutines.CompletableDeferred
@@ -132,7 +135,13 @@ class HomeViewModelTest {
                         snapshotCache = snapshots,
                         clock = { NOW },
                     ),
-                locationProvider = mock { on { lastKnownLocation() } doReturn null },
+                // No fix and nothing remembered, so this resolves to
+                // WeatherLocation.DEFAULT — which the fixtures answer for.
+                locationResolver =
+                    LocationResolver(
+                        mock<LocationProvider> { on { lastKnownLocation() } doReturn null },
+                        InMemoryLastLocationStore(),
+                    ),
                 configRepository = configRepository,
                 onSnapshotLoaded = onSnapshotLoaded,
             )

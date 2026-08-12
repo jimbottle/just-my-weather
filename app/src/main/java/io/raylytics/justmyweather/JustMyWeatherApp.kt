@@ -8,6 +8,7 @@ import io.raylytics.justmyweather.alerts.AlertScheduling
 import io.raylytics.justmyweather.alerts.AlertWorker
 import io.raylytics.justmyweather.data.AlertRulesRepository
 import io.raylytics.justmyweather.data.AlertSettingsRepository
+import io.raylytics.justmyweather.data.DataStoreLastLocationStore
 import io.raylytics.justmyweather.data.DataStorePointCache
 import io.raylytics.justmyweather.data.DataStoreSnapshotCache
 import io.raylytics.justmyweather.data.GadgetbridgeSettingsRepository
@@ -19,6 +20,7 @@ import io.raylytics.justmyweather.data.gadgetbridge.GadgetbridgeExporter
 import io.raylytics.justmyweather.data.nws.NwsClient
 import io.raylytics.justmyweather.data.nws.OkHttpTransport
 import io.raylytics.justmyweather.location.LocationProvider
+import io.raylytics.justmyweather.location.LocationResolver
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -48,6 +50,13 @@ class AppContainer(context: Context) {
             snapshotCache = DataStoreSnapshotCache(appContext.dataStore),
         )
     val locationProvider = LocationProvider(appContext)
+
+    // Everything that needs a place asks this, not the provider directly: a
+    // moment without a fix must fall back to where we last knew the user to
+    // be, not to a default city. The background poll is the caller that most
+    // depends on it — it never gets a fix at all.
+    val locationResolver =
+        LocationResolver(locationProvider, DataStoreLastLocationStore(appContext.dataStore))
     val viewConfigRepository = ViewConfigRepository(appContext.dataStore)
     val themeConfigRepository = ThemeConfigRepository(appContext.dataStore)
     val alertRulesRepository = AlertRulesRepository(appContext.dataStore)

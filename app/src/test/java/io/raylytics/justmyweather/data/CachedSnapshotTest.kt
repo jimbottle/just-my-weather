@@ -40,6 +40,12 @@ class CachedSnapshotTest {
     }
 
     @Test
+    fun `the overnight gap is covered — the case a three-hour cap used to reject`() {
+        // Measured on a real device: last use 21:49, next use 09:50.
+        assertTrue(entry(savedAt = now.minus(Duration.ofHours(12))).isUsableFor(here, now))
+    }
+
+    @Test
     fun `a reading older than the cap is not`() {
         val stale = entry(savedAt = now.minus(CachedSnapshot.MAX_AGE).minusSeconds(1))
         assertFalse(stale.isUsableFor(here, now))

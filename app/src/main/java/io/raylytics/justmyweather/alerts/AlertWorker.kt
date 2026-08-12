@@ -13,7 +13,6 @@ import androidx.work.WorkerParameters
 import io.raylytics.justmyweather.AppContainer
 import io.raylytics.justmyweather.JustMyWeatherApp
 import io.raylytics.justmyweather.data.AlertRulesRepository
-import io.raylytics.justmyweather.data.WeatherLocation
 import kotlinx.coroutines.flow.first
 import java.io.IOException
 import java.time.Instant
@@ -48,15 +47,16 @@ class AlertWorker(
             return Result.success()
         }
 
-        // Keep the fix itself, not just the resolved location: a poll with no
-        // fix still evaluates rules against the default, but it must not
-        // overwrite the reading the home screen opens on — that entry belongs
-        // to wherever the user actually was. See WeatherRepository.load.
-        val fix = container.locationProvider.lastKnownLocation()
-        val location = fix ?: WeatherLocation.DEFAULT
+        // Through the resolver, never a bare fallback: this worker runs in the
+        // background, where the platform hands a foreground-only app no
+        // location at all, and the old `?: DEFAULT` here quietly evaluated
+        // every rule against New York. remember=false still, because the
+        // reading the home screen opens on belongs to the foreground — a poll
+        // working from a remembered location should not overwrite it.
+        val location = container.locationResolver.resolve()
         val snapshot =
             try {
-                container.weatherRepository.load(location, remember = fix != null)
+                container.weatherRepository.load(location, remember = false)
             } catch (_: IOException) {
                 return Result.retry() // transient network — try again next backoff
             } catch (_: Exception) {
@@ -104,7 +104,7 @@ class AlertWorker(
         container: AppContainer,
         repository: AlertRulesRepository,
     ) {
-        val location = container.locationProvider.lastKnownLocation() ?: WeatherLocation.DEFAULT
+        val location = container.locationResolver.resolve()
         val active =
             runCatching { SafetyAlerts.filter(container.weatherRepository.loadActiveAlerts(location)) }
                 .getOrNull() ?: return

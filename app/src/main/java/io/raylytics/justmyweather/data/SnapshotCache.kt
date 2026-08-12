@@ -28,10 +28,8 @@ data class CachedSnapshot(
      *
      * Two independent gates, both about honesty rather than performance:
      *
-     *  - **Age.** The screen labels the hero "Observed 9:40 AM" — a time, with
-     *     no date. Yesterday evening's 68° would therefore read as this
-     *     morning's, which is worse than showing nothing at all. Anything older
-     *     than [MAX_AGE] is dropped and the user gets the placeholder.
+     *  - **Age.** Past [MAX_AGE] the reading resembles nothing current and the
+     *     user gets the placeholder instead.
      *  - **Place.** A remembered reading describes where it was taken. A device
      *     fix drifts by metres between launches, so exact coordinate equality
      *     would reject nearly every genuine hit; [MAX_DEGREES_AWAY] is instead
@@ -49,9 +47,25 @@ data class CachedSnapshot(
     }
 
     companion object {
-        /** Three hours: long enough to cover "I checked before lunch and again
-         * after", short enough that the reading is still plausibly about now. */
-        val MAX_AGE: Duration = Duration.ofHours(3)
+        /**
+         * A day, so the overnight gap is covered.
+         *
+         * This was three hours, chosen to cover "I checked before lunch and
+         * again after" — which turned out to be the wrong pattern to design
+         * for. The commonest opening of a weather app is the first check of
+         * the day, and measured on a real device that gap was twelve hours
+         * (21:49 to 09:50), so the cap rejected a perfectly good reading every
+         * single morning and the feature never fired when it was most wanted.
+         *
+         * A tight cap was justified while the glance showed a bare clock time
+         * with no date: last night's 68° would have read as this morning's.
+         * That reason is gone — the age now ships beside the timestamp
+         * ("Observed 8:12 PM · 14 hr ago", and "1 day ago" past a day), the
+         * reading is marked refreshing, and the live fetch replaces it within
+         * about a second. Staleness is stated rather than hidden, so the cap
+         * only has to exclude readings so old they resemble nothing at all.
+         */
+        val MAX_AGE: Duration = Duration.ofHours(24)
 
         /** ~5.5 km of latitude; less of longitude away from the equator. */
         const val MAX_DEGREES_AWAY: Double = 0.05

@@ -53,7 +53,7 @@ class MainActivity : ComponentActivity() {
             initializer {
                 HomeViewModel(
                     container.weatherRepository,
-                    container.locationProvider,
+                    container.locationResolver,
                     container.viewConfigRepository,
                     // No-op unless the user switched the hand-off on.
                     container.gadgetbridgeExporter::export,
