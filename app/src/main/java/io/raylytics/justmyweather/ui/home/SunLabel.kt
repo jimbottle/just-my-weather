@@ -5,7 +5,6 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.time.temporal.ChronoUnit
-import java.util.Locale
 
 /*
  * How a sun time reads on the glance. Pure — instants and a zone in, words out
@@ -29,12 +28,21 @@ object SunLabel {
         val at = event.atZone(zone)
         val time = at.format(formatter)
         val days = ChronoUnit.DAYS.between(now.atZone(zone).toLocalDate(), at.toLocalDate())
-        return when (days) {
-            0L -> time
-            1L -> "$time tomorrow"
+        return when {
+            // Defensive. These events are always in the future when freshly
+            // computed, so a past one means the caller is holding a stale
+            // value. Falling through to the weekday branch would print last
+            // Saturday as though it were the coming one; the bare time is at
+            // least not a claim about which day.
+            days < 0L -> time
+            days == 0L -> time
+            days == 1L -> "$time tomorrow"
             // Only reachable near the poles, where the next sunrise can be
             // days out. Naming the weekday beats "in 3 days" for a glance.
-            else -> "$time ${at.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.getDefault())}"
+            // The locale comes from the formatter the caller supplied, so the
+            // day name and the clock time never disagree about language — and
+            // a test that pins one has pinned the other.
+            else -> "$time ${at.dayOfWeek.getDisplayName(TextStyle.SHORT, formatter.locale)}"
         }
     }
 }

@@ -71,6 +71,14 @@ class HomeViewModel(
      */
     private val sunEvents = MutableStateFlow<SunEvents?>(null)
 
+    /**
+     * The coordinate the sun times were last worked out for, so [refreshSunTimes]
+     * can redo them without a fetch or a permission read. Null until the first
+     * location resolves, which is the only state in which there is nothing to
+     * recompute.
+     */
+    private var sunLocation: WeatherLocation? = null
+
     /** null = follow the config's default; set once the user taps a chip. */
     private val chosenMode = MutableStateFlow<ViewMode?>(null)
 
@@ -176,7 +184,8 @@ class HomeViewModel(
             val location = currentLocation()
             // Before the fetch, and independent of it: pure arithmetic that
             // cannot fail, so the sun times still appear on a dead network.
-            sunEvents.value = SunTimes.next(location.latitude, location.longitude, clock())
+            sunLocation = location
+            refreshSunTimes()
             val result = runCatching { repository.load(location) }
             weather.value =
                 result.fold(
@@ -236,6 +245,24 @@ class HomeViewModel(
                     .getOrDefault(emptyList())
             ensureForecast(mode.value)
         }
+    }
+
+    /**
+     * Re-work the next sunrise and sunset for the moment it is now.
+     *
+     * Needed because "next" decays: a value computed at 5am and still on
+     * screen at 9am names a sunrise that has already happened, and unlike the
+     * reading above it — which carries "Observed 4 hr ago" — the sun row has
+     * no cue that would let the user notice. [refresh] is not enough on its
+     * own; it runs at launch, on a permission grant and on the button, none of
+     * which is "the user came back to the app four hours later".
+     *
+     * Free to call: pure arithmetic over a coordinate we already hold, no I/O
+     * and no permission read, so the screen can drive it from a timer.
+     */
+    fun refreshSunTimes() {
+        val location = sunLocation ?: return
+        sunEvents.value = SunTimes.next(location.latitude, location.longitude, clock())
     }
 
     /** The mode collector in `init` triggers the fetch on every mode change.

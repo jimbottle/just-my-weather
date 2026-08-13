@@ -123,6 +123,9 @@ class HomeViewModelTest {
         config: ViewConfig? = null,
         snapshots: SnapshotCache = InMemorySnapshotCache(),
         onSnapshotLoaded: suspend (WeatherSnapshot) -> Unit = {},
+        // A lambda, not an Instant: a test that steps time needs the clock to
+        // keep reading its variable, not a copy taken at construction.
+        clock: () -> Instant = { NOW },
     ): Harness {
         val transport = RoutingTransport()
         val configRepository = ViewConfigRepository(FakePreferencesDataStore())
@@ -144,6 +147,7 @@ class HomeViewModelTest {
                     ),
                 configRepository = configRepository,
                 onSnapshotLoaded = onSnapshotLoaded,
+                clock = clock,
             )
         backgroundScope.launch { vm.state.collect {} }
         return Harness(transport, vm)
@@ -439,6 +443,68 @@ class HomeViewModelTest {
         gate.complete(Unit)
         advanceUntilIdle()
         assertEquals(68.0, h.vm.ready().snapshot.temperatureF)
+    }
+
+    @Test
+    fun `sun times are off until the config asks for them`() = runTest(dispatcher) {
+        val off = harness()
+        advanceUntilIdle()
+        assertNull(off.vm.ready().sunEvents, "the opt-in ships off")
+
+        val on = harness(config = ViewConfig.DEFAULT.setShowSunTimes(true))
+        advanceUntilIdle()
+        assertNotNull(on.vm.ready().sunEvents, "switched on, the glance carries them")
+    }
+
+    @Test
+    fun `sun times survive a failed fetch, because they were never fetched`() = runTest(dispatcher) {
+        // The claim the feature is sold on: computed on device, so a dead
+        // network cannot take them away. Seed a reading so the glance still
+        // renders, then fail the observation.
+        val snapshots = InMemorySnapshotCache()
+        snapshots.put(remembered)
+        val h = harness(config = ViewConfig.DEFAULT.setShowSunTimes(true), snapshots = snapshots)
+        h.transport.failObservation = true
+        advanceUntilIdle()
+
+        assertNotNull(h.vm.ready().refreshError, "the fetch really did fail")
+        assertNotNull(h.vm.ready().sunEvents, "sun times do not depend on the fetch")
+    }
+
+    @Test
+    fun `the location resolves before the fetch, so sun times need no successful load`() =
+        runTest(dispatcher) {
+            // Ordering guard: SunTimes.next must run before the fetch that can
+            // throw. Park the observation and assert the events are already
+            // there while it is still in flight.
+            val snapshots = InMemorySnapshotCache()
+            snapshots.put(remembered)
+            val h = harness(config = ViewConfig.DEFAULT.setShowSunTimes(true), snapshots = snapshots)
+            h.transport.gateObservation = CompletableDeferred()
+            val gate = h.transport.gateObservation!!
+            advanceUntilIdle()
+
+            assertNotNull(h.vm.ready().sunEvents, "computed before the fetch returned")
+            gate.complete(Unit)
+            advanceUntilIdle()
+        }
+
+    @Test
+    fun `refreshSunTimes re-works them for the new now`() = runTest(dispatcher) {
+        // "Next" decays with the clock. Nothing else in the ViewModel would
+        // notice, so this is the whole defence against a passed sunrise still
+        // being presented as the coming one.
+        var now = Instant.parse("2026-08-13T09:00:00Z") // before sunrise
+        val h = harness(config = ViewConfig.DEFAULT.setShowSunTimes(true), clock = { now })
+        advanceUntilIdle()
+        val first = h.vm.ready().sunEvents!!.sunrise
+
+        // Step past that sunrise; the next one is now tomorrow's.
+        now = first!!.plusSeconds(60)
+        h.vm.refreshSunTimes()
+        advanceUntilIdle()
+        val second = h.vm.ready().sunEvents!!.sunrise
+        assertTrue(second!!.isAfter(first), "the sunrise that passed must not still be 'next'")
     }
 
     private companion object {

@@ -26,7 +26,10 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import io.raylytics.justmyweather.alerts.AlertWorker
@@ -40,10 +43,18 @@ import io.raylytics.justmyweather.ui.theme.JustMyWeatherTheme
 import io.raylytics.justmyweather.ui.theme.ThemeViewModel
 import io.raylytics.justmyweather.ui.theme.themeResolvesToDark
 import io.raylytics.justmyweather.view.ThemeConfig
+import kotlinx.coroutines.delay
+import kotlin.time.Duration.Companion.minutes
 
 /** The screens this app has. A plain enum + state switch is all the navigation
  * a handful of destinations need — no nav library to learn or wire. */
 private enum class Screen { HOME, CUSTOMIZE, ALERTS }
+
+/** How often the sun times are re-worked while the app is in front. A minute
+ * is finer than the values themselves, which move by seconds a day; the point
+ * of the timer is the boundary — being on the right side of a sunset within a
+ * minute of it happening. */
+private val SUN_TIME_TICK = 1.minutes
 
 class MainActivity : ComponentActivity() {
     private val container by lazy { (application as JustMyWeatherApp).container }
@@ -184,6 +195,26 @@ private fun App(
     onEnterAlerts: () -> Unit,
 ) {
     var screen by rememberSaveable { mutableStateOf(Screen.HOME) }
+
+    // Keep "next sunrise / next sunset" actually next. The value decays with
+    // the clock rather than with the data, so nothing about a fetch would
+    // catch it: a glance left open — or backgrounded at 5am and reopened at
+    // 9am — would otherwise name a sunrise that has already happened.
+    //
+    // Gated on RESUMED so it re-works the moment the user comes back and
+    // costs nothing while they are elsewhere. Driven from here rather than
+    // from inside HomeScreen because this is the edge that already knows
+    // about lifecycle, and it leaves the screen a pure function of its state.
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(lifecycle, homeViewModel) {
+        lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            while (true) {
+                homeViewModel.refreshSunTimes()
+                delay(SUN_TIME_TICK)
+            }
+        }
+    }
+
     when (screen) {
         Screen.HOME -> {
             val state by homeViewModel.state.collectAsStateWithLifecycle()
