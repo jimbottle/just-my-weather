@@ -1,15 +1,17 @@
 package io.raylytics.justmyweather.ui.home
 
 import androidx.activity.ComponentActivity
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import io.raylytics.justmyweather.data.SunEvents
 import org.junit.After
-import org.junit.Assume.assumeTrue
 import org.junit.Rule
 import org.junit.Test
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 
 /**
@@ -22,6 +24,14 @@ import java.time.ZoneId
  * recomposed. Only "now" has moved, so only a clock held as state inside the
  * row can catch it. Without that, the row goes on saying "tomorrow" about a
  * sunrise happening in six hours.
+ *
+ * Every instant below is BUILT FROM the device's own zone rather than
+ * hardcoded in UTC. The row formats in [ZoneId.systemDefault], so fixed UTC
+ * instants would straddle local midnight at exactly one offset: the test would
+ * fail against correct code in US Central and westward, and skip itself
+ * entirely on a default GMT emulator image — a result decided by the device's
+ * settings rather than by the code. Derived this way the crossing is real in
+ * every zone, and no assumption or skip is needed.
  */
 class SunTimesRowTest {
     @get:Rule
@@ -34,49 +44,57 @@ class SunTimesRowTest {
         compose.mainClock.autoAdvance = true
     }
 
-    // Fixed events either side of a local midnight in New York: sunset this
-    // evening, sunrise the following morning. Deliberately never changed.
-    private val sunset: Instant = Instant.parse("2026-08-13T23:56:00Z") // 7:56 PM EDT the 13th
-    private val sunrise: Instant = Instant.parse("2026-08-14T10:05:00Z") // 6:05 AM EDT the 14th
-    private val events = SunEvents(sunrise = sunrise, sunset = sunset)
+    private val zone: ZoneId = ZoneId.systemDefault()
+    private val day: LocalDate = LocalDate.of(2026, 8, 13)
+
+    private fun localInstant(date: LocalDate, hour: Int, minute: Int): Instant =
+        date.atTime(hour, minute).atZone(zone).toInstant()
+
+    // Both events fall on the morning and evening AFTER the crossing, so they
+    // are in the future from either side of it — and, crucially, they never
+    // change. Only the clock moves.
+    private val events =
+        SunEvents(
+            sunrise = localInstant(day.plusDays(1), 6, 5),
+            sunset = localInstant(day.plusDays(1), 20, 30),
+        )
 
     @Test
     fun theDayQualifierFollowsTheClockEvenWhenTheEventsDoNot() {
-        // The row formats in the device's zone; this case is only meaningful
-        // where the two instants straddle local midnight.
-        assumeTrue(
-            "needs a zone where these instants straddle midnight",
-            ZoneId.systemDefault().rules.getOffset(sunrise).totalSeconds <= -4 * 3600,
-        )
         compose.mainClock.autoAdvance = false
-        var fakeNow = Instant.parse("2026-08-14T03:59:00Z") // 11:59 PM EDT on the 13th
+        var fakeNow = localInstant(day, 23, 59)
         compose.setContent { SunTimesRow(events) { fakeNow } }
         compose.mainClock.advanceTimeByFrame()
 
-        // Before midnight, that sunrise genuinely belongs to tomorrow.
-        compose.onNodeWithText("tomorrow", substring = true).assertIsDisplayed()
+        // A minute before midnight both events belong to tomorrow — asserting
+        // the count, not "at least one", so the row is pinned rather than
+        // merely probed.
+        compose.onAllNodesWithText("tomorrow", substring = true).assertCountEquals(2)
 
-        // Six minutes later it is the small hours of the 14th. The events are
-        // untouched — same objects, same instants — so nothing upstream emits.
-        fakeNow = Instant.parse("2026-08-14T04:05:00Z") // 12:05 AM EDT on the 14th
+        // Six minutes later it is the small hours of the next day. The events
+        // are untouched — same object, same instants — so nothing upstream
+        // emits and nothing recomposes unless the row's own clock moved.
+        fakeNow = localInstant(day.plusDays(1), 0, 5)
         compose.mainClock.advanceTimeBy(SUN_TICK.inWholeMilliseconds + 1)
         compose.mainClock.advanceTimeByFrame()
         compose.mainClock.advanceTimeByFrame()
 
-        compose.onNodeWithText("tomorrow", substring = true).assertDoesNotExist()
+        compose.onAllNodesWithText("tomorrow", substring = true).assertCountEquals(0)
     }
 
     @Test
     fun aMissingEventRendersAsADashRatherThanVanishing() {
-        // Polar night is a real state, not an error. The row must stay put so
-        // the absence reads as "the sun is not doing that", rather than the
-        // element quietly disappearing for a season.
+        // Polar night is a real state, not an error. Both halves matter: the
+        // labels stay so the absence reads as "the sun is not doing that", and
+        // the value is a visible dash rather than an empty gap that looks like
+        // a value failed to load.
         compose.mainClock.autoAdvance = false
-        val now = Instant.parse("2026-12-21T12:00:00Z")
+        val now = localInstant(day, 12, 0)
         compose.setContent { SunTimesRow(SunEvents(sunrise = null, sunset = null)) { now } }
         compose.mainClock.advanceTimeByFrame()
 
         compose.onNodeWithText("Sunrise").assertIsDisplayed()
         compose.onNodeWithText("Sunset").assertIsDisplayed()
+        compose.onAllNodesWithText("—").assertCountEquals(2)
     }
 }
