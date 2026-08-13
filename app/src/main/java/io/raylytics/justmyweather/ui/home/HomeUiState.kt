@@ -1,5 +1,6 @@
 package io.raylytics.justmyweather.ui.home
 
+import io.raylytics.justmyweather.data.SunEvents
 import io.raylytics.justmyweather.data.WeatherSnapshot
 import io.raylytics.justmyweather.data.nws.ActiveAlert
 import io.raylytics.justmyweather.data.nws.DailyPeriod
@@ -44,6 +45,13 @@ sealed interface HomeUiState {
          * tells the user how old that reading now is.
          */
         val refreshError: String? = null,
+        /**
+         * The next sunrise and sunset, or null when the user hasn't switched
+         * them on. Either event inside can still be null on its own: above the
+         * Arctic circle the sun may not rise for months, and saying nothing is
+         * better than inventing a time.
+         */
+        val sunEvents: SunEvents? = null,
     ) : HomeUiState
 
     /** Network or NWS failure, with a short plain-language message. */

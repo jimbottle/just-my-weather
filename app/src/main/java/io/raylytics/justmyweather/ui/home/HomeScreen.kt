@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
+import io.raylytics.justmyweather.data.SunEvents
 import io.raylytics.justmyweather.data.WeatherSnapshot
 import io.raylytics.justmyweather.data.nws.ActiveAlert
 import io.raylytics.justmyweather.data.nws.DailyPeriod
@@ -151,6 +152,13 @@ private fun GlanceView(
         // The Now glance always leads — the framing below adds to it rather
         // than replacing it, so the screen answers "right now" AND "ahead".
         NowContent(snapshot = snapshot, config = config)
+
+        // Its own element rather than two more label · value rows: these are
+        // computed, not measured, they come as a pair that reads as one fact,
+        // and sitting among the station's readings would imply the station
+        // reported them. Directly under the glance because the sun is part of
+        // "what is it like right now", not part of the forecast below.
+        state.sunEvents?.let { SunTimesRow(events = it) }
 
         // The counterpart to "Observed" above: everything below this line is
         // model output, not measurement. Only rendered when a forecast framing
@@ -444,6 +452,52 @@ internal fun ObservedLine(
         style = MaterialTheme.typography.labelMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
+}
+
+/**
+ * "Sunrise 6:52 AM · Sunset 8:31 PM" — the next of each, side by side.
+ *
+ * Both are the NEXT occurrence, so from mid-afternoon onwards the sunrise is
+ * tomorrow's and [SunLabel] says so. Ordering is fixed (sunrise then sunset)
+ * rather than soonest-first: a pair whose order changed through the day would
+ * make the user re-read the labels every time instead of the values.
+ *
+ * A missing event renders as "—", which happens for real above the Arctic
+ * circle. Dropping the pair entirely would be worse: the row would silently
+ * vanish for months, looking like a bug rather than like polar night.
+ */
+@Composable
+private fun SunTimesRow(events: SunEvents) {
+    val zone = ZoneId.systemDefault()
+    val now = Instant.now()
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(20.dp),
+        modifier = Modifier.padding(top = 4.dp),
+    ) {
+        SunTime("Sunrise", events.sunrise, now, zone)
+        SunTime("Sunset", events.sunset, now, zone)
+    }
+}
+
+@Composable
+private fun SunTime(
+    label: String,
+    event: Instant?,
+    now: Instant,
+    zone: ZoneId,
+) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = event?.let { SunLabel.format(it, now, zone, timeFormat) } ?: "—",
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onBackground,
+        )
+    }
 }
 
 /** The mode chips. A horizontally scrolling row rather than FlowRow so future

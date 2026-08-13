@@ -1,6 +1,8 @@
 package io.raylytics.justmyweather.view
 
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class ViewConfigCodecTest {
@@ -132,5 +134,18 @@ class ViewConfigCodecTest {
             "",
         )
         assertEquals(AlertBannerPosition.TOP, ViewConfigCodec.decode(legacy).alertBannerPosition)
+    }
+
+    @Test
+    fun `sun times survive a round trip and default off for a config written before them`() {
+        val on = ViewConfig.DEFAULT.setShowSunTimes(true)
+        assertTrue(ViewConfigCodec.decode(ViewConfigCodec.encode(on)).showSunTimes)
+        assertFalse(ViewConfigCodec.decode(ViewConfigCodec.encode(ViewConfig.DEFAULT)).showSunTimes)
+
+        // A config persisted before the option existed carries no such key.
+        // It must decode to OFF — an opt-in that switches itself on during an
+        // app update is not opt-in.
+        val legacy = """{"density":"cozy","items":[{"key":"temperature","visible":true}]}"""
+        assertFalse(ViewConfigCodec.decode(legacy).showSunTimes)
     }
 }

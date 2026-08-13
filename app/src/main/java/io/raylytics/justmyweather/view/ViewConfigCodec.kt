@@ -35,6 +35,9 @@ object ViewConfigCodec {
         // Defaulted like every field here, so a config written before the
         // safety banner existed still decodes.
         val alertBannerPosition: String = AlertBannerPosition.DEFAULT.key,
+        // Defaulted false so a config written before sun times existed decodes
+        // to the feature being off, rather than switching itself on.
+        val showSunTimes: Boolean = false,
         val items: List<StoredSetting> = emptyList(),
     )
 
@@ -49,6 +52,7 @@ object ViewConfigCodec {
                 dailyLayout = config.dailyLayout.key,
                 hourlyLayout = config.hourlyLayout.key,
                 alertBannerPosition = config.alertBannerPosition.key,
+                showSunTimes = config.showSunTimes,
                 items = config.items.map { StoredSetting(it.field.key, it.visible, it.customLabel) },
             ),
         )
@@ -96,6 +100,7 @@ object ViewConfigCodec {
             dailyLayout,
             hourlyLayout,
             bannerPosition,
+            stored.showSunTimes,
         )
     }
 }

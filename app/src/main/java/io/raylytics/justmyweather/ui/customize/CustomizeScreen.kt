@@ -71,6 +71,7 @@ fun CustomizeScreen(
     onSetDailyLayout: (ForecastLayout) -> Unit,
     onSetHourlyLayout: (ForecastLayout) -> Unit,
     onSetAlertBannerPosition: (AlertBannerPosition) -> Unit,
+    onSetShowSunTimes: (Boolean) -> Unit,
     theme: ThemeConfig,
     onThemeChange: (ThemeConfig) -> Unit,
     gadgetbridgeEnabled: Boolean,
@@ -137,6 +138,7 @@ fun CustomizeScreen(
                     position = config.alertBannerPosition,
                     onSelect = onSetAlertBannerPosition,
                 )
+                SunTimesToggle(enabled = config.showSunTimes, onChange = onSetShowSunTimes)
                 GadgetbridgeToggle(enabled = gadgetbridgeEnabled, onChange = onSetGadgetbridgeEnabled)
             }
         }
@@ -174,6 +176,45 @@ private fun GadgetbridgeToggle(
         Text(
             text = "Hands each new reading to Gadgetbridge, which passes it to a paired watch. " +
                 "Does nothing if Gadgetbridge isn't installed.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+/**
+ * The next sunrise and sunset on the glance. Off by default, like everything
+ * optional here: the shipped view is the calm minimum.
+ *
+ * Says where the times come from, because "computed, not fetched" is the
+ * answer to both questions this raises — why they work with no signal, and why
+ * they might differ by a minute from another app's.
+ */
+@Composable
+private fun SunTimesToggle(
+    enabled: Boolean,
+    onChange: (Boolean) -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text("Sun", style = MaterialTheme.typography.labelMedium)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("Show sunrise and sunset", style = MaterialTheme.typography.bodyLarge)
+            Switch(
+                checked = enabled,
+                onCheckedChange = onChange,
+                modifier = Modifier.testTag("sun-times-toggle"),
+            )
+        }
+        Text(
+            text = "The next sunrise and sunset for your location. Worked out on your device " +
+                "from the date and where you are, so they need no connection.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

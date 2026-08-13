@@ -216,6 +216,7 @@ private fun App(
                 onSetDailyLayout = customizeViewModel::setDailyLayout,
                 onSetHourlyLayout = customizeViewModel::setHourlyLayout,
                 onSetAlertBannerPosition = customizeViewModel::setAlertBannerPosition,
+                onSetShowSunTimes = customizeViewModel::setShowSunTimes,
                 theme = themeConfig,
                 onThemeChange = onThemeChange,
                 gadgetbridgeEnabled = gadgetbridgeEnabled,

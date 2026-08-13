@@ -3,6 +3,8 @@ package io.raylytics.justmyweather.ui.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.raylytics.justmyweather.alerts.SafetyAlerts
+import io.raylytics.justmyweather.data.SunEvents
+import io.raylytics.justmyweather.data.SunTimes
 import io.raylytics.justmyweather.data.ViewConfigRepository
 import io.raylytics.justmyweather.data.WeatherLocation
 import io.raylytics.justmyweather.data.WeatherRepository
@@ -20,6 +22,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.time.Instant
 
 /**
  * Drives the default home glance. Two independent inputs flow in: the weather
@@ -46,6 +49,8 @@ class HomeViewModel(
      * MainActivity. Defaults to doing nothing, which is also what tests want.
      */
     private val onSnapshotLoaded: suspend (WeatherSnapshot) -> Unit = {},
+    /** Injected so the sun times are testable without waiting for dawn. */
+    private val clock: () -> Instant = Instant::now,
 ) : ViewModel() {
     private val weather = MutableStateFlow<WeatherLoad>(WeatherLoad.Loading)
     private val forecasts = MutableStateFlow(ForecastLoad())
@@ -57,6 +62,14 @@ class HomeViewModel(
      * error for the zone is not a reason to show an error screen.
      */
     private val safetyAlerts = MutableStateFlow<List<ActiveAlert>>(emptyList())
+
+    /**
+     * The next sunrise and sunset, recomputed whenever we resolve a location.
+     * Not fetched — see [SunTimes] — so this costs nothing and works offline;
+     * it is held separately from the weather because it has no dependency on
+     * the fetch succeeding.
+     */
+    private val sunEvents = MutableStateFlow<SunEvents?>(null)
 
     /** null = follow the config's default; set once the user taps a chip. */
     private val chosenMode = MutableStateFlow<ViewMode?>(null)
@@ -72,9 +85,13 @@ class HomeViewModel(
             chosen ?: config.defaultMode
         }.stateIn(viewModelScope, SharingStarted.Eagerly, ViewMode.DEFAULT)
 
+    /** Paired so the five-flow limit of the typed [combine] still fits: these
+     * two are the "what to show for right now" half of the screen. */
+    private val glance = combine(weather, sunEvents) { load, sun -> load to sun }
+
     val state: StateFlow<HomeUiState> =
-        combine(weather, configRepository.config, mode, forecasts, safetyAlerts) {
-                load, config, mode, forecasts, alerts ->
+        combine(glance, configRepository.config, mode, forecasts, safetyAlerts) {
+                (load, sun), config, mode, forecasts, alerts ->
             when (load) {
                 is WeatherLoad.Loading -> HomeUiState.Loading
                 is WeatherLoad.Error -> HomeUiState.Error(load.message)
@@ -96,6 +113,9 @@ class HomeViewModel(
                             },
                         safetyAlerts = alerts,
                         refreshError = load.error,
+                        // Gated here rather than in the composable so the
+                        // screen renders exactly what the state says.
+                        sunEvents = sun.takeIf { config.showSunTimes },
                     )
             }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUiState.Loading)
@@ -154,6 +174,9 @@ class HomeViewModel(
             // pre-refresh data can never be resurrected past the clear.
             forecastMutex.withLock { forecasts.value = ForecastLoad() }
             val location = currentLocation()
+            // Before the fetch, and independent of it: pure arithmetic that
+            // cannot fail, so the sun times still appear on a dead network.
+            sunEvents.value = SunTimes.next(location.latitude, location.longitude, clock())
             val result = runCatching { repository.load(location) }
             weather.value =
                 result.fold(

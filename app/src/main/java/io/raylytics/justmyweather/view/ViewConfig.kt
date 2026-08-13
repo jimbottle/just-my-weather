@@ -39,6 +39,12 @@ data class ViewConfig(
     val hourlyLayout: ForecastLayout = ForecastLayout.DEFAULT,
     /** Where a safety-alert banner sits on the days there is one. */
     val alertBannerPosition: AlertBannerPosition = AlertBannerPosition.DEFAULT,
+    /**
+     * Whether the next sunrise and sunset show on the glance. Off by default,
+     * like every other addition: the shipped view is the calm minimum, and
+     * anything extra is something you go and turn on.
+     */
+    val showSunTimes: Boolean = false,
 ) {
     val visible: List<FieldSetting> get() = items.filter { it.visible }
 
@@ -60,6 +66,8 @@ data class ViewConfig(
 
     fun setAlertBannerPosition(position: AlertBannerPosition): ViewConfig =
         copy(alertBannerPosition = position)
+
+    fun setShowSunTimes(show: Boolean): ViewConfig = copy(showSunTimes = show)
 
     fun moveUp(index: Int): ViewConfig = swap(index, index - 1)
 
@@ -102,6 +110,7 @@ data class ViewConfig(
             dailyLayout: ForecastLayout = ForecastLayout.DEFAULT,
             hourlyLayout: ForecastLayout = ForecastLayout.DEFAULT,
             alertBannerPosition: AlertBannerPosition = AlertBannerPosition.DEFAULT,
+            showSunTimes: Boolean = false,
         ): ViewConfig {
             val seen = LinkedHashMap<WeatherField, FieldSetting>()
             settings.forEach { setting -> seen.putIfAbsent(setting.field, setting) }
@@ -116,6 +125,7 @@ data class ViewConfig(
                 dailyLayout,
                 hourlyLayout,
                 alertBannerPosition,
+                showSunTimes,
             )
         }
     }

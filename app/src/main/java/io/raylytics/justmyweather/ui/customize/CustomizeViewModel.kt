@@ -61,6 +61,8 @@ class CustomizeViewModel(
 
     fun setAlertBannerPosition(position: AlertBannerPosition) = edit { it.setAlertBannerPosition(position) }
 
+    fun setShowSunTimes(show: Boolean) = edit { it.setShowSunTimes(show) }
+
     private fun edit(transform: (ViewConfig) -> ViewConfig) {
         viewModelScope.launch { repository.save(transform(config.value)) }
     }
