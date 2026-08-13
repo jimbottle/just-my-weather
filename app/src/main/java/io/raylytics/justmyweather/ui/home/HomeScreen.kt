@@ -75,8 +75,10 @@ private const val LABEL_WIDTH_SHARE = 0.55f
 
 /** The space between a field's label and its value. Wide enough to read as two
  * things, narrow enough that they still read as one row — the gap is what made
- * a value look like a button when it was the whole width of the block. */
-private val VALUE_GAP = 12.dp
+ * a value look like a button when it was the whole width of the block.
+ * Internal so FieldRowsTest asserts against this value rather than a copy of
+ * it that could drift. */
+internal val VALUE_GAP = 12.dp
 
 /** How often the observation age re-reads the clock. See [ObservedLine].
  * Internal so the instrumented test steps the clock by exactly one tick

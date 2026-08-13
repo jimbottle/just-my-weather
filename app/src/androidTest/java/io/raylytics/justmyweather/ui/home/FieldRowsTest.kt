@@ -49,6 +49,10 @@ class FieldRowsTest {
     private fun widthOf(text: String): Dp =
         compose.onNodeWithText(text).getUnclippedBoundsInRoot().let { it.right - it.left }
 
+    private fun leftOf(text: String): Dp = compose.onNodeWithText(text).getUnclippedBoundsInRoot().left
+
+    private fun rightOf(text: String): Dp = compose.onNodeWithText(text).getUnclippedBoundsInRoot().right
+
     @Test
     fun shortLabelLeavesTheValueMostOfTheRow() {
         // The case that distinguishes "shared width" from a 50/50 cap: under
@@ -87,6 +91,29 @@ class FieldRowsTest {
     fun aShortPairIsNotStretchedApart() {
         show(label = "Wind", value = "8 mph")
         assertTrue(widthOf("Wind") < 100.dp)
+
+        // The point of the pair, and the thing every width assertion in this
+        // file is blind to: WHERE the value starts. The value is weighted, so
+        // its width is the row's remainder under any arrangement — only its
+        // left edge moves, which is why no width check can see this and why
+        // reverting the layout once left the whole suite green.
+        //
+        // Under SpaceBetween the weighted value ate all the slack, so its node
+        // sat flush against the label (gap 0) while TextAlign.End threw the
+        // glyphs to the far side of the row — and a lone word out there was
+        // twice mistaken for a button.
+        //
+        // What this pins is the arrangement. The alignment inside the node is
+        // NOT observable through bounds: with a weighted child, End and Start
+        // give identical node edges and differ only in where the glyphs land.
+        // TextAlign.Start is also Compose's default, so losing it takes an
+        // explicit TextAlign.End rather than a deletion — a deliberate act,
+        // not a silent drift.
+        val gap = leftOf("8 mph") - rightOf("Wind")
+        assertTrue(
+            "value must start one gap after the label, got $gap (expected about $VALUE_GAP)",
+            gap > VALUE_GAP - 2.dp && gap < VALUE_GAP + 2.dp,
+        )
     }
 
     @Test
