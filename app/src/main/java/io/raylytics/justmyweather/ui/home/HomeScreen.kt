@@ -60,13 +60,23 @@ import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * How much of a label/value row the label may occupy before it ellipsizes.
+ * How much of a label/value row the label may occupy before it ellipsizes,
+ * measured against the row MINUS [VALUE_GAP] — the gap is overhead both sides
+ * share, and charging it to neither is how the value's guaranteed floor got
+ * broken when the gap was introduced.
  *
  * Sized so the longest built-in label still fits ("Precip (last hr)" is about
  * 46% of the narrowest block) while a runaway custom label cannot crowd the
- * value out. Everything the label does not use goes to the value.
+ * value out. Everything the label does not use goes to the value. Lowered from
+ * 0.6 when the gap arrived: at the narrow end a 12dp gap plus a 60% label left
+ * the value under the floor FieldRowsTest guarantees it.
  */
-private const val LABEL_WIDTH_SHARE = 0.6f
+private const val LABEL_WIDTH_SHARE = 0.55f
+
+/** The space between a field's label and its value. Wide enough to read as two
+ * things, narrow enough that they still read as one row — the gap is what made
+ * a value look like a button when it was the whole width of the block. */
+private val VALUE_GAP = 12.dp
 
 /** How often the observation age re-reads the clock. See [ObservedLine].
  * Internal so the instrumented test steps the clock by exactly one tick
@@ -260,7 +270,10 @@ internal fun FieldRows(
     modifier: Modifier = Modifier,
 ) {
     BoxWithConstraints(modifier = modifier.widthIn(max = blockMaxWidth)) {
-        val labelCap = maxWidth * LABEL_WIDTH_SHARE
+        // The gap comes off the top: what the two of them then split is the
+        // space actually available to text, so the value's share is a share of
+        // something real rather than of a row it does not entirely get.
+        val labelCap = (maxWidth - VALUE_GAP) * LABEL_WIDTH_SHARE
         Column(verticalArrangement = Arrangement.spacedBy(rowSpacing)) {
             rows.forEach { row ->
                 // CAP the label, then give the value everything left over.
@@ -280,7 +293,24 @@ internal fun FieldRows(
                 // cap instead of starving the value. The label gives way rather
                 // than the value because the user chose the label and knows what
                 // it says.
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                // The value sits NEXT TO its label, not against the far edge.
+                //
+                // SpaceBetween put a short value — "Clear", "8 mph" — alone at
+                // the right of a 240-280dp block, a hand's width from the word
+                // it belongs to. That is the geometry of a settings row with a
+                // trailing action, and it was read as one twice: "Clear" was
+                // taken for a Clear/reset control both times, the second time
+                // even though the accent colour already marked the real
+                // controls. Colour was not enough because position spoke
+                // louder. Held together, the pair reads as one fact.
+                //
+                // The value still takes the remaining width (weight), so a long
+                // NWS condition has the whole row to wrap into — it simply
+                // starts at the label rather than ending at the edge.
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(VALUE_GAP),
+                ) {
                     Text(
                         text = row.label,
                         style = MaterialTheme.typography.bodyMedium,
@@ -293,7 +323,7 @@ internal fun FieldRows(
                         text = row.value,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onBackground,
-                        textAlign = TextAlign.End,
+                        textAlign = TextAlign.Start,
                         modifier = Modifier.weight(1f),
                     )
                 }
