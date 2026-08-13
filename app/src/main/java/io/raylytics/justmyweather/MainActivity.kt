@@ -39,22 +39,16 @@ import io.raylytics.justmyweather.ui.customize.CustomizeScreen
 import io.raylytics.justmyweather.ui.customize.CustomizeViewModel
 import io.raylytics.justmyweather.ui.home.HomeScreen
 import io.raylytics.justmyweather.ui.home.HomeViewModel
+import io.raylytics.justmyweather.ui.home.SUN_TICK
 import io.raylytics.justmyweather.ui.theme.JustMyWeatherTheme
 import io.raylytics.justmyweather.ui.theme.ThemeViewModel
 import io.raylytics.justmyweather.ui.theme.themeResolvesToDark
 import io.raylytics.justmyweather.view.ThemeConfig
 import kotlinx.coroutines.delay
-import kotlin.time.Duration.Companion.minutes
 
 /** The screens this app has. A plain enum + state switch is all the navigation
  * a handful of destinations need — no nav library to learn or wire. */
 private enum class Screen { HOME, CUSTOMIZE, ALERTS }
-
-/** How often the sun times are re-worked while the app is in front. A minute
- * is finer than the values themselves, which move by seconds a day; the point
- * of the timer is the boundary — being on the right side of a sunset within a
- * minute of it happening. */
-private val SUN_TIME_TICK = 1.minutes
 
 class MainActivity : ComponentActivity() {
     private val container by lazy { (application as JustMyWeatherApp).container }
@@ -210,7 +204,7 @@ private fun App(
         lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
             while (true) {
                 homeViewModel.refreshSunTimes()
-                delay(SUN_TIME_TICK)
+                delay(SUN_TICK)
             }
         }
     }

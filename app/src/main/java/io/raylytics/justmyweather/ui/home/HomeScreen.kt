@@ -56,6 +56,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.roundToInt
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -71,6 +72,13 @@ private const val LABEL_WIDTH_SHARE = 0.6f
  * Internal so the instrumented test steps the clock by exactly one tick
  * instead of hardcoding a number that could drift from this one. */
 internal val AGE_TICK = 30.seconds
+
+/** How often the sun row re-reads the clock, and how often MainActivity asks
+ * the ViewModel to re-work the events. One constant because the two halves are
+ * one behaviour: which event is next, and which day it falls on. A minute is
+ * finer than the values move; the point is being on the right side of a
+ * boundary within a minute of crossing it. */
+internal val SUN_TICK = 1.minutes
 
 /**
  * The home view. Out of the box it's a calm single glance; once the user edits
@@ -467,9 +475,29 @@ internal fun ObservedLine(
  * vanish for months, looking like a bug rather than like polar night.
  */
 @Composable
-private fun SunTimesRow(events: SunEvents) {
+internal fun SunTimesRow(
+    events: SunEvents,
+    /** The wall clock, injectable so the day-boundary behaviour is testable. */
+    clock: () -> Instant = Instant::now,
+) {
     val zone = ZoneId.systemDefault()
-    val now = Instant.now()
+    // Held as ticking state, not read straight into composition. The events
+    // themselves do NOT change across local midnight — at 23:59 and at 00:05
+    // the next sunrise is the same instant — so the state carrying them is
+    // structurally equal, the StateFlow conflates it, and this row is never
+    // recomposed. A clock read inline would therefore stay on yesterday's side
+    // of midnight and keep saying "tomorrow" about a sunrise happening this
+    // morning. Only "now" moves in that scenario, so only "now" can drive it.
+    var now by remember { mutableStateOf(clock()) }
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(lifecycle) {
+        lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            while (true) {
+                now = clock()
+                delay(SUN_TICK)
+            }
+        }
+    }
     Row(
         horizontalArrangement = Arrangement.spacedBy(20.dp),
         modifier = Modifier.padding(top = 4.dp),
