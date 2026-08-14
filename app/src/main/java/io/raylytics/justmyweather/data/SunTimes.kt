@@ -1,8 +1,8 @@
 package io.raylytics.justmyweather.data
 
-import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.ZoneOffset
 import kotlin.math.abs
 import kotlin.math.acos
@@ -34,23 +34,24 @@ import kotlin.math.tan
  * open-meteo agree with each other and with this. Check against those.
  */
 
-/** The next sunrise and sunset after some moment. Either is null when the sun
- * does not do that thing within the search window — see [SunTimes.next]. */
-data class SunEvents(
+/**
+ * One day's sunrise and sunset, as they fall on that LOCAL date.
+ *
+ * A day rather than "the next of each", because those two are not the same
+ * day for most of the waking hours: from sunrise until sunset, tonight's
+ * sunset belongs to today while the next sunrise belongs to tomorrow. Keyed to
+ * a date, each time is unambiguous without a qualifier hung off it.
+ *
+ * Either may be null. Above the Arctic circle the sun can decline to rise or
+ * set for months, and saying nothing is better than inventing a time.
+ */
+data class SunDay(
+    val date: LocalDate,
     val sunrise: Instant?,
     val sunset: Instant?,
 )
 
 object SunTimes {
-    /**
-     * How far ahead to look. Three days covers every latitude where the sun
-     * rises and sets daily, plus the shoulder either side of a polar summer
-     * or winter. Beyond that the honest answer is "not soon", which is what a
-     * null says — better than printing a date months away as if it were a
-     * time of day.
-     */
-    private const val SEARCH_DAYS = 3
-
     private const val MINUTES_PER_DAY = 1440.0
 
     /**
@@ -67,32 +68,42 @@ object SunTimes {
     private const val REFINEMENTS = 2
 
     /**
-     * The next sunrise and sunset strictly after [from] at this coordinate.
+     * [count] days of sun times starting at [start], in [zone].
      *
-     * Each is searched independently, because they are independent questions:
-     * at three in the afternoon the next sunset is tonight and the next
-     * sunrise is tomorrow, and a caller that assumed they came from the same
-     * day would show yesterday's sunrise half the time.
+     * The caller gets whole days and picks the one it wants, rather than being
+     * handed a "next" that silently spans two dates.
      */
-    fun next(latitude: Double, longitude: Double, from: Instant): SunEvents =
-        SunEvents(
-            sunrise = nextEvent(latitude, longitude, from, rising = true),
-            sunset = nextEvent(latitude, longitude, from, rising = false),
+    fun daysFrom(
+        latitude: Double,
+        longitude: Double,
+        start: LocalDate,
+        zone: ZoneId,
+        count: Int,
+    ): List<SunDay> = (0 until count).map { forDate(latitude, longitude, start.plusDays(it.toLong()), zone) }
+
+    /** Sunrise and sunset falling on the local date [date] in [zone]. */
+    fun forDate(latitude: Double, longitude: Double, date: LocalDate, zone: ZoneId): SunDay =
+        SunDay(
+            date = date,
+            sunrise = eventOnLocalDate(latitude, longitude, date, zone, rising = true),
+            sunset = eventOnLocalDate(latitude, longitude, date, zone, rising = false),
         )
 
-    private fun nextEvent(latitude: Double, longitude: Double, from: Instant, rising: Boolean): Instant? {
-        // Start a day early: the UTC date rolls at a different moment than the
-        // local one, so "today" at this longitude may still be yesterday in UTC
-        // and its event may not have happened yet.
-        val start = from.atZone(ZoneOffset.UTC).toLocalDate().minusDays(1)
-        for (offset in 0..(SEARCH_DAYS + 1)) {
-            val event = eventOn(start.plusDays(offset.toLong()), latitude, longitude, rising)
-            if (event != null && event.isAfter(from)) {
-                // Cheap guard against returning something absurd if the search
-                // window is ever widened without revisiting this.
-                if (Duration.between(from, event) <= Duration.ofDays(SEARCH_DAYS.toLong())) return event
-                return null
-            }
+    /**
+     * The event that lands on local date [date]. [eventOn] works in UTC dates,
+     * and a local date straddles two of them at every offset but zero — so try
+     * the neighbours and keep whichever actually falls on the day asked for.
+     */
+    private fun eventOnLocalDate(
+        latitude: Double,
+        longitude: Double,
+        date: LocalDate,
+        zone: ZoneId,
+        rising: Boolean,
+    ): Instant? {
+        for (offset in -1..1) {
+            val event = eventOn(date.plusDays(offset.toLong()), latitude, longitude, rising) ?: continue
+            if (event.atZone(zone).toLocalDate() == date) return event
         }
         return null
     }

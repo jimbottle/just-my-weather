@@ -1,6 +1,6 @@
 package io.raylytics.justmyweather.ui.home
 
-import io.raylytics.justmyweather.data.SunEvents
+import io.raylytics.justmyweather.data.SunDay
 import io.raylytics.justmyweather.data.WeatherSnapshot
 import io.raylytics.justmyweather.data.nws.ActiveAlert
 import io.raylytics.justmyweather.data.nws.DailyPeriod
@@ -46,12 +46,13 @@ sealed interface HomeUiState {
          */
         val refreshError: String? = null,
         /**
-         * The next sunrise and sunset, or null when the user hasn't switched
-         * them on. Either event inside can still be null on its own: above the
-         * Arctic circle the sun may not rise for months, and saying nothing is
-         * better than inventing a time.
+         * Sun times per day, today first — empty when the user hasn't switched
+         * them on. A day rather than "the next of each" because those two fall
+         * on different dates for most of the waking hours, and a row carrying
+         * its own date needs no qualifier. Either time within a day can still
+         * be null: above the Arctic circle the sun may not rise for months.
          */
-        val sunEvents: SunEvents? = null,
+        val sunDays: List<SunDay> = emptyList(),
     ) : HomeUiState
 
     /** Network or NWS failure, with a short plain-language message. */

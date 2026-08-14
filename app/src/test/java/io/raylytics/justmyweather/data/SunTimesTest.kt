@@ -1,11 +1,14 @@
 package io.raylytics.justmyweather.data
 
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import java.time.Duration
 import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 import kotlin.math.abs
 
 /**
@@ -38,88 +41,99 @@ class SunTimesTest {
 
     @Test
     fun `mid-latitude northern, matching USNO`() {
-        // Louisville, the developer's own sky. USNO: rise 10:56, set 00:40 (+1d).
-        val e = SunTimes.next(38.2527, -85.7585, Instant.parse("2026-08-13T09:00:00Z"))
-        assertNear("2026-08-13T10:56:00Z", e.sunrise, "Louisville sunrise")
-        assertNear("2026-08-14T00:40:00Z", e.sunset, "Louisville sunset")
+        // Louisville, the developer's own sky. USNO: rise 10:56Z, set 00:40Z —
+        // both of which are 13 August where he lives.
+        val day =
+            SunTimes.forDate(38.2527, -85.7585, LocalDate.of(2026, 8, 13), ZoneId.of("America/Kentucky/Louisville"))
+        assertNear("2026-08-13T10:56:00Z", day.sunrise, "Louisville sunrise")
+        assertNear("2026-08-14T00:40:00Z", day.sunset, "Louisville sunset")
     }
 
     @Test
     fun `the app's own default location`() {
-        // WeatherLocation.DEFAULT is New York, so this is what a fresh install
-        // with no location permission shows. USNO: rise 10:03, set 23:58.
-        val e = SunTimes.next(40.7128, -74.0060, Instant.parse("2026-08-13T09:00:00Z"))
-        assertNear("2026-08-13T10:03:00Z", e.sunrise, "New York sunrise")
-        assertNear("2026-08-13T23:58:00Z", e.sunset, "New York sunset")
+        // WeatherLocation.DEFAULT is New York. USNO: rise 10:03Z, set 23:58Z.
+        val day = SunTimes.forDate(40.7128, -74.0060, LocalDate.of(2026, 8, 13), ZoneId.of("America/New_York"))
+        assertNear("2026-08-13T10:03:00Z", day.sunrise, "New York sunrise")
+        assertNear("2026-08-13T23:58:00Z", day.sunset, "New York sunset")
     }
 
     @Test
     fun `high latitude in deep winter, where a coarse model goes wrong`() {
         // Reykjavik, 64°N, winter solstice: a four-hour day, and the case that
         // separates a good solar model from a passable one. USNO: 11:22, 15:29.
-        val e = SunTimes.next(64.1466, -21.9426, Instant.parse("2026-12-21T09:00:00Z"))
-        assertNear("2026-12-21T11:22:00Z", e.sunrise, "Reykjavik sunrise")
-        assertNear("2026-12-21T15:29:00Z", e.sunset, "Reykjavik sunset")
+        val day = SunTimes.forDate(64.1466, -21.9426, LocalDate.of(2026, 12, 21), ZoneId.of("Atlantic/Reykjavik"))
+        assertNear("2026-12-21T11:22:00Z", day.sunrise, "Reykjavik sunrise")
+        assertNear("2026-12-21T15:29:00Z", day.sunset, "Reykjavik sunset")
     }
 
     @Test
-    fun `southern hemisphere, where the seasons invert`() {
-        // Sydney. USNO: rise 20:36 (prev UTC day), set 07:24.
-        val e = SunTimes.next(-33.8688, 151.2093, Instant.parse("2026-08-12T19:00:00Z"))
-        assertNear("2026-08-12T20:36:00Z", e.sunrise, "Sydney sunrise")
-        assertNear("2026-08-13T07:24:00Z", e.sunset, "Sydney sunset")
+    fun `southern hemisphere, where the local date runs ahead of UTC`() {
+        // Sydney: the sunrise USNO reports at 20:36Z on the 12th is the MORNING
+        // of the 13th there. Asking by local date has to find it across that
+        // UTC boundary — the thing "the next of each" never had to do.
+        val day = SunTimes.forDate(-33.8688, 151.2093, LocalDate.of(2026, 8, 13), ZoneId.of("Australia/Sydney"))
+        assertNear("2026-08-12T20:36:00Z", day.sunrise, "Sydney sunrise")
+        assertNear("2026-08-13T07:24:00Z", day.sunset, "Sydney sunset")
     }
 
     @Test
     fun `the equator at an equinox`() {
         // Quito. USNO: 11:18, 23:24.
-        val e = SunTimes.next(-0.1807, -78.4678, Instant.parse("2026-03-20T09:00:00Z"))
-        assertNear("2026-03-20T11:18:00Z", e.sunrise, "Quito sunrise")
-        assertNear("2026-03-20T23:24:00Z", e.sunset, "Quito sunset")
+        val day = SunTimes.forDate(-0.1807, -78.4678, LocalDate.of(2026, 3, 20), ZoneId.of("America/Guayaquil"))
+        assertNear("2026-03-20T11:18:00Z", day.sunrise, "Quito sunrise")
+        assertNear("2026-03-20T23:24:00Z", day.sunset, "Quito sunset")
     }
 
     @Test
     fun `polar night and midnight sun have no answer, and say so`() {
         // Longyearbyen at 78°N. The sun does not rise in December nor set in
         // June, and null is the honest answer — not a fabricated time, and not
-        // a crash. This is why the return type is nullable at all.
-        val december = SunTimes.next(78.2232, 15.6267, Instant.parse("2026-12-21T09:00:00Z"))
+        // a crash. This is why the times are nullable at all.
+        val zone = ZoneId.of("Arctic/Longyearbyen")
+        val december = SunTimes.forDate(78.2232, 15.6267, LocalDate.of(2026, 12, 21), zone)
         assertNull(december.sunrise, "no sunrise during polar night")
         assertNull(december.sunset, "no sunset during polar night")
 
-        val june = SunTimes.next(78.2232, 15.6267, Instant.parse("2026-06-21T09:00:00Z"))
+        val june = SunTimes.forDate(78.2232, 15.6267, LocalDate.of(2026, 6, 21), zone)
         assertNull(june.sunrise, "no sunrise during midnight sun")
         assertNull(june.sunset, "no sunset during midnight sun")
     }
 
     @Test
-    fun `next means next — the two events come from different days when they must`() {
-        // Mid-afternoon in Louisville: tonight's sunset is hours away, but the
-        // next sunrise is tomorrow's. A caller that took both from "today"
-        // would show a sunrise that already happened.
-        val afternoon = Instant.parse("2026-08-13T19:00:00Z") // 3pm local
-        val e = SunTimes.next(38.2527, -85.7585, afternoon)
-        assertTrue(e.sunset!!.isAfter(afternoon), "sunset must be in the future")
-        assertTrue(e.sunrise!!.isAfter(e.sunset), "at 3pm the next sunrise follows the next sunset")
-        assertNear("2026-08-14T10:57:00Z", e.sunrise, "tomorrow's sunrise")
+    fun `a day's times always fall on that day, in every zone`() {
+        // The invariant the day rows rest on: a row headed with a date must not
+        // carry another date's times. Walked across zones either side of UTC
+        // and across a year, because the UTC date a local event belongs to
+        // shifts with both.
+        val places =
+            listOf(
+                Triple(38.2527, -85.7585, ZoneId.of("America/Kentucky/Louisville")),
+                Triple(-33.8688, 151.2093, ZoneId.of("Australia/Sydney")),
+                Triple(35.6762, 139.6503, ZoneId.of("Asia/Tokyo")),
+                // Kiritimati is UTC+14, the far edge of the date line.
+                Triple(1.9, -157.4, ZoneId.of("Pacific/Kiritimati")),
+                Triple(64.1466, -21.9426, ZoneId.of("Atlantic/Reykjavik")),
+            )
+        for ((lat, lon, zone) in places) {
+            for (month in 1..12) {
+                val date = LocalDate.of(2026, month, 15)
+                val day = SunTimes.forDate(lat, lon, date, zone)
+                day.sunrise?.let {
+                    assertEquals(date, it.atZone(zone).toLocalDate(), "sunrise off its date at $zone in $month")
+                }
+                day.sunset?.let {
+                    assertEquals(date, it.atZone(zone).toLocalDate(), "sunset off its date at $zone in $month")
+                }
+            }
+        }
     }
 
     @Test
-    fun `both events are always strictly in the future`() {
-        // Walk a day in twenty-minute steps at a mid-latitude and assert the
-        // invariant the UI depends on. The boundaries either side of an event
-        // are where an off-by-one day would show.
-        var from = Instant.parse("2026-08-13T00:00:00Z")
-        val end = from.plus(Duration.ofDays(1))
-        while (from.isBefore(end)) {
-            val e = SunTimes.next(38.2527, -85.7585, from)
-            assertTrue(e.sunrise!!.isAfter(from), "sunrise not in the future at $from")
-            assertTrue(e.sunset!!.isAfter(from), "sunset not in the future at $from")
-            assertTrue(
-                Duration.between(from, e.sunrise).toHours() < 25,
-                "sunrise implausibly far off at $from: ${e.sunrise}",
-            )
-            from = from.plus(Duration.ofMinutes(20))
-        }
+    fun `daysFrom returns consecutive days starting where asked`() {
+        val start = LocalDate.of(2026, 8, 13)
+        val days = SunTimes.daysFrom(38.2527, -85.7585, start, ZoneId.of("America/Kentucky/Louisville"), 3)
+        assertEquals(listOf(start, start.plusDays(1), start.plusDays(2)), days.map { it.date })
+        // And the sun keeps setting a little earlier through August.
+        assertTrue(days[1].sunset!!.isBefore(days[0].sunset!!.plusSeconds(86400)), "sunset drifts earlier")
     }
 }

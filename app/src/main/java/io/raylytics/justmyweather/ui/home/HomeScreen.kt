@@ -37,7 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
-import io.raylytics.justmyweather.data.SunEvents
+import io.raylytics.justmyweather.data.SunDay
 import io.raylytics.justmyweather.data.WeatherSnapshot
 import io.raylytics.justmyweather.data.nws.ActiveAlert
 import io.raylytics.justmyweather.data.nws.DailyPeriod
@@ -91,6 +91,10 @@ internal val AGE_TICK = 30.seconds
  * finer than the values move; the point is being on the right side of a
  * boundary within a minute of crossing it. */
 internal val SUN_TICK = 1.minutes
+
+/** Width of each sun-time column, sized for "12:00 AM" at titleMedium so the
+ * two columns stay aligned down the rows regardless of the times in them. */
+private val SUN_COLUMN_WIDTH = 92.dp
 
 /**
  * The home view. Out of the box it's a calm single glance; once the user edits
@@ -178,7 +182,7 @@ private fun GlanceView(
         // and sitting among the station's readings would imply the station
         // reported them. Directly under the glance because the sun is part of
         // "what is it like right now", not part of the forecast below.
-        state.sunEvents?.let { SunTimesRow(events = it) }
+        if (state.sunDays.isNotEmpty()) SunTimesTable(days = state.sunDays)
 
         // The counterpart to "Observed" above: everything below this line is
         // model output, not measurement. Only rendered when a forecast framing
@@ -495,69 +499,88 @@ internal fun ObservedLine(
 }
 
 /**
- * "Sunrise 6:52 AM · Sunset 8:31 PM" — the next of each, side by side.
+ * Sun times as day rows, laid out like the daily forecast: the date beside its
+ * values, sunrise and sunset in columns.
  *
- * Both are the NEXT occurrence, so from mid-afternoon onwards the sunrise is
- * tomorrow's and [SunLabel] says so. Ordering is fixed (sunrise then sunset)
- * rather than soonest-first: a pair whose order changed through the day would
- * make the user re-read the labels every time instead of the values.
+ * Day rows rather than "the next of each" because those two are not the same
+ * day for most of the waking hours — between sunrise and sunset, tonight's
+ * sunset is today's while the next sunrise is tomorrow's. A row that carries
+ * its own date says which is which without hanging a "tomorrow" off a time.
  *
- * A missing event renders as "—", which happens for real above the Arctic
- * circle. Dropping the pair entirely would be worse: the row would silently
- * vanish for months, looking like a bug rather than like polar night.
+ * Sunrise takes the emphasis and sunset the quieter tone, the same pairing the
+ * daily high and low use, so the column a value sits in is not the only thing
+ * telling them apart.
  */
 @Composable
-internal fun SunTimesRow(
-    events: SunEvents,
-    /** The wall clock, injectable so the day-boundary behaviour is testable. */
-    clock: () -> Instant = Instant::now,
-) {
+internal fun SunTimesTable(days: List<SunDay>) {
     val zone = ZoneId.systemDefault()
-    // Held as ticking state, not read straight into composition. The events
-    // themselves do NOT change across local midnight — at 23:59 and at 00:05
-    // the next sunrise is the same instant — so the state carrying them is
-    // structurally equal, the StateFlow conflates it, and this row is never
-    // recomposed. A clock read inline would therefore stay on yesterday's side
-    // of midnight and keep saying "tomorrow" about a sunrise happening this
-    // morning. Only "now" moves in that scenario, so only "now" can drive it.
-    var now by remember { mutableStateOf(clock()) }
-    val lifecycle = LocalLifecycleOwner.current.lifecycle
-    LaunchedEffect(lifecycle) {
-        lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
-            while (true) {
-                now = clock()
-                delay(SUN_TICK)
-            }
-        }
-    }
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(20.dp),
-        modifier = Modifier.padding(top = 4.dp),
+    Column(
+        modifier = Modifier.widthIn(max = 320.dp).padding(top = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        SunTime("Sunrise", events.sunrise, now, zone)
-        SunTime("Sunset", events.sunset, now, zone)
+        // Column headings once at the top, not repeated per row: with two
+        // values a row this is a small table, and repeating the words would
+        // outweigh the times they label.
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            Text(
+                text = "Sunrise",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.End,
+                modifier = Modifier.width(SUN_COLUMN_WIDTH),
+            )
+            Text(
+                text = "Sunset",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.End,
+                modifier = Modifier.width(SUN_COLUMN_WIDTH),
+            )
+        }
+        days.forEach { day -> SunDayRow(day = day, zone = zone) }
     }
 }
 
 @Composable
-private fun SunTime(
-    label: String,
-    event: Instant?,
-    now: Instant,
-    zone: ZoneId,
-) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(
-            text = event?.let { SunLabel.format(it, now, zone, timeFormat) } ?: "—",
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onBackground,
-        )
+private fun SunDayRow(day: SunDay, zone: ZoneId) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // The same two-line date marker the hourly strip uses, so a date reads
+        // as a date wherever it appears on this screen.
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = day.date.format(weekdayFormat).uppercase(Locale.getDefault()),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = day.date.format(monthDayFormat),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        SunTimeCell(day.sunrise, zone, MaterialTheme.colorScheme.onBackground)
+        SunTimeCell(day.sunset, zone, MaterialTheme.colorScheme.onSurfaceVariant)
     }
+}
+
+/** One time in its column. A missing event renders as "—": polar night is a
+ * real state, and an empty gap would read as a value that failed to load. */
+@Composable
+private fun SunTimeCell(
+    event: Instant?,
+    zone: ZoneId,
+    color: androidx.compose.ui.graphics.Color,
+) {
+    Text(
+        text = event?.atZone(zone)?.format(timeFormat) ?: "—",
+        style = MaterialTheme.typography.titleMedium,
+        color = color,
+        textAlign = TextAlign.End,
+        modifier = Modifier.width(SUN_COLUMN_WIDTH),
+    )
 }
 
 /** The mode chips. A horizontally scrolling row rather than FlowRow so future

@@ -3,7 +3,7 @@ package io.raylytics.justmyweather.ui.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.raylytics.justmyweather.alerts.SafetyAlerts
-import io.raylytics.justmyweather.data.SunEvents
+import io.raylytics.justmyweather.data.SunDay
 import io.raylytics.justmyweather.data.SunTimes
 import io.raylytics.justmyweather.data.ViewConfigRepository
 import io.raylytics.justmyweather.data.WeatherLocation
@@ -23,6 +23,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.time.Instant
+import java.time.ZoneId
 
 /**
  * Drives the default home glance. Two independent inputs flow in: the weather
@@ -38,6 +39,8 @@ import java.time.Instant
  * falls back to where we last knew the user to be rather than to a default
  * city on the other side of the country.
  */
+private const val SUN_DAYS = 2
+
 class HomeViewModel(
     private val repository: WeatherRepository,
     private val locationResolver: LocationResolver,
@@ -51,6 +54,9 @@ class HomeViewModel(
     private val onSnapshotLoaded: suspend (WeatherSnapshot) -> Unit = {},
     /** Injected so the sun times are testable without waiting for dawn. */
     private val clock: () -> Instant = Instant::now,
+    /** Injected alongside the clock: which local day it is decides which rows
+     * the glance shows, and that answer is a zone away from the instant. */
+    private val zone: () -> ZoneId = ZoneId::systemDefault,
 ) : ViewModel() {
     private val weather = MutableStateFlow<WeatherLoad>(WeatherLoad.Loading)
     private val forecasts = MutableStateFlow(ForecastLoad())
@@ -69,7 +75,7 @@ class HomeViewModel(
      * it is held separately from the weather because it has no dependency on
      * the fetch succeeding.
      */
-    private val sunEvents = MutableStateFlow<SunEvents?>(null)
+    private val sunEvents = MutableStateFlow<List<SunDay>>(emptyList())
 
     /**
      * The coordinate the sun times were last worked out for, so [refreshSunTimes]
@@ -123,7 +129,7 @@ class HomeViewModel(
                         refreshError = load.error,
                         // Gated here rather than in the composable so the
                         // screen renders exactly what the state says.
-                        sunEvents = sun.takeIf { config.showSunTimes },
+                        sunDays = if (config.showSunTimes) sun else emptyList(),
                     )
             }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUiState.Loading)
@@ -262,7 +268,8 @@ class HomeViewModel(
      */
     fun refreshSunTimes() {
         val location = sunLocation ?: return
-        sunEvents.value = SunTimes.next(location.latitude, location.longitude, clock())
+        val today = clock().atZone(zone()).toLocalDate()
+        sunEvents.value = SunTimes.daysFrom(location.latitude, location.longitude, today, zone(), SUN_DAYS)
     }
 
     /** The mode collector in `init` triggers the fetch on every mode change.

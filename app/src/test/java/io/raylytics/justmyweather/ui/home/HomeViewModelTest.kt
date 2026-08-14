@@ -42,6 +42,8 @@ import org.junit.jupiter.api.Test
 import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.mock
 import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 
 /**
  * Locks in the view-mode contract: forecasts fetch lazily once per framing,
@@ -126,6 +128,7 @@ class HomeViewModelTest {
         // A lambda, not an Instant: a test that steps time needs the clock to
         // keep reading its variable, not a copy taken at construction.
         clock: () -> Instant = { NOW },
+        zone: () -> ZoneId = { ZoneId.of("America/New_York") },
     ): Harness {
         val transport = RoutingTransport()
         val configRepository = ViewConfigRepository(FakePreferencesDataStore())
@@ -148,6 +151,7 @@ class HomeViewModelTest {
                 configRepository = configRepository,
                 onSnapshotLoaded = onSnapshotLoaded,
                 clock = clock,
+                zone = zone,
             )
         backgroundScope.launch { vm.state.collect {} }
         return Harness(transport, vm)
@@ -449,11 +453,11 @@ class HomeViewModelTest {
     fun `sun times are off until the config asks for them`() = runTest(dispatcher) {
         val off = harness()
         advanceUntilIdle()
-        assertNull(off.vm.ready().sunEvents, "the opt-in ships off")
+        assertTrue(off.vm.ready().sunDays.isEmpty(), "the opt-in ships off")
 
         val on = harness(config = ViewConfig.DEFAULT.setShowSunTimes(true))
         advanceUntilIdle()
-        assertNotNull(on.vm.ready().sunEvents, "switched on, the glance carries them")
+        assertTrue(on.vm.ready().sunDays.isNotEmpty(), "switched on, the glance carries them")
     }
 
     @Test
@@ -468,7 +472,7 @@ class HomeViewModelTest {
         advanceUntilIdle()
 
         assertNotNull(h.vm.ready().refreshError, "the fetch really did fail")
-        assertNotNull(h.vm.ready().sunEvents, "sun times do not depend on the fetch")
+        assertTrue(h.vm.ready().sunDays.isNotEmpty(), "sun times do not depend on the fetch")
     }
 
     @Test
@@ -484,27 +488,50 @@ class HomeViewModelTest {
             val gate = h.transport.gateObservation!!
             advanceUntilIdle()
 
-            assertNotNull(h.vm.ready().sunEvents, "computed before the fetch returned")
+            assertTrue(h.vm.ready().sunDays.isNotEmpty(), "computed before the fetch returned")
             gate.complete(Unit)
             advanceUntilIdle()
         }
 
     @Test
-    fun `refreshSunTimes re-works them for the new now`() = runTest(dispatcher) {
-        // "Next" decays with the clock. Nothing else in the ViewModel would
-        // notice, so this is the whole defence against a passed sunrise still
-        // being presented as the coming one.
-        var now = Instant.parse("2026-08-13T09:00:00Z") // before sunrise
-        val h = harness(config = ViewConfig.DEFAULT.setShowSunTimes(true), clock = { now })
+    fun `the rows roll over at local midnight`() = runTest(dispatcher) {
+        // Which day is "today" decays with the clock, and nothing else in the
+        // ViewModel would notice. This is the whole defence against the glance
+        // still heading its first row with yesterday's date.
+        val zone = ZoneId.of("America/New_York")
+        var now = Instant.parse("2026-08-14T03:59:00Z") // 11:59 PM on the 13th
+        val h =
+            harness(
+                config = ViewConfig.DEFAULT.setShowSunTimes(true),
+                clock = { now },
+                zone = { zone },
+            )
         advanceUntilIdle()
-        val first = h.vm.ready().sunEvents!!.sunrise
+        assertEquals(LocalDate.of(2026, 8, 13), h.vm.ready().sunDays.first().date, "before midnight")
+        assertEquals(LocalDate.of(2026, 8, 14), h.vm.ready().sunDays[1].date, "tomorrow follows today")
 
-        // Step past that sunrise; the next one is now tomorrow's.
-        now = first!!.plusSeconds(60)
+        now = Instant.parse("2026-08-14T04:05:00Z") // 12:05 AM on the 14th
         h.vm.refreshSunTimes()
         advanceUntilIdle()
-        val second = h.vm.ready().sunEvents!!.sunrise
-        assertTrue(second!!.isAfter(first), "the sunrise that passed must not still be 'next'")
+        assertEquals(LocalDate.of(2026, 8, 14), h.vm.ready().sunDays.first().date, "after midnight")
+    }
+
+    @Test
+    fun `each row's times belong to that row's date`() = runTest(dispatcher) {
+        // The reason day rows replaced "the next of each": a row carrying a
+        // date must not carry another day's times.
+        val zone = ZoneId.of("America/New_York")
+        val h =
+            harness(
+                config = ViewConfig.DEFAULT.setShowSunTimes(true),
+                clock = { Instant.parse("2026-08-14T17:00:00Z") },
+                zone = { zone },
+            )
+        advanceUntilIdle()
+        h.vm.ready().sunDays.forEach { day ->
+            assertEquals(day.date, day.sunrise!!.atZone(zone).toLocalDate(), "sunrise on its own date")
+            assertEquals(day.date, day.sunset!!.atZone(zone).toLocalDate(), "sunset on its own date")
+        }
     }
 
     private companion object {
