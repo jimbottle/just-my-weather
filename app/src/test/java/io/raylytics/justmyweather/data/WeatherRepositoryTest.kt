@@ -70,6 +70,29 @@ class WeatherRepositoryTest {
     }
 
     @Test
+    fun `a jittering coarse fix resolves the point once, not once per launch`() = runTest {
+        // The defect this cache was failing at. Coarse location keeps latitude
+        // steady and puts a fresh random offset on longitude about every hour,
+        // so a phone sitting on one doorstep produced a new key — and a new
+        // /points AND /stations round trip — on nearly every launch. These are
+        // real coordinates from Evan's device.
+        val transport = RoutingTransport()
+        val cache = InMemoryPointCache()
+        val jittered =
+            listOf(
+                -85.6806540212635,
+                -85.68068173281894,
+                -85.6804653663773,
+                -85.68013327780797,
+                -85.68098307942641,
+            )
+        jittered.forEach { lon ->
+            repo(transport, cache).load(WeatherLocation(38.252252252252255, lon, label = "Home"))
+        }
+        assertEquals(1, transport.pointsLookups(), "five launches, one grid resolution")
+    }
+
+    @Test
     fun `a point from a shared cache is reused by a fresh repository without re-resolving`() = runTest {
         // Covers the repository→cache seam: a second repository sharing the cache
         // reuses the resolved point instead of re-fetching. (The durable

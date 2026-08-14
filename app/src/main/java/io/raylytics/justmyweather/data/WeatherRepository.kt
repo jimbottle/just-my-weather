@@ -147,7 +147,10 @@ class WeatherRepository(
     }
 
     private suspend fun resolvePoint(location: WeatherLocation): PointsLookup {
-        val key = "${location.latitude},${location.longitude}"
+        // Rounded, not raw: a coarse fix jitters by metres between launches
+        // and every point inside a 2.5km grid cell resolves the same anyway.
+        // See PointCacheKey.
+        val key = PointCacheKey.of(location)
         return resolveMutex.withLock {
             pointCache.get(key)
                 ?: nws.resolveLocation(location.latitude, location.longitude)
