@@ -43,9 +43,16 @@ class CachedSnapshotTest {
     }
 
     @Test
-    fun `the overnight gap is covered — the case a three-hour cap used to reject`() {
-        // Measured on a real device: last use 21:49, next use 09:50.
-        assertTrue(entry(savedAt = now.minus(Duration.ofHours(12))).isUsableFor(here, now))
+    fun `the real gaps between one check and the next are covered`() {
+        // Both measured on Evan's own phone rather than imagined. The first
+        // sank a three-hour cap; the second, a fortnight later, sank a
+        // twenty-four-hour one. They are here so the next person changing
+        // MAX_AGE can see what it has to clear.
+        assertTrue(entry(savedAt = now.minus(Duration.ofHours(12))).isUsableFor(here, now), "overnight, 12h")
+        assertTrue(
+            entry(savedAt = now.minus(Duration.ofMinutes(26 * 60 + 24))).isUsableFor(here, now),
+            "a day and a bit, 26.4h",
+        )
     }
 
     @Test

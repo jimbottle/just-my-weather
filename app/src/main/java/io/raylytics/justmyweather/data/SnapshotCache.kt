@@ -55,27 +55,26 @@ data class CachedSnapshot(
 
     companion object {
         /**
-         * A day, so the overnight gap is covered.
+         * Two days.
          *
-         * This was three hours, chosen to cover "I checked before lunch and
-         * again after" — which turned out to be the wrong pattern to design
-         * for. The commonest opening of a weather app is the first check of
-         * the day, and measured on a real device that gap was twelve hours
-         * (21:49 to 09:50), so the cap rejected a perfectly good reading every
-         * single morning and the feature never fired when it was most wanted.
+         * This number has been wrong twice, both times because it was sized
+         * from one measurement. It began at three hours — chosen for "I
+         * checked before lunch and again after" — and missed the commonest
+         * opening of a weather app, the first check of the day. Raised to a
+         * day on a measured overnight gap of twelve hours, it was then
+         * overtaken by a real gap of 26.4 hours a fortnight later. Someone who
+         * checks the weather every day or two is not an edge case, and a cap
+         * that only just covers the last gap observed will keep being
+         * outrun; two days clears both measurements with room.
          *
-         * A tight cap was justified while the glance showed a bare clock time
-         * with no date: last night's 68° would have read as this morning's.
-         * That reason is gone — the age now ships beside the timestamp
-         * ("Observed 8:12 PM · 14 hr ago", and "1 day ago" past a day), the
-         * reading is marked refreshing, and the live fetch replaces it within
-         * about a second. Staleness is stated rather than hidden, so the cap
-         * only has to exclude readings so old they resemble nothing at all.
-         *
-         * That reasoning is conditional, and [MAX_AGE_WITHOUT_OBSERVATION_TIME]
-         * is the condition failing.
+         * What makes a generous cap safe is that the staleness is stated, not
+         * hidden: the age ships beside the timestamp ("Observed 1:08 PM · 1 day
+         * ago"), the reading is marked refreshing, and the live fetch replaces
+         * it in about a second. That reasoning is conditional on the age being
+         * displayable at all, which is what [MAX_AGE_WITHOUT_OBSERVATION_TIME]
+         * is for.
          */
-        val MAX_AGE: Duration = Duration.ofHours(24)
+        val MAX_AGE: Duration = Duration.ofHours(48)
 
         /**
          * The cap when the reading carries no observation time.
