@@ -100,30 +100,61 @@ class SunTimesTest {
     }
 
     @Test
-    fun `a day's times always fall on that day, in every zone`() {
-        // The invariant the day rows rest on: a row headed with a date must not
-        // carry another date's times. Walked across zones either side of UTC
-        // and across a year, because the UTC date a local event belongs to
-        // shifts with both.
+    fun `every day of the year has its times, in zones either side of UTC`() {
+        // The search in eventOnLocalDate looks a day either side of the UTC
+        // date, because a local day straddles two of them at every offset but
+        // zero. Its one reachable failure is a FALSE NULL — a straddle the
+        // window misses — so this asserts the events are THERE, day by day,
+        // for a whole year.
+        //
+        // Asserting only "a returned time falls on its date" would be vacuous:
+        // forDate returns a time only when it does. That check is kept below
+        // as a guard on the filter itself, but it is the counts that have
+        // teeth.
         val places =
             listOf(
                 Triple(38.2527, -85.7585, ZoneId.of("America/Kentucky/Louisville")),
                 Triple(-33.8688, 151.2093, ZoneId.of("Australia/Sydney")),
                 Triple(35.6762, 139.6503, ZoneId.of("Asia/Tokyo")),
-                // Kiritimati is UTC+14, the far edge of the date line.
+                // Kiritimati keeps UTC+14 at longitude 157 WEST — the widest
+                // gap there is between a local date and the UTC date its
+                // sunrise falls on, and the case the window exists for.
                 Triple(1.9, -157.4, ZoneId.of("Pacific/Kiritimati")),
                 Triple(64.1466, -21.9426, ZoneId.of("Atlantic/Reykjavik")),
             )
         for ((lat, lon, zone) in places) {
-            for (month in 1..12) {
-                val date = LocalDate.of(2026, month, 15)
+            var rises = 0
+            var sets = 0
+            var days = 0
+            var date = LocalDate.of(2026, 1, 1)
+            while (date.year == 2026) {
                 val day = SunTimes.forDate(lat, lon, date, zone)
                 day.sunrise?.let {
-                    assertEquals(date, it.atZone(zone).toLocalDate(), "sunrise off its date at $zone in $month")
+                    rises++
+                    assertEquals(date, it.atZone(zone).toLocalDate(), "sunrise off its date, $zone $date")
                 }
                 day.sunset?.let {
-                    assertEquals(date, it.atZone(zone).toLocalDate(), "sunset off its date at $zone in $month")
+                    sets++
+                    assertEquals(date, it.atZone(zone).toLocalDate(), "sunset off its date, $zone $date")
                 }
+                days++
+                date = date.plusDays(1)
+            }
+            assertEquals(365, days, "2026 is not a leap year")
+            assertEquals(365, rises, "every day at $zone should have a sunrise")
+
+            if (zone == ZoneId.of("Atlantic/Reykjavik")) {
+                // One genuine exception, and worth knowing rather than
+                // rounding away: at 64°N around the solstice the sun sets
+                // just after midnight, so 15 June's sunset lands on the 16th
+                // and the 15th has none of its own. A real null, not a miss.
+                assertEquals(364, sets, "Reykjavik loses exactly one sunset to the solstice straddle")
+                assertNull(
+                    SunTimes.forDate(lat, lon, LocalDate.of(2026, 6, 15), zone).sunset,
+                    "the known straddle is 15 June",
+                )
+            } else {
+                assertEquals(365, sets, "every day at $zone should have a sunset")
             }
         }
     }
