@@ -112,29 +112,46 @@ fun HomeScreen(
     modifier: Modifier = Modifier,
 ) {
     Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        Box(
+        // The controls are pinned, not scrolled. A tall day — an alert banner,
+        // the sun table and an hourly strip all at once — used to push them
+        // below the fold, and since the glance column carries no scrollbar or
+        // clipped edge there was nothing to suggest they were still down
+        // there: they simply looked absent. Giving the content weight(1f) and
+        // the bar the remainder keeps it on screen at any height, with no
+        // overlap and no padding arithmetic to get wrong.
+        Column(
             modifier = Modifier.fillMaxSize().padding(horizontal = 32.dp, vertical = 48.dp),
-            contentAlignment = Alignment.Center,
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            when (state) {
-                is HomeUiState.Loading ->
-                    Text(
-                        text = "…",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+            Box(
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                contentAlignment = Alignment.Center,
+            ) {
+                when (state) {
+                    is HomeUiState.Loading ->
+                        Text(
+                            text = "…",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
 
-                is HomeUiState.Error ->
-                    ErrorView(message = state.message, onRefresh = onRefresh)
+                    is HomeUiState.Error ->
+                        ErrorView(message = state.message, onRefresh = onRefresh)
 
-                is HomeUiState.Ready ->
-                    GlanceView(
-                        state = state,
-                        onRefresh = onRefresh,
-                        onSetMode = onSetMode,
-                        onCustomize = onCustomize,
-                        onAlerts = onAlerts,
-                    )
+                    is HomeUiState.Ready ->
+                        GlanceView(state = state, onSetMode = onSetMode)
+                }
+            }
+            // Only with a reading on screen: the error view carries its own
+            // "Try again", and a bare "…" has nothing to refresh yet.
+            if (state is HomeUiState.Ready) {
+                ActionBar(
+                    refreshing = state.refreshing,
+                    refreshError = state.refreshError,
+                    onRefresh = onRefresh,
+                    onCustomize = onCustomize,
+                    onAlerts = onAlerts,
+                )
             }
         }
     }
@@ -143,10 +160,7 @@ fun HomeScreen(
 @Composable
 private fun GlanceView(
     state: HomeUiState.Ready,
-    onRefresh: () -> Unit,
     onSetMode: (ViewMode) -> Unit,
-    onCustomize: () -> Unit,
-    onAlerts: () -> Unit,
 ) {
     val snapshot = state.snapshot
     val config = state.config
@@ -222,30 +236,10 @@ private fun GlanceView(
         // sits with the hero as "Observed HH:MM", where it explains the number
         // it belongs to instead of trailing the whole screen.
 
+        // The chips stay in the scroll. They were never the thing that went
+        // missing, and pinning them too would spend a third of a short
+        // viewport on chrome.
         ModeToggle(selected = state.mode, onSelect = onSetMode)
-
-        // A refresh that failed with a reading already on screen. It sits with
-        // the Refresh button — the control it is about — and in the same quiet
-        // style as a failed forecast fetch, because the glance above is still
-        // good: only its age is in question, and "Observed" already says that.
-        state.refreshError?.let { message ->
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-            )
-        }
-
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            // The button label reflects the refreshing flag, so a re-fetch is an
-            // observable state change (and the flag stops being dead state).
-            TextButton(onClick = onRefresh, enabled = !state.refreshing) {
-                Text(if (state.refreshing) "Refreshing…" else "Refresh")
-            }
-            TextButton(onClick = onCustomize) { Text("Customize") }
-            TextButton(onClick = onAlerts) { Text("Alerts") }
-        }
 
         if (config.alertBannerPosition == AlertBannerPosition.BOTTOM) {
             SafetyAlertBanner(alerts = state.safetyAlerts)
@@ -581,6 +575,47 @@ private fun SunTimeCell(
         textAlign = TextAlign.End,
         modifier = Modifier.width(SUN_COLUMN_WIDTH),
     )
+}
+
+/**
+ * The controls, pinned below the glance.
+ *
+ * The failed-refresh message rides here rather than in the scroll. It belongs
+ * beside the button it is about — that pairing is why it stopped being a
+ * full-screen error in the first place — and leaving it above the fold while
+ * the button stayed pinned would have split the two apart again.
+ */
+@Composable
+private fun ActionBar(
+    refreshing: Boolean,
+    refreshError: String?,
+    onRefresh: () -> Unit,
+    onCustomize: () -> Unit,
+    onAlerts: () -> Unit,
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = Modifier.padding(top = 8.dp),
+    ) {
+        refreshError?.let { message ->
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            // The button label reflects the refreshing flag, so a re-fetch is an
+            // observable state change (and the flag stops being dead state).
+            TextButton(onClick = onRefresh, enabled = !refreshing) {
+                Text(if (refreshing) "Refreshing…" else "Refresh")
+            }
+            TextButton(onClick = onCustomize) { Text("Customize") }
+            TextButton(onClick = onAlerts) { Text("Alerts") }
+        }
+    }
 }
 
 /** The mode chips. A horizontally scrolling row rather than FlowRow so future
