@@ -347,6 +347,14 @@ Rules that follow from this:
   (insets, notifications, WorkManager, permissions).
 - UI verification runs on **API 35+** (Android 15 enforces edge-to-edge for
   `targetSdk 35`; API 34 does not, and that gap once shipped a broken layout).
+  A real device counts — instrumented tests run there again. They could not
+  for a while: Espresso 3.5, which `compose-bom` drags in, resolves
+  `android.hardware.input.InputManager.getInstance` by reflection and that
+  method is gone in Android 17, so every test died at `Espresso.onIdle`
+  before its body ran. `app/build.gradle.kts` therefore pins
+  `espresso-core` and `test:runner` **ahead of the BOM**; don't drop those
+  pins back to whatever the BOM offers without re-running the suite on a
+  current device.
 
 ## Architecture Overview
 

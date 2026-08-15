@@ -132,8 +132,14 @@ dependencies {
     testImplementation("org.mockito.kotlin:mockito-kotlin:5.4.0")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
 
-    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test.ext:junit:1.3.0")
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+    // Pinned ahead of what compose-bom drags in. Espresso 3.5 resolves
+    // android.hardware.input.InputManager.getInstance by reflection, and that
+    // method is gone in Android 17 — every instrumented test dies at
+    // Espresso.onIdle before its body runs. See just-my-weather-1te.
+    androidTestImplementation("androidx.test.espresso:espresso-core:3.7.0")
+    androidTestImplementation("androidx.test:runner:1.7.0")
 }
 
 tasks.withType<Test>().configureEach {
