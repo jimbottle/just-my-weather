@@ -37,7 +37,15 @@ object PointCacheKey {
         val parts = key.split(',')
         if (parts.size != 2) return false
         return parts.all { part ->
-            val value = part.toDoubleOrNull() ?: return false
+            // isFinite, not just non-null. "NaN" parses to a perfectly good
+            // Double and then throws inside roundToLong — and this runs over
+            // whatever the persisted blob happens to contain, on the launch
+            // path, before any write could clean it out. One such key would
+            // therefore break every point resolution permanently, which is
+            // exactly the crash PointCacheCodec promises corrupt data can
+            // never cause. ("Infinity" survives only because roundToLong
+            // saturates instead of throwing — luck, not a guarantee.)
+            val value = part.toDoubleOrNull()?.takeIf { it.isFinite() } ?: return false
             round(value) == part
         }
     }

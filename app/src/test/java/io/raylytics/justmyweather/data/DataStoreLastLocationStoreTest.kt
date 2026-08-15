@@ -77,4 +77,24 @@ class DataStoreLastLocationStoreTest {
         cache.save(away)
         assertEquals(away, DataStoreLastLocationStore(store).load())
     }
+
+    @Test
+    fun `a coordinate that is not a number is not a location`() = runTest {
+        // Same hazard by a different door: a non-finite coordinate read back
+        // from a corrupted store reaches PointCacheKey.of, where rounding a
+        // NaN throws — on the launch path, for every load.
+        val store = FakePreferencesDataStore()
+        store.edit {
+            it[doublePreferencesKey("last_location_lat")] = Double.NaN
+            it[doublePreferencesKey("last_location_lon")] = -85.7585
+        }
+        assertNull(DataStoreLastLocationStore(store).load(), "NaN latitude")
+
+        val infinite = FakePreferencesDataStore()
+        infinite.edit {
+            it[doublePreferencesKey("last_location_lat")] = 38.2522
+            it[doublePreferencesKey("last_location_lon")] = Double.POSITIVE_INFINITY
+        }
+        assertNull(DataStoreLastLocationStore(infinite).load(), "infinite longitude")
+    }
 }

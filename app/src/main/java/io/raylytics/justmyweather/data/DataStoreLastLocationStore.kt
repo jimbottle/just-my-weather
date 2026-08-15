@@ -23,8 +23,12 @@ class DataStoreLastLocationStore(
 ) : LastLocationStore {
     override suspend fun load(): WeatherLocation? {
         val prefs = dataStore.data.first()
-        val latitude = prefs[LATITUDE] ?: return null
-        val longitude = prefs[LONGITUDE] ?: return null
+        // Finite, not merely present. A NaN or infinite coordinate is not a
+        // place, and it reaches PointCacheKey.of — where rounding a NaN throws
+        // — on the launch path. Treating it as "nothing remembered" costs a
+        // fallback; letting it through costs every point resolution.
+        val latitude = prefs[LATITUDE]?.takeIf { it.isFinite() } ?: return null
+        val longitude = prefs[LONGITUDE]?.takeIf { it.isFinite() } ?: return null
         return WeatherLocation(latitude = latitude, longitude = longitude, label = prefs[LABEL].orEmpty())
     }
 

@@ -93,4 +93,20 @@ class PointCacheKeyTest {
         assertFalse(PointCacheKey.isCanonical("north,west"))
         assertFalse(PointCacheKey.isCanonical(""))
     }
+
+    @Test
+    fun `junk that parses as a number is still rejected, without throwing`() {
+        // The dangerous shape of junk: strings that ARE valid Doubles but
+        // cannot be rounded. "NaN" parses happily and then throws inside
+        // roundToLong — and this validator runs across whatever the persisted
+        // blob contains, on the launch path, before any write could clear it.
+        // A single such key would otherwise break every point resolution for
+        // good, which is the one thing the codec promises corrupt data cannot
+        // do.
+        assertFalse(PointCacheKey.isCanonical("NaN,0.00"))
+        assertFalse(PointCacheKey.isCanonical("0.00,NaN"))
+        assertFalse(PointCacheKey.isCanonical("-NaN,+NaN"))
+        assertFalse(PointCacheKey.isCanonical("Infinity,0.00"))
+        assertFalse(PointCacheKey.isCanonical("-Infinity,-Infinity"))
+    }
 }
