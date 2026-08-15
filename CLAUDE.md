@@ -345,6 +345,14 @@ Rules that follow from this:
 - **Prefer the JVM gate.** Unit tests + ktlint + assemble need no device at all;
   reach for an emulator only when the change is genuinely visual or runtime
   (insets, notifications, WorkManager, permissions).
+- **Never run `connectedAndroidTest` against the developer's phone.** It
+  UNINSTALLS the app when it finishes, and an uninstall takes the app's data:
+  alert rules, the safety-notification opt-in, view config, the remembered
+  reading, the point cache. Verified the hard way — a suite run "just to
+  prove it works on hardware" wiped a real install and every setting on it.
+  Run instrumented tests on the emulator; if a physical device is genuinely
+  required, say so first, and reinstall afterwards knowing the data is gone.
+  A plain `adb install -r` is the safe way to put a build on a phone.
 - UI verification runs on **API 35+** (Android 15 enforces edge-to-edge for
   `targetSdk 35`; API 34 does not, and that gap once shipped a broken layout).
   A real device counts — instrumented tests run there again. They could not
