@@ -45,6 +45,10 @@ import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -256,6 +260,10 @@ internal fun ModuleGrid(
                     val isDragged = dragged == field
                     val wiggle = wiggleAngle(active = arranging && !isDragged, phase = index)
                     ModuleTile(
+                        index = index,
+                        lastIndex = modules.lastIndex,
+                        onMove = onMove,
+                        onCycleSpan = onCycleSpan,
                         module = module,
                         arranging = arranging,
                         heroStyle = spec.heroStyle,
@@ -305,12 +313,28 @@ internal fun ModuleGrid(
  * value at a size that follows the tile's width. Width IS prominence: a full
  * tile shows its value near hero size and drops the label (a full-width value
  * speaks for itself, as the old hero did), narrower tiles caption themselves.
+ *
+ * The tile is also where arranging becomes reachable without gestures. Its
+ * accessibility actions — Move up, Move down, Resize — are the SAME
+ * [onMove]/[onCycleSpan] calls the drag and tap make, and they are offered at
+ * all times rather than only while arranging: long-press-and-drag is not a
+ * gesture a TalkBack or switch-access user can perform at all, so gating them
+ * behind a mode they cannot enter would be gating them behind nothing.
+ * Merging the tile into one node is what makes them reachable — an unmerged
+ * node carrying no text of its own never takes accessibility focus, and
+ * unfocusable actions are not actions.
  */
 @Composable
 private fun ModuleTile(
     module: ModuleValue,
     arranging: Boolean,
     heroStyle: TextStyle,
+    /** This tile's place among the visible modules, and the last such index —
+     * together they decide which move actions exist at the ends. */
+    index: Int,
+    lastIndex: Int,
+    onMove: (WeatherField, Int) -> Unit,
+    onCycleSpan: (WeatherField) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val borderColor =
@@ -333,7 +357,41 @@ private fun ModuleTile(
             modifier
                 .heightIn(min = TILE_MIN_HEIGHT)
                 .border(1.dp, borderColor, RoundedCornerShape(TILE_CORNER))
-                .padding(TILE_PADDING),
+                .padding(TILE_PADDING)
+                .semantics(mergeDescendants = true) {
+                    // The width is state, not a label: it changes under the
+                    // user and is what Resize acts on, so it belongs where a
+                    // screen reader re-reads it rather than in the name.
+                    stateDescription = "${module.span.label} width"
+                    customActions =
+                        buildList {
+                            if (index > 0) {
+                                add(
+                                    CustomAccessibilityAction("Move up") {
+                                        onMove(module.field, index - 1)
+                                        true
+                                    },
+                                )
+                            }
+                            if (index < lastIndex) {
+                                add(
+                                    CustomAccessibilityAction("Move down") {
+                                        onMove(module.field, index + 1)
+                                        true
+                                    },
+                                )
+                            }
+                            // Named for where it lands, not for what it does:
+                            // "Resize" alone leaves the user to guess which of
+                            // three widths a tap will pick.
+                            add(
+                                CustomAccessibilityAction("Resize to ${module.span.next().label.lowercase()}") {
+                                    onCycleSpan(module.field)
+                                    true
+                                },
+                            )
+                        }
+                },
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             if (module.span != ModuleSpan.FULL) {

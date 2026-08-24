@@ -1,0 +1,79 @@
+# Arrange mode on the glance grid: the launcher gesture, end to end on real
+# touch events.
+#
+# This flow exists because the gesture path is the part unit and Compose tests
+# cannot vouch for. Both of the bugs this feature shipped with were invisible
+# to every other layer: a graphicsLayer that kept its last values so a dropped
+# tile froze mid-air, and a tile-level gesture coroutine that died when a
+# reorder re-targeted its composable, so the drop event never arrived. Only a
+# real pointer stream reaches them.
+#
+# What this flow deliberately does NOT cover: the drag-to-reorder itself.
+# Reordering requires hold-then-move, and Maestro 2.5.0 has no such gesture —
+# `dragAndDrop` does not exist, and a coordinate `swipe`, even at 2500ms, moves
+# from the first frame and so never satisfies the long-press (probed on-device:
+# the swipe reported COMPLETED and the tile order was unchanged). Until that
+# gap closes (just-my-weather-csa), verify a drag by hand with:
+#   adb -s <serial> shell input draganddrop <x1> <y1> <x2> <y2> 1200
+# which does synthesise a real hold-then-move. Do NOT reach for
+# `adb shell input motionevent` — separate shell calls carry mismatched
+# downTimes and the stream is rejected as a broken gesture.
+appId: io.raylytics.justmyweather
+---
+- launchApp:
+    clearState: true
+    permissions:
+      all: allow
+
+# Wait for the glance. Arrange mode is not offered until there is something to
+# arrange, so this also proves the grid rendered.
+- extendedWaitUntil:
+    visible: "Customize"
+    timeout: 60000
+- assertVisible:
+    id: "module_temperature"
+- assertNotVisible: "Done arranging"
+
+# Long-press any tile to enter arrange mode. The tiles wiggle and take the
+# accent border (neither is assertable here); the Done affordance is the part
+# that must be discoverable, and its appearance is the assertion.
+- longPressOn:
+    id: "module_temperature"
+- assertVisible: "Done arranging"
+
+# A tap while arranging cycles that tile's width. The tile stays present at its
+# new size — what must NOT happen is the tap being swallowed by the long-press
+# that opened the mode, or the tile vanishing from the grid.
+- tapOn:
+    id: "module_conditions"
+- assertVisible:
+    id: "module_conditions"
+- assertVisible:
+    id: "module_temperature"
+
+# A second tap cycles again — the mode stays live across taps rather than
+# falling out of arrange after one edit.
+- tapOn:
+    id: "module_conditions"
+- assertVisible: "Done arranging"
+
+# Done leaves arrange mode; the grid stays, the editing affordance goes.
+- tapOn: "Done arranging"
+- assertNotVisible: "Done arranging"
+- assertVisible:
+    id: "module_temperature"
+- assertVisible: "Refresh"
+
+# The arrangement persisted: it went through the same ViewConfig/DataStore path
+# as every other customization, so it must survive the app being killed.
+- stopApp
+- launchApp:
+    permissions:
+      all: allow
+- extendedWaitUntil:
+    visible: "Customize"
+    timeout: 60000
+- assertVisible:
+    id: "module_temperature"
+- assertVisible:
+    id: "module_conditions"

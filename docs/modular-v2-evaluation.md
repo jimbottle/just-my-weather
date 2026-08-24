@@ -45,9 +45,14 @@ list-based customize screen gave them:
 - Reorder: the customize screen's up/down arrows remain, driving the same
   config.
 - Resize: the customize screen's span chips are the non-gesture path.
-- Still owed (just-my-weather-duo): semantics custom actions on the tiles
-  themselves, so the grid is first-class under TalkBack rather than merely
-  bypassable.
+- On the tiles themselves: each module carries accessibility custom actions —
+  Move up, Move down, and "Resize to &lt;next width&gt;" — calling the same
+  `onMove`/`onCycleSpan` the drag and tap do, with its width announced as
+  state. They are offered **at all times, not only while arranging**: a hold
+  -and-drag is not a gesture a TalkBack or switch-access user can perform, so
+  gating them behind that mode would gate them behind nothing. A move that
+  would be a no-op (up from the first tile, down from the last) is absent
+  rather than ignored. Asserted in `ModuleGridTest`.
 
 ### 4. Implementation legibility
 
@@ -60,6 +65,22 @@ it, so it is held to structural rules:
   and does not leak drag state elsewhere.
 - Judge by whether "add a module size" or "change the wiggle" is a one-file
   change a newcomer can find.
+
+### 4a. What the tests can and cannot reach
+
+Worth stating plainly, because the gaps are where the shipped bugs lived:
+
+- **JVM** covers the geometry (`GridPackingTest`, `ViewConfigTest`) and the
+  persistence path including overlapping edits (`HomeViewModelTest`).
+- **Instrumented** (`ModuleGridTest`) covers what only a device measures —
+  spans in real dp, gaps left empty — and the accessibility actions.
+- **Maestro** (`06-arrange.yaml`) covers the real touch path: long-press entry,
+  tap-to-cycle, exit, and persistence across a restart.
+- **Nothing automated covers the drag reorder.** Maestro 2.5.0 has no
+  hold-then-move gesture, and a slow coordinate swipe never satisfies the
+  long-press (probed on-device). Verify it by hand with `adb shell input
+  draganddrop`; just-my-weather-csa proposes the UX change that would close
+  this.
 
 ### 5. Runtime behaviour
 
