@@ -32,6 +32,15 @@ shapes never leak past `WeatherRepository`.
   across launches. `WeatherSnapshot` / `WeatherLocation` are the domain objects.
 - **`location/`** — `LocationProvider` over the platform `LocationManager`
   (coarse only, no Play Services, so it builds from source anywhere).
+  `LocationResolver` is the one answer to "where are we?": a saved place the
+  user chose, else a live fix, else the last place we knew, else the built-in
+  default. The alert worker shares it, so a chosen place is what background
+  polling watches.
+- **`data/places/`** — picking a place without a geocoder. `PlaceCatalog` is
+  the pure parse + search over the bundled gazetteer (`assets/places.tsv`,
+  built by `scripts/build-gazetteer.sh` from public-domain US Census data);
+  `AssetPlaceSource` is the only Android-aware part; `SavedPlaces` + its codec
+  and repository hold what the user kept and which one is showing.
 - **`view/`** — the customization *data* (pure, no Compose): `WeatherField` (the
   data-point catalog), `ViewConfig` + `Density`, `ThemeConfig`, and their JSON
   codecs, plus `ModuleSpan` (tile widths on the 4-column grid), `packGridRows`

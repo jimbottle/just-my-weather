@@ -95,6 +95,7 @@ class HomeScreenControlsTest {
                     onAlerts = {},
                     onCycleSpan = {},
                     onMoveModule = { _, _ -> },
+                    onPlaces = {},
                 )
             }
         }

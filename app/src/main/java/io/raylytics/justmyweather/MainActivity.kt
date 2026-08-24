@@ -40,6 +40,8 @@ import io.raylytics.justmyweather.ui.customize.CustomizeViewModel
 import io.raylytics.justmyweather.ui.home.HomeScreen
 import io.raylytics.justmyweather.ui.home.HomeViewModel
 import io.raylytics.justmyweather.ui.home.SUN_TICK
+import io.raylytics.justmyweather.ui.places.PlacesScreen
+import io.raylytics.justmyweather.ui.places.PlacesViewModel
 import io.raylytics.justmyweather.ui.theme.JustMyWeatherTheme
 import io.raylytics.justmyweather.ui.theme.ThemeViewModel
 import io.raylytics.justmyweather.ui.theme.themeResolvesToDark
@@ -48,7 +50,7 @@ import kotlinx.coroutines.delay
 
 /** The screens this app has. A plain enum + state switch is all the navigation
  * a handful of destinations need — no nav library to learn or wire. */
-private enum class Screen { HOME, CUSTOMIZE, ALERTS }
+private enum class Screen { HOME, CUSTOMIZE, ALERTS, PLACES }
 
 class MainActivity : ComponentActivity() {
     private val container by lazy { (application as JustMyWeatherApp).container }
@@ -73,6 +75,17 @@ class MainActivity : ComponentActivity() {
                 CustomizeViewModel(
                     container.viewConfigRepository,
                     container.gadgetbridgeSettingsRepository,
+                )
+            }
+        }
+    }
+
+    private val placesViewModel: PlacesViewModel by viewModels {
+        viewModelFactory {
+            initializer {
+                PlacesViewModel(
+                    container.savedPlacesRepository,
+                    loadCatalog = container.placeSource::load,
                 )
             }
         }
@@ -163,6 +176,7 @@ class MainActivity : ComponentActivity() {
                         homeViewModel = homeViewModel,
                         customizeViewModel = customizeViewModel,
                         alertsViewModel = alertsViewModel,
+                        placesViewModel = placesViewModel,
                         themeConfig = themeConfig,
                         onThemeChange = themeViewModel::save,
                         onEnterAlerts = ::requestNotificationsIfNeeded,
@@ -184,6 +198,7 @@ private fun App(
     homeViewModel: HomeViewModel,
     customizeViewModel: CustomizeViewModel,
     alertsViewModel: AlertsViewModel,
+    placesViewModel: PlacesViewModel,
     themeConfig: ThemeConfig,
     onThemeChange: (ThemeConfig) -> Unit,
     onEnterAlerts: () -> Unit,
@@ -217,6 +232,7 @@ private fun App(
                 onRefresh = homeViewModel::refresh,
                 onSetMode = homeViewModel::setForecastMode,
                 onCycleSpan = homeViewModel::cycleModuleSpan,
+                onPlaces = { screen = Screen.PLACES },
                 onMoveModule = homeViewModel::moveModule,
                 onCustomize = { screen = Screen.CUSTOMIZE },
                 onAlerts = {
@@ -249,6 +265,38 @@ private fun App(
                 gadgetbridgeEnabled = gadgetbridgeEnabled,
                 onSetGadgetbridgeEnabled = customizeViewModel::setGadgetbridgeEnabled,
                 onDone = { screen = Screen.HOME },
+            )
+        }
+
+        Screen.PLACES -> {
+            BackHandler { screen = Screen.HOME }
+            val saved by placesViewModel.saved.collectAsStateWithLifecycle()
+            val results by placesViewModel.results.collectAsStateWithLifecycle()
+            val loading by placesViewModel.loading.collectAsStateWithLifecycle()
+            // The query is screen state, not app state: it does not outlive the
+            // visit, and holding it in the ViewModel only to mirror it here
+            // would be two copies of one string.
+            var query by rememberSaveable { mutableStateOf("") }
+            PlacesScreen(
+                saved = saved,
+                results = results,
+                query = query,
+                loading = loading,
+                onQueryChange = {
+                    query = it
+                    placesViewModel.setQuery(it)
+                },
+                onSave = placesViewModel::save,
+                onSaveCoordinates = placesViewModel::saveCoordinates,
+                onSelect = placesViewModel::select,
+                onRemove = placesViewModel::remove,
+                onDone = {
+                    screen = Screen.HOME
+                    // The place decides which coordinates every fetch uses, so
+                    // coming back has to re-ask rather than keep showing the
+                    // last place's weather under the new place's name.
+                    homeViewModel.refresh()
+                },
             )
         }
 

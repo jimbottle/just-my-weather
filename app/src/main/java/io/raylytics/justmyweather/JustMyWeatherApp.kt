@@ -19,6 +19,8 @@ import io.raylytics.justmyweather.data.gadgetbridge.GadgetbridgeBroadcaster
 import io.raylytics.justmyweather.data.gadgetbridge.GadgetbridgeExporter
 import io.raylytics.justmyweather.data.nws.NwsClient
 import io.raylytics.justmyweather.data.nws.OkHttpTransport
+import io.raylytics.justmyweather.data.places.AssetPlaceSource
+import io.raylytics.justmyweather.data.places.SavedPlacesRepository
 import io.raylytics.justmyweather.location.LocationProvider
 import io.raylytics.justmyweather.location.LocationResolver
 import kotlinx.coroutines.CoroutineScope
@@ -55,8 +57,21 @@ class AppContainer(context: Context) {
     // moment without a fix must fall back to where we last knew the user to
     // be, not to a default city. The background poll is the caller that most
     // depends on it — it never gets a fix at all.
+    val savedPlacesRepository = SavedPlacesRepository(appContext.dataStore)
+
+    /** The gazetteer is opened only when the places screen asks; nothing here
+     * holds 32k rows for the life of the process. */
+    val placeSource = AssetPlaceSource(appContext)
+
+    // A chosen place outranks the device fix, for the alert worker as much as
+    // for the glance — they share this one resolver, which is why the choice
+    // reaches background polling without any extra wiring.
     val locationResolver =
-        LocationResolver(locationProvider, DataStoreLastLocationStore(appContext.dataStore))
+        LocationResolver(
+            locationProvider,
+            DataStoreLastLocationStore(appContext.dataStore),
+            chosenPlace = savedPlacesRepository::current,
+        )
     val viewConfigRepository = ViewConfigRepository(appContext.dataStore)
     val themeConfigRepository = ThemeConfigRepository(appContext.dataStore)
     val alertRulesRepository = AlertRulesRepository(appContext.dataStore)

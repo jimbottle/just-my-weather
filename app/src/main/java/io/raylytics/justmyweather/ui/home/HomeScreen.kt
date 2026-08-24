@@ -1,6 +1,7 @@
 package io.raylytics.justmyweather.ui.home
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -86,6 +87,7 @@ fun HomeScreen(
     onAlerts: () -> Unit,
     onCycleSpan: (WeatherField) -> Unit,
     onMoveModule: (WeatherField, Int) -> Unit,
+    onPlaces: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var arranging by rememberSaveable { mutableStateOf(false) }
@@ -128,6 +130,7 @@ fun HomeScreen(
                             onDoneArranging = { arranging = false },
                             onCycleSpan = onCycleSpan,
                             onMoveModule = onMoveModule,
+                            onPlaces = onPlaces,
                         )
                 }
             }
@@ -155,6 +158,7 @@ private fun GlanceView(
     onDoneArranging: () -> Unit,
     onCycleSpan: (WeatherField) -> Unit,
     onMoveModule: (WeatherField, Int) -> Unit,
+    onPlaces: () -> Unit,
 ) {
     val snapshot = state.snapshot
     val config = state.config
@@ -175,10 +179,19 @@ private fun GlanceView(
             SafetyAlertBanner(alerts = state.safetyAlerts)
         }
 
+        // The place name is the way into choosing a place. Tapping the thing
+        // you want to change beats a fourth button in the action bar, which is
+        // already the busiest part of a screen built around calm — and it puts
+        // the control where someone looks when they notice the wrong city.
         Text(
             text = snapshot.locationLabel.uppercase(Locale.getDefault()),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier =
+                Modifier
+                    .clickable(onClick = onPlaces)
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                    .testTag("locationLabel"),
         )
 
         // Grid one of two: the glance. It always leads, and the forecast grid

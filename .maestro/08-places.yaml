@@ -1,0 +1,73 @@
+# Choosing where the weather is for.
+#
+# The chain this walks is the whole feature: the bundled gazetteer is read off
+# the APK, a search finds a real place in it, saving it selects it, and the
+# glance re-fetches for those coordinates. Nothing here touches the network for
+# the lookup itself — that is the point of shipping the list.
+appId: io.raylytics.justmyweather
+---
+- launchApp:
+    clearState: true
+    permissions:
+      all: allow
+
+- extendedWaitUntil:
+    visible: "Refresh"
+    timeout: 60000
+
+# The place name is the way in — tapping the thing you want to change.
+- tapOn:
+    id: "locationLabel"
+- assertVisible: "Places"
+- assertVisible: "Use my location"
+
+# Search the bundled list. "Louisville" exists in ten states, so narrowing by
+# state proves the state is part of the answer and not decoration.
+#
+# Results are addressed by id, not by their text: the search FIELD also holds
+# "louisville, ky", Maestro matches text case-insensitively, and a `tapOn` for
+# that string lands in the text box instead of on a result. Index 0 is the
+# best match, which is the ranking PlaceCatalogTest pins down.
+- tapOn:
+    id: "place-search"
+- inputText: "louisville, ky"
+- extendedWaitUntil:
+    visible:
+      id: "place-result"
+    timeout: 20000
+
+# Saving selects it, and the search box clears back to the saved list.
+- tapOn:
+    id: "place-result"
+    index: 0
+- assertVisible: "Saved"
+- assertVisible: "Showing"
+
+# Back to the glance: it names the chosen place and has re-fetched for it.
+- tapOn: "Done"
+- extendedWaitUntil:
+    visible: "LOUISVILLE, KY"
+    timeout: 60000
+- assertVisible:
+    text: ".*°"
+
+# The choice is persistent, not session state — the alert worker reads the same
+# store, so it has to survive the app dying.
+- stopApp
+- launchApp:
+    permissions:
+      all: allow
+- extendedWaitUntil:
+    visible: "LOUISVILLE, KY"
+    timeout: 60000
+
+# Handing back to the device is one tap, and the place stays saved for later.
+- tapOn:
+    id: "locationLabel"
+- tapOn: "Use my location"
+- assertVisible: "Louisville, KY"
+- tapOn: "Done"
+- extendedWaitUntil:
+    visible: "Refresh"
+    timeout: 60000
+- assertNotVisible: "LOUISVILLE, KY"

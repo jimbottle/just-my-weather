@@ -22,6 +22,36 @@ class LocationResolverTest {
         mock<LocationProvider> { on { lastKnownLocation() } doReturn fix }
 
     @Test
+    fun `a chosen place outranks even a live fix`() = runTest {
+        // Someone who picked a place is saying which sky to watch. Preferring
+        // wherever the phone happens to be would make the setting work only
+        // while standing still — and this same resolver is what the background
+        // alert poll asks.
+        val chosen = WeatherLocation(39.97, -105.14, "Louisville, CO")
+        val store = InMemoryLastLocationStore()
+        val resolver = LocationResolver(provider(home), store, chosenPlace = { chosen })
+        assertEquals(chosen, resolver.resolve())
+        // …and the choice is NOT written into the "last place we knew you to
+        // be" memory: that answers a different question, and polluting it
+        // would outlive the choice.
+        assertEquals(null, store.load())
+    }
+
+    @Test
+    fun `no chosen place falls through to the fix, as before`() = runTest {
+        val store = InMemoryLastLocationStore()
+        val resolver = LocationResolver(provider(home), store, chosenPlace = { null })
+        assertEquals(home, resolver.resolve())
+    }
+
+    @Test
+    fun `a places lookup that throws must not cost the caller its fix`() = runTest {
+        val store = InMemoryLastLocationStore()
+        val resolver = LocationResolver(provider(home), store, chosenPlace = { error("store is broken") })
+        assertEquals(home, resolver.resolve())
+    }
+
+    @Test
     fun `a live fix wins and is remembered`() = runTest {
         val store = InMemoryLastLocationStore()
         assertEquals(home, LocationResolver(provider(home), store).resolve())

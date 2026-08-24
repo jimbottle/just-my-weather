@@ -29,8 +29,21 @@ import io.raylytics.justmyweather.data.WeatherLocation
 class LocationResolver(
     private val provider: LocationProvider,
     private val store: LastLocationStore,
+    /**
+     * The place the user has chosen from their saved list, or null to follow
+     * the device. A plain function rather than a repository so this class stays
+     * ignorant of storage — and so tests can answer it without a DataStore.
+     */
+    private val chosenPlace: suspend () -> WeatherLocation? = { null },
 ) {
     suspend fun resolve(): WeatherLocation {
+        // An explicit choice outranks a live fix, and says so first. Someone
+        // who picked a place is telling the app which sky to watch; quietly
+        // preferring wherever the phone happens to be would make the setting
+        // work only while standing still. This runs on the background poll
+        // too, which is the half that matters: the choice is what the alert
+        // worker watches.
+        runCatching { chosenPlace() }.getOrNull()?.let { return it }
         provider.lastKnownLocation()?.let { fix ->
             // Best-effort: a store that won't write must not cost the caller
             // the perfectly good fix it is holding.

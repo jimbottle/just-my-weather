@@ -41,6 +41,8 @@ Pre-1.0, but the core product is in place:
   forecast ("overnight low below 35°", "chance of rain above 50% within 12h"),
   quiet by default, fires once per onset, with optional quiet hours and a
   configurable polling cadence
+- ✅ Saved places — search bundled US towns and cities offline, or enter
+  coordinates; a chosen place drives the glance and the alert poll alike
 - ⏳ Custom quiet-hours window, per-rule tone/snooze
 
 See the issue tracker (beads) for the live plan.
@@ -75,9 +77,13 @@ common extension points.
 
 Weather comes from the public US National Weather Service API — no key, no
 account, US coverage. Location is **coarse** and optional (the platform location
-provider, not Google Play Services); without it, the app falls back to a
-sensible default place (picking/saving your own place is planned). Personal
-alerts are evaluated and delivered on-device.
+provider, not Google Play Services). You can also pick and save places by name:
+tap the place name on the glance to search a list of ~32,000 US towns and
+cities **bundled in the app**, or enter coordinates for somewhere unlisted. The
+search does no network call and needs no geocoding key — the list is public
+-domain US Census Gazetteer data, rebuildable with `scripts/build-gazetteer.sh`.
+A chosen place is what the background alert poll watches too. Personal alerts
+are evaluated and delivered on-device.
 
 ### Why the "Observed" time doesn't move when you refresh
 
