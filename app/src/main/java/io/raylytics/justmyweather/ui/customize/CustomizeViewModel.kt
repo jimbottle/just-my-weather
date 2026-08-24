@@ -66,7 +66,11 @@ class CustomizeViewModel(
 
     fun setShowSunTimes(show: Boolean) = edit { it.setShowSunTimes(show) }
 
+    // Through the repository's atomic update, not read-then-save: these edits
+    // arrive at tap speed, but the home screen's arrange gestures write to the
+    // same preference, and only one of the two racing patterns has to be
+    // stale-read for an edit to vanish.
     private fun edit(transform: (ViewConfig) -> ViewConfig) {
-        viewModelScope.launch { repository.save(transform(config.value)) }
+        viewModelScope.launch { repository.update(transform) }
     }
 }

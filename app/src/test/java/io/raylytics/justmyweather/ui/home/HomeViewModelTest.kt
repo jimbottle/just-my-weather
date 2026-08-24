@@ -16,13 +16,16 @@ import io.raylytics.justmyweather.data.nws.HttpTransport
 import io.raylytics.justmyweather.data.nws.NwsClient
 import io.raylytics.justmyweather.location.LocationProvider
 import io.raylytics.justmyweather.location.LocationResolver
+import io.raylytics.justmyweather.view.ModuleSpan
 import io.raylytics.justmyweather.view.ViewConfig
 import io.raylytics.justmyweather.view.ViewMode
+import io.raylytics.justmyweather.view.WeatherField
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -62,15 +65,20 @@ class HomeViewModelTest {
     @AfterEach
     fun tearDown() = Dispatchers.resetMain()
 
-    /** Minimal DataStore<Preferences> so a real ViewConfigRepository runs on the JVM. */
+    /** Minimal DataStore<Preferences> so a real ViewConfigRepository runs on the JVM.
+     * [gate], when set, parks every write until it completes — how the arrange-edit
+     * test holds two edits in flight at once to prove they compose. */
     private class FakePreferencesDataStore(
         initial: Preferences = emptyPreferences(),
     ) : DataStore<Preferences> {
         private val flow = MutableStateFlow(initial)
         override val data: Flow<Preferences> = flow
+        var gate: CompletableDeferred<Unit>? = null
 
-        override suspend fun updateData(transform: suspend (Preferences) -> Preferences): Preferences =
-            transform(flow.value).also { flow.value = it }
+        override suspend fun updateData(transform: suspend (Preferences) -> Preferences): Preferences {
+            gate?.await()
+            return transform(flow.value).also { flow.value = it }
+        }
     }
 
     /** Routes by endpoint, counts fetches per forecast framing, and can fail
@@ -117,7 +125,12 @@ class HomeViewModelTest {
         }
     }
 
-    private class Harness(val transport: RoutingTransport, val vm: HomeViewModel)
+    private class Harness(
+        val transport: RoutingTransport,
+        val vm: HomeViewModel,
+        val configStore: FakePreferencesDataStore,
+        val configRepository: ViewConfigRepository,
+    )
 
     /** Builds the ViewModel over real repositories; collects [HomeViewModel.state]
      * for the test body so the WhileSubscribed combine actually runs. */
@@ -131,7 +144,8 @@ class HomeViewModelTest {
         zone: () -> ZoneId = { ZoneId.of("America/New_York") },
     ): Harness {
         val transport = RoutingTransport()
-        val configRepository = ViewConfigRepository(FakePreferencesDataStore())
+        val configStore = FakePreferencesDataStore()
+        val configRepository = ViewConfigRepository(configStore)
         config?.let { c -> launch { configRepository.save(c) } }
         val vm =
             HomeViewModel(
@@ -154,7 +168,7 @@ class HomeViewModelTest {
                 zone = zone,
             )
         backgroundScope.launch { vm.state.collect {} }
-        return Harness(transport, vm)
+        return Harness(transport, vm, configStore, configRepository)
     }
 
     private fun HomeViewModel.ready(): HomeUiState.Ready = state.value as HomeUiState.Ready
@@ -532,6 +546,61 @@ class HomeViewModelTest {
             assertEquals(day.date, day.sunrise!!.atZone(zone).toLocalDate(), "sunrise on its own date")
             assertEquals(day.date, day.sunset!!.atZone(zone).toLocalDate(), "sunset on its own date")
         }
+    }
+
+    @Test
+    fun `cycleModuleSpan persists the next width for that field only`() = runTest(dispatcher) {
+        val h = harness()
+        advanceUntilIdle()
+        h.vm.cycleModuleSpan(WeatherField.CONDITIONS) // half -> full
+        advanceUntilIdle()
+        val saved = h.configRepository.config.first()
+        assertEquals(ModuleSpan.FULL, saved.items.first { it.field == WeatherField.CONDITIONS }.span)
+        // The neighbour keeps its width — the transform touches one field.
+        assertEquals(ModuleSpan.FULL, saved.items.first { it.field == WeatherField.TEMPERATURE }.span)
+        assertEquals(ModuleSpan.QUARTER, saved.items.first { it.field == WeatherField.WIND }.span)
+    }
+
+    @Test
+    fun `moveModule persists the dropped order`() = runTest(dispatcher) {
+        val h = harness()
+        advanceUntilIdle()
+        h.vm.moveModule(WeatherField.TEMPERATURE, 1)
+        advanceUntilIdle()
+        assertEquals(
+            listOf(WeatherField.CONDITIONS, WeatherField.TEMPERATURE),
+            h.configRepository.config.first().visible.map { it.field },
+        )
+    }
+
+    @Test
+    fun `overlapping arrange edits compose rather than the stale one winning`() = runTest(dispatcher) {
+        // A drag emits edits faster than DataStore writes them. Park the store
+        // so BOTH edits are in flight at once, then release: each transform
+        // must apply to the state the previous one produced. The read-then-save
+        // pattern this guards against computed both transforms from the same
+        // original config, so whichever wrote last silently erased the other.
+        val h = harness()
+        advanceUntilIdle()
+        val gate = CompletableDeferred<Unit>()
+        h.configStore.gate = gate
+        h.vm.moveModule(WeatherField.TEMPERATURE, 1)
+        h.vm.cycleModuleSpan(WeatherField.CONDITIONS)
+        runCurrent()
+        h.configStore.gate = null
+        gate.complete(Unit)
+        advanceUntilIdle()
+        val saved = h.configRepository.config.first()
+        assertEquals(
+            listOf(WeatherField.CONDITIONS, WeatherField.TEMPERATURE),
+            saved.visible.map { it.field },
+            "the move survived",
+        )
+        assertEquals(
+            ModuleSpan.FULL,
+            saved.items.first { it.field == WeatherField.CONDITIONS }.span,
+            "the resize survived",
+        )
     }
 
     private companion object {

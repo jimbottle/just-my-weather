@@ -20,7 +20,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -282,13 +281,15 @@ class HomeViewModel(
     fun moveModule(field: WeatherField, toVisibleIndex: Int) = editConfig { it.moveVisible(field, toVisibleIndex) }
 
     /**
-     * Arrange-mode edits persist exactly the way the customize screen's do — a
-     * pure transform of the latest stored config, saved back. The glance
-     * observes the same flow, so the grid reflects the edit as soon as it
-     * lands; there is no separate in-memory arrangement to reconcile.
+     * Arrange-mode edits persist as atomic transforms of the stored config —
+     * [ViewConfigRepository.update] runs the transform inside the DataStore
+     * edit, so the burst of edits a drag emits composes in order instead of a
+     * stale read clobbering a newer write. The glance observes the same flow,
+     * so the grid reflects the edit as soon as it lands; there is no separate
+     * in-memory arrangement to reconcile.
      */
     private fun editConfig(transform: (ViewConfig) -> ViewConfig) {
-        viewModelScope.launch { configRepository.save(transform(configRepository.config.first())) }
+        viewModelScope.launch { configRepository.update(transform) }
     }
 
     /** The mode collector in `init` triggers the fetch on every mode change.
