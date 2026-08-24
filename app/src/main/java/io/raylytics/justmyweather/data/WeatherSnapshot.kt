@@ -1,6 +1,7 @@
 package io.raylytics.justmyweather.data
 
 import java.time.Instant
+import java.time.ZoneId
 
 /**
  * Everything the UI might show for one place at one moment, already in display
@@ -29,4 +30,24 @@ data class WeatherSnapshot(
     val relativeHumidityPercent: Double? = null,
     /** Wind bearing in degrees clockwise from true north, 0–360. */
     val windDirectionDegrees: Double? = null,
-)
+    /**
+     * IANA id of the place this reading is FOR, from the NWS point lookup —
+     * not the device's zone. Kept as a string so the data layer cannot fail on
+     * an id it does not recognise; [zone] does the parsing, safely.
+     *
+     * Null when unknown (an older cached point, or a lookup that never
+     * carried one), and the UI then falls back to the device's zone, which is
+     * what the app always did.
+     */
+    val timeZone: String? = null,
+) {
+    /**
+     * The place's zone, or null if unknown or unparseable.
+     *
+     * Parsed here rather than at construction so a garbage id — a corrupted
+     * cache, a zone this JVM has never heard of — costs a fallback to the
+     * device's zone instead of taking down the reading it is attached to.
+     */
+    val zone: ZoneId?
+        get() = timeZone?.let { id -> runCatching { ZoneId.of(id) }.getOrNull() }
+}

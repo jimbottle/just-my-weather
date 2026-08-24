@@ -89,7 +89,7 @@ class HomeViewModelTest {
     /** Routes by endpoint, counts fetches per forecast framing, and can fail
      * the daily endpoint on demand or park one daily (or observation) response
      * on a gate so a test can act while that fetch is genuinely in flight. */
-    private class RoutingTransport : HttpTransport {
+    private class RoutingTransport(private val points: String = POINTS) : HttpTransport {
         var hourlyFetches = 0
         var dailyFetches = 0
         var failDaily = false
@@ -109,7 +109,7 @@ class HomeViewModelTest {
                         OBSERVATION
                     }
                     url.endsWith("/stations") -> STATIONS
-                    "/points/" in url -> POINTS
+                    "/points/" in url -> points
                     url.endsWith("/forecast/hourly") -> {
                         hourlyFetches++
                         HOURLY
@@ -141,6 +141,7 @@ class HomeViewModelTest {
      * for the test body so the WhileSubscribed combine actually runs. */
     private fun TestScope.harness(
         config: ViewConfig? = null,
+        points: String = POINTS,
         snapshots: SnapshotCache = InMemorySnapshotCache(),
         onSnapshotLoaded: suspend (WeatherSnapshot) -> Unit = {},
         // A lambda, not an Instant: a test that steps time needs the clock to
@@ -148,7 +149,7 @@ class HomeViewModelTest {
         clock: () -> Instant = { NOW },
         zone: () -> ZoneId = { ZoneId.of("America/New_York") },
     ): Harness {
-        val transport = RoutingTransport()
+        val transport = RoutingTransport(points)
         val configStore = FakePreferencesDataStore()
         val configRepository = ViewConfigRepository(configStore)
         config?.let { c -> launch { configRepository.save(c) } }
@@ -582,6 +583,47 @@ class HomeViewModelTest {
     }
 
     @Test
+    fun `times read in the place's zone, not the device's`() = runTest(dispatcher) {
+        // The bug saved places made reachable: the fixture point is in New
+        // York, so a device sitting in Los Angeles must still be told New York
+        // time — a saved place hours away is arguably the main reason to save
+        // one, and "Sunset 10:48 PM" for somewhere the sun sets at 7:48 is
+        // wrong rather than merely surprising.
+        val h = harness(zone = { ZoneId.of("America/Los_Angeles") })
+        advanceUntilIdle()
+        assertEquals(ZoneId.of("America/New_York"), h.vm.ready().zone)
+    }
+
+    @Test
+    fun `an unknown zone falls back to the device's rather than failing`() = runTest(dispatcher) {
+        // A point that carries no zone (an older cached lookup) must leave the
+        // app exactly as it always behaved.
+        val h = harness(zone = { ZoneId.of("America/Los_Angeles") }, points = POINTS_NO_ZONE)
+        advanceUntilIdle()
+        assertEquals(ZoneId.of("America/Los_Angeles"), h.vm.ready().zone)
+    }
+
+    @Test
+    fun `sun rows are worked out for the place's day, not the device's`() = runTest(dispatcher) {
+        // 02:00 UTC on the 15th is 22:00 on the 14th in New York (the fixture
+        // point) but 11:00 on the 15th in Tokyo (the device). With the sun
+        // module on, the first row must be the PLACE's today — the day rows
+        // exist to say which date a time belongs to, so taking the date from
+        // the wrong zone defeats them.
+        //
+        // Not 04:00Z: that is exactly midnight in New York, so the two zones
+        // would agree on the date and the test would pass either way.
+        val h =
+            harness(
+                config = ViewConfig.DEFAULT.toggle(ModuleKey.Sun),
+                clock = { Instant.parse("2026-08-15T02:00:00Z") },
+                zone = { ZoneId.of("Asia/Tokyo") },
+            )
+        advanceUntilIdle()
+        assertEquals(LocalDate.of(2026, 8, 14), h.vm.ready().sunDays.first().date)
+    }
+
+    @Test
     fun `cycleModuleSpan persists the next width for that field only`() = runTest(dispatcher) {
         val h = harness()
         advanceUntilIdle()
@@ -662,6 +704,14 @@ class HomeViewModelTest {
             )
 
         const val POINTS =
+            """{"properties":{"gridId":"OKX","gridX":33,"gridY":35,
+                "forecastZone":"https://api.weather.gov/zones/forecast/NYZ072",
+                "timeZone":"America/New_York",
+                "relativeLocation":{"properties":{"city":"Brooklyn","state":"NY"}}}}"""
+
+        /** The same point with no timeZone — an older cached lookup, or a
+         * response that simply omits it. */
+        const val POINTS_NO_ZONE =
             """{"properties":{"gridId":"OKX","gridX":33,"gridY":35,
                 "forecastZone":"https://api.weather.gov/zones/forecast/NYZ072",
                 "relativeLocation":{"properties":{"city":"Brooklyn","state":"NY"}}}}"""

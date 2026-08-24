@@ -30,6 +30,7 @@ import org.junit.Rule
 import org.junit.Test
 import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 
 /**
  * The two things about the module grid that only a device can answer: what the
@@ -93,7 +94,7 @@ class ModuleGridTest {
             content =
                 when (key) {
                     is ModuleKey.Reading -> ModuleContent.Reading("—")
-                    ModuleKey.Sun -> ModuleContent.Sun(sunDays)
+                    ModuleKey.Sun -> ModuleContent.Sun(sunDays, ZoneId.systemDefault())
                 },
         )
 

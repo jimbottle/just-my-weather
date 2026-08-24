@@ -38,6 +38,9 @@ class NwsClient(
             gridY = props.gridY ?: error("nws /points/$lat,$lon missing gridY"),
             forecastZoneId = zoneId,
             observationStationId = stationId,
+            // Not fatal if absent: everything still works, times just fall
+            // back to the device's zone.
+            timeZone = props.timeZone,
             // The /points response already carries the nearest city/state, so
             // we keep it here rather than re-fetching /points just for a label.
             relativeLocation = props.toRelativeLocation(),

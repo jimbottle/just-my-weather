@@ -7,6 +7,7 @@ import io.raylytics.justmyweather.data.nws.DailyPeriod
 import io.raylytics.justmyweather.data.nws.ForecastPoint
 import io.raylytics.justmyweather.view.ForecastMode
 import io.raylytics.justmyweather.view.ViewConfig
+import java.time.ZoneId
 
 /**
  * The complete state of the home screen as one value. A sealed hierarchy keeps
@@ -54,6 +55,13 @@ sealed interface HomeUiState {
          * be null: above the Arctic circle the sun may not rise for months.
          */
         val sunDays: List<SunDay> = emptyList(),
+        /**
+         * The zone every time on screen is formatted in: the PLACE's, from the
+         * NWS point lookup, falling back to the device's when unknown. A saved
+         * place can be hours away, and "Sunset 10:48 PM" for somewhere the sun
+         * sets at 7:48 is wrong rather than merely surprising.
+         */
+        val zone: ZoneId = ZoneId.systemDefault(),
     ) : HomeUiState
 
     /** Network or NWS failure, with a short plain-language message. */

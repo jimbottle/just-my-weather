@@ -34,7 +34,8 @@ class DataStorePointCacheTest {
             transform(flow.value).also { flow.value = it }
     }
 
-    private val point = PointsLookup("OKX", 33, 35, "NYZ072", "KNYC", RelativeLocation("Brooklyn", "NY"))
+    private val point =
+        PointsLookup("OKX", 33, 35, "NYZ072", "KNYC", relativeLocation = RelativeLocation("Brooklyn", "NY"))
 
     @Test
     fun `a put survives into a fresh instance via the store`() = runTest {

@@ -21,6 +21,9 @@ object PointCacheCodec {
         val gridY: Int,
         val forecastZoneId: String,
         val observationStationId: String,
+        // Defaulted null so a cache written before the zone was captured still
+        // decodes; the next resolve fills it in.
+        val timeZone: String? = null,
         val city: String? = null,
         val state: String? = null,
     )
@@ -36,6 +39,7 @@ object PointCacheCodec {
                     gridY = p.gridY,
                     forecastZoneId = p.forecastZoneId,
                     observationStationId = p.observationStationId,
+                    timeZone = p.timeZone,
                     city = p.relativeLocation?.city,
                     state = p.relativeLocation?.state,
                 )
@@ -53,6 +57,7 @@ object PointCacheCodec {
                 gridY = s.gridY,
                 forecastZoneId = s.forecastZoneId,
                 observationStationId = s.observationStationId,
+                timeZone = s.timeZone,
                 relativeLocation =
                     if (s.city != null && s.state != null) RelativeLocation(s.city, s.state) else null,
             )

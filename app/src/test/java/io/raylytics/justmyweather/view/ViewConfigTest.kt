@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 
 class ViewConfigTest {
     /** Shorthand: every reading module is `ModuleKey.Reading(field)`, and
@@ -114,8 +115,11 @@ class ViewConfigTest {
         // exactly what would lose the two-day distinction.
         val days = listOf(SunDay(LocalDate.of(2026, 6, 24), null, null))
         val config = ViewConfig.DEFAULT.toggle(ModuleKey.Sun)
-        val sun = config.render(snapshot, days).modules.first { it.module == ModuleKey.Sun }
-        assertEquals(ModuleContent.Sun(days), sun.content)
+        val zone = ZoneId.of("America/New_York")
+        val sun = config.render(snapshot, days, zone).modules.first { it.module == ModuleKey.Sun }
+        // The zone travels WITH the days: they are instants, and the same
+        // sunrise formats as a different clock time depending where you ask.
+        assertEquals(ModuleContent.Sun(days, zone), sun.content)
         // Full width by default: that is the size the table needs.
         assertEquals(ModuleSpan.FULL, sun.span)
     }

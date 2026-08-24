@@ -369,7 +369,7 @@ private fun ModuleTile(
                 // Sun times draw themselves: they are a table at full width and
                 // today's pair when narrower. See SunModule.kt for why that is
                 // adaptation rather than two designs.
-                is ModuleContent.Sun -> SunModuleContent(days = content.days, span = module.span)
+                is ModuleContent.Sun -> SunModuleContent(days = content.days, span = module.span, zone = content.zone)
             }
         }
     }

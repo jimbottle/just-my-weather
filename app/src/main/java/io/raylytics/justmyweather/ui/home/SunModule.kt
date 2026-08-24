@@ -40,6 +40,8 @@ private val SUN_COLUMN_WIDTH = 92.dp
 internal fun SunModuleContent(
     days: List<SunDay>,
     span: ModuleSpan,
+    /** The PLACE's zone, not the device's — see ModuleContent.Sun. */
+    zone: ZoneId,
 ) {
     if (days.isEmpty()) {
         // Honest absence, the same em-dash an empty reading gets: the module is
@@ -52,8 +54,8 @@ internal fun SunModuleContent(
         return
     }
     when (span) {
-        ModuleSpan.FULL -> SunTimesTable(days)
-        ModuleSpan.HALF, ModuleSpan.QUARTER -> SunPair(days.first())
+        ModuleSpan.FULL -> SunTimesTable(days, zone)
+        ModuleSpan.HALF, ModuleSpan.QUARTER -> SunPair(days.first(), zone)
     }
 }
 
@@ -66,8 +68,7 @@ internal fun SunModuleContent(
  * telling them apart.
  */
 @Composable
-internal fun SunTimesTable(days: List<SunDay>) {
-    val zone = ZoneId.systemDefault()
+internal fun SunTimesTable(days: List<SunDay>, zone: ZoneId = ZoneId.systemDefault()) {
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -103,8 +104,7 @@ internal fun SunTimesTable(days: List<SunDay>) {
  * position left to carry the distinction.
  */
 @Composable
-private fun SunPair(day: SunDay) {
-    val zone = ZoneId.systemDefault()
+private fun SunPair(day: SunDay, zone: ZoneId) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(2.dp),

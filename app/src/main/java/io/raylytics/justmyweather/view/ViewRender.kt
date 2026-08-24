@@ -2,6 +2,7 @@ package io.raylytics.justmyweather.view
 
 import io.raylytics.justmyweather.data.SunDay
 import io.raylytics.justmyweather.data.WeatherSnapshot
+import java.time.ZoneId
 
 /**
  * What a module actually has to draw.
@@ -20,9 +21,17 @@ sealed interface ModuleContent {
     /** A single reading, already formatted ("72°", "Calm", "—"). */
     data class Reading(val text: String) : ModuleContent
 
-    /** Sun times, today first. The tile decides how much of this it can show
-     * at its width; the days themselves are not the tile's to choose. */
-    data class Sun(val days: List<SunDay>) : ModuleContent
+    /**
+     * Sun times, today first, with the zone they are to be read in — the
+     * PLACE's, not the device's. The zone travels with the days because they
+     * are instants: the same sunrise formats as two different clock times
+     * depending on where you ask from, and the answer the user wants is the
+     * one local to the place they are looking at.
+     *
+     * The tile decides how much of this it can show at its width; the days
+     * themselves are not the tile's to choose.
+     */
+    data class Sun(val days: List<SunDay>, val zone: ZoneId) : ModuleContent
 }
 
 /** A module resolved to what the screen shows: its label, its content, and how
@@ -53,7 +62,13 @@ data class RenderedView(
  * worked out on the device from the date and where you are, which is why the
  * sun module keeps working with no signal.
  */
-fun ViewConfig.render(snapshot: WeatherSnapshot, sunDays: List<SunDay> = emptyList()): RenderedView =
+fun ViewConfig.render(
+    snapshot: WeatherSnapshot,
+    sunDays: List<SunDay> = emptyList(),
+    /** Which zone the sun times read in. Defaults to the device's, which is
+     * the honest fallback while the place's own zone is unknown. */
+    zone: ZoneId = ZoneId.systemDefault(),
+): RenderedView =
     RenderedView(
         visible.map { setting ->
             ModuleValue(
@@ -64,7 +79,7 @@ fun ViewConfig.render(snapshot: WeatherSnapshot, sunDays: List<SunDay> = emptyLi
                     when (val module = setting.module) {
                         is ModuleKey.Reading ->
                             ModuleContent.Reading(module.field.format(snapshot) ?: "—")
-                        ModuleKey.Sun -> ModuleContent.Sun(sunDays)
+                        ModuleKey.Sun -> ModuleContent.Sun(sunDays, zone)
                     },
             )
         },

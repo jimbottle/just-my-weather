@@ -195,6 +195,7 @@ private fun GlanceView(
             snapshot = snapshot,
             config = config,
             sunDays = state.sunDays,
+            zone = state.zone,
             arranging = arranging,
             onStartArranging = onStartArranging,
             onCycleSpan = onCycleSpan,
@@ -225,6 +226,7 @@ private fun GlanceView(
                 dailyStyle = config.dailyStyle,
                 hours = state.hourly,
                 periods = state.daily,
+                zone = state.zone,
                 error = state.forecastError,
                 gap = spec.moduleGap,
                 modifier = Modifier.padding(top = 4.dp),
@@ -290,12 +292,14 @@ private fun NowContent(
     /** Not part of the snapshot: computed on the device, so the sun module
      * works with no signal. */
     sunDays: List<SunDay>,
+    /** The place's zone — every clock face on the glance reads in it. */
+    zone: ZoneId,
     arranging: Boolean,
     onStartArranging: () -> Unit,
     onCycleSpan: (ModuleKey) -> Unit,
     onMoveModule: (ModuleKey, Int) -> Unit,
 ) {
-    val rendered: RenderedView = config.render(snapshot, sunDays)
+    val rendered: RenderedView = config.render(snapshot, sunDays, zone)
     val spec = config.density.spec()
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -333,7 +337,7 @@ private fun NowContent(
         // the time to be "just the number", but a number whose provenance is
         // undiscoverable is exactly what made this confusing, and one quiet
         // line is the smallest thing that fixes it.
-        ObservedLine(snapshot)
+        ObservedLine(snapshot, zone = zone)
     }
 }
 
@@ -376,6 +380,9 @@ private fun NowContent(
 @Composable
 internal fun ObservedLine(
     snapshot: WeatherSnapshot,
+    /** Formats the observed time in the PLACE's zone: a station reading is
+     * taken where the weather is, not where the phone is. */
+    zone: ZoneId = ZoneId.systemDefault(),
     /** The wall clock, injectable so a test can decide when "now" is — the
      * defects this line has had were all in *when* it read the clock, which is
      * untestable while the read is hard-wired. */
@@ -394,7 +401,7 @@ internal fun ObservedLine(
             }
         }
     }
-    val time = observedLabel(snapshot)
+    val time = observedLabel(snapshot, zone)
     val age = observedAt?.let { ObservationAge.label(it, now) }
     Text(
         text =
@@ -505,5 +512,5 @@ internal val monthDayFormat: DateTimeFormatter = DateTimeFormatter.ofPattern("MM
  * printing the age beside this — "Observed 12:40 PM · 12 min ago" — so the
  * timestamp keeps saying what it means and the age answers "is this current?".
  */
-private fun observedLabel(snapshot: WeatherSnapshot): String? =
-    snapshot.observedAt?.atZone(ZoneId.systemDefault())?.format(timeFormat)
+private fun observedLabel(snapshot: WeatherSnapshot, zone: ZoneId): String? =
+    snapshot.observedAt?.atZone(zone)?.format(timeFormat)

@@ -27,6 +27,11 @@ data class NwsPointsResponse(
         val gridX: Int? = null,
         val gridY: Int? = null,
         val forecastZone: String? = null,
+        /** IANA id for the POINT, e.g. "America/New_York" — not the device's.
+         * NWS returns it on every /points response, which is why the app needs
+         * no timezone-boundary dataset to know what time it is where you are
+         * looking. */
+        val timeZone: String? = null,
         val relativeLocation: RelativeLocationFeature? = null,
     )
 

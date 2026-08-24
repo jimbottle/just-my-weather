@@ -82,6 +82,7 @@ class WeatherRepository(
                 observedAt = obs.observedAt,
                 relativeHumidityPercent = obs.relativeHumidityPercent,
                 windDirectionDegrees = obs.windDirectionDegrees,
+                timeZone = point.timeZone,
             )
         // Remember it for the next cold start. A failure to persist must never
         // cost the caller its reading — the worst case is one blank first paint.
@@ -145,6 +146,17 @@ class WeatherRepository(
         val point = resolvePoint(location)
         return nws.getDailyForecast(point.gridId, point.gridX, point.gridY)
     }
+
+    /**
+     * The place's timezone if we already know it, WITHOUT going to the network.
+     *
+     * Cache-only on purpose. The caller is the sun-times computation, which is
+     * pure arithmetic that must keep working on a dead network — asking here
+     * must never become a fetch, and "not known yet" is a perfectly good answer
+     * that falls back to the device's zone until a reading lands.
+     */
+    suspend fun cachedZone(location: WeatherLocation): String? =
+        runCatching { pointCache.get(PointCacheKey.of(location)) }.getOrNull()?.timeZone
 
     private suspend fun resolvePoint(location: WeatherLocation): PointsLookup {
         // Rounded, not raw: a coarse fix jitters by metres between launches

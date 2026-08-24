@@ -87,6 +87,18 @@ class HomeViewModel(
      */
     private var sunLocation: WeatherLocation? = null
 
+    /**
+     * The zone of the place being shown, once known. Everything with a clock
+     * face on it reads through this: sunrise, the hourly labels, the observed
+     * time. Null means "not known yet", and the device's zone stands in.
+     *
+     * It matters because a saved place can be in another timezone, and that is
+     * arguably the main reason to save one. Before saved places existed you
+     * were nearly always looking at where you stood, so device and place
+     * agreed and this was unreachable.
+     */
+    private val placeZone = MutableStateFlow<ZoneId?>(null)
+
     /** null = follow the config's default; set once the user taps a chip on
      * the forecast grid. */
     private val chosenMode = MutableStateFlow<ForecastMode?>(null)
@@ -116,12 +128,13 @@ class HomeViewModel(
         }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     /** Paired so the five-flow limit of the typed [combine] still fits: these
-     * two are the "what to show for right now" half of the screen. */
-    private val glance = combine(weather, sunEvents) { load, sun -> load to sun }
+     * are the "what to show for right now" half of the screen. */
+    private val glance =
+        combine(weather, sunEvents, placeZone) { load, sun, zone -> Triple(load, sun, zone) }
 
     val state: StateFlow<HomeUiState> =
         combine(glance, configRepository.config, forecast, forecasts, safetyAlerts) {
-                (load, sun), config, forecastChoice, forecasts, alerts ->
+                (load, sun, placeZone), config, forecastChoice, forecasts, alerts ->
             // Before the stored config lands, fall back to what it will say:
             // the config flow itself has already emitted by the time a Ready
             // state can exist, so this only covers the first frame.
@@ -157,6 +170,10 @@ class HomeViewModel(
                         // Gated on the module being on the grid, not on a
                         // separate switch: the sun module IS the switch now.
                         sunDays = if (config.shows(ModuleKey.Sun)) sun else emptyList(),
+                        // The reading's own zone wins over the flow's, so the
+                        // first frame after a fetch is never formatted in the
+                        // previous place's time.
+                        zone = (load as? WeatherLoad.Ready)?.snapshot?.zone ?: placeZone ?: zone(),
                     )
             }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUiState.Loading)
@@ -218,6 +235,9 @@ class HomeViewModel(
             // Before the fetch, and independent of it: pure arithmetic that
             // cannot fail, so the sun times still appear on a dead network.
             sunLocation = location
+            // Cache-only, so this stays free and offline-safe: the sun module
+            // is pure arithmetic and must not wait on a fetch to be right.
+            placeZone.value = runCatching { repository.cachedZone(location) }.getOrNull()?.let(::parseZone)
             refreshSunTimes()
             val result = runCatching { repository.load(location) }
             weather.value =
@@ -263,7 +283,19 @@ class HomeViewModel(
             // leave a Ready state standing, and re-exporting the reading it
             // retained would send the watch the same reading again as if it
             // were new.
-            result.onSuccess { runCatching { onSnapshotLoaded(it) } }
+            // A landed reading is the authority on its own zone, and may be
+            // the first time we learn it for a newly chosen place.
+            result.onSuccess { snapshot ->
+                snapshot.zone?.let { learned ->
+                    if (placeZone.value != learned) {
+                        placeZone.value = learned
+                        // The sun rows are computed against a zone; a new one
+                        // means "today" may be a different day.
+                        refreshSunTimes()
+                    }
+                }
+                runCatching { onSnapshotLoaded(snapshot) }
+            }
             // Alerts are a side dish: a fetch that fails leaves the glance
             // intact and the banner simply absent.
             //
@@ -295,9 +327,16 @@ class HomeViewModel(
      */
     fun refreshSunTimes() {
         val location = sunLocation ?: return
-        val today = clock().atZone(zone()).toLocalDate()
-        sunEvents.value = SunTimes.daysFrom(location.latitude, location.longitude, today, zone(), SUN_DAYS)
+        // The place's zone decides which day "today" is — for a place a few
+        // hours away that is a different date for part of the day, and the
+        // whole point of the day rows is saying which date a time belongs to.
+        val zone = placeZone.value ?: zone()
+        val today = clock().atZone(zone).toLocalDate()
+        sunEvents.value = SunTimes.daysFrom(location.latitude, location.longitude, today, zone, SUN_DAYS)
     }
+
+    /** An id this JVM does not recognise costs a fallback, never a crash. */
+    private fun parseZone(id: String): ZoneId? = runCatching { ZoneId.of(id) }.getOrNull()
 
     /** A tap on a wiggling module: step it to the next grid width. */
     fun cycleModuleSpan(module: ModuleKey) = editConfig { it.cycleSpan(module) }

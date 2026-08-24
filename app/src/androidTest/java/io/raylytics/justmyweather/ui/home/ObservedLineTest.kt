@@ -114,7 +114,7 @@ class ObservedLineTest {
             reads++
             fakeNow
         }
-        compose.setContent { ObservedLine(snapshotAt(observedAt = t0.minusSeconds(60)), clock) }
+        compose.setContent { ObservedLine(snapshotAt(observedAt = t0.minusSeconds(60)), clock = clock) }
         compose.mainClock.advanceTimeByFrame()
         compose.onNodeWithText("1 min ago", substring = true).assertExists()
 

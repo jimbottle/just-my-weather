@@ -18,6 +18,10 @@ data class PointsLookup(
     val gridY: Int,
     val forecastZoneId: String,
     val observationStationId: String,
+    /** The point's own IANA timezone, so times read in the local time of the
+     * place being looked at rather than of the phone doing the looking.
+     * Nullable: an older cached point predates this being captured. */
+    val timeZone: String? = null,
     val relativeLocation: RelativeLocation? = null,
 )
 

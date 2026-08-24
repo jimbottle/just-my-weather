@@ -71,6 +71,9 @@ internal fun ForecastGrid(
     hours: List<ForecastPoint>?,
     periods: List<DailyPeriod>?,
     error: String?,
+    /** The place's zone: an hour label is a clock face, and one for a place a
+     * few timezones away must not read in the phone's time. */
+    zone: ZoneId,
     gap: androidx.compose.ui.unit.Dp,
     modifier: Modifier = Modifier,
 ) {
@@ -87,7 +90,7 @@ internal fun ForecastGrid(
                         span = { HOUR_SPAN },
                         gap = gap,
                         modifier = Modifier.fillMaxWidth(),
-                    ) { hour, _, tileModifier -> HourTile(hour, tileModifier) }
+                    ) { hour, _, tileModifier -> HourTile(hour, zone, tileModifier) }
                 }
 
             ForecastMode.DAILY ->
@@ -161,7 +164,7 @@ private fun ForecastHeader(
 
 /** One hour: when, how likely rain is, how warm. */
 @Composable
-private fun HourTile(hour: ForecastPoint, modifier: Modifier = Modifier) {
+private fun HourTile(hour: ForecastPoint, zone: ZoneId, modifier: Modifier = Modifier) {
     TileShell(borderColor = MaterialTheme.colorScheme.surfaceVariant, modifier = modifier) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -170,7 +173,7 @@ private fun HourTile(hour: ForecastPoint, modifier: Modifier = Modifier) {
             Text(
                 text =
                     hour.startTime
-                        .atZone(ZoneId.systemDefault())
+                        .atZone(zone)
                         .format(hourFormat)
                         .lowercase(Locale.getDefault()),
                 style = MaterialTheme.typography.labelSmall,
