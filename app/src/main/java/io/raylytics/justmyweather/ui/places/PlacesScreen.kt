@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import io.raylytics.justmyweather.data.WeatherLocation
 import io.raylytics.justmyweather.data.places.Place
 import io.raylytics.justmyweather.data.places.SavedPlaces
+import java.util.Locale
 
 /**
  * Choose where the weather is for.
@@ -288,9 +289,22 @@ internal fun parseCoordinates(name: String, latitude: String, longitude: String)
     val lon = longitude.trim().toDoubleOrNull() ?: return null
     if (!lat.isFinite() || !lon.isFinite()) return null
     if (lat !in -90.0..90.0 || lon !in -180.0..180.0) return null
-    val label = name.trim().ifBlank { "${"%.2f".format(lat)}, ${"%.2f".format(lon)}" }
-    return WeatherLocation(latitude = lat, longitude = lon, label = label)
+    return WeatherLocation(latitude = lat, longitude = lon, label = name.trim().ifBlank { coordinateLabel(lat, lon) })
 }
 
 private fun coordinateLabel(location: WeatherLocation): String =
-    "${"%.2f".format(location.latitude)}, ${"%.2f".format(location.longitude)}"
+    coordinateLabel(location.latitude, location.longitude)
+
+/**
+ * "38.22, -85.74" — always with a dot, whatever the device's locale.
+ *
+ * [Locale.US] is not decoration here, twice over. A device set to German
+ * formats 38.22 as "38,22", so the pair would read "38,22, -85,74" — a comma
+ * serving as both the decimal point and the separator between the two numbers,
+ * which is unreadable. And because [SavedPlaces] uses the label as a place's
+ * identity, a locale-dependent label would make the same coordinates a
+ * different place after a language change. The same trap `PointCacheKey.round`
+ * documents.
+ */
+internal fun coordinateLabel(latitude: Double, longitude: Double): String =
+    String.format(Locale.US, "%.2f, %.2f", latitude, longitude)
