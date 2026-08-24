@@ -40,14 +40,14 @@ import io.raylytics.justmyweather.view.AccentChoice
 import io.raylytics.justmyweather.view.AlertBannerPosition
 import io.raylytics.justmyweather.view.DailyStyle
 import io.raylytics.justmyweather.view.Density
-import io.raylytics.justmyweather.view.FieldSetting
 import io.raylytics.justmyweather.view.ForecastMode
+import io.raylytics.justmyweather.view.ModuleKey
+import io.raylytics.justmyweather.view.ModuleSetting
 import io.raylytics.justmyweather.view.ModuleSpan
 import io.raylytics.justmyweather.view.ThemeConfig
 import io.raylytics.justmyweather.view.ThemeMood
 import io.raylytics.justmyweather.view.TypeChoice
 import io.raylytics.justmyweather.view.ViewConfig
-import io.raylytics.justmyweather.view.WeatherField
 import kotlinx.coroutines.delay
 
 private const val RELABEL_DEBOUNCE_MS = 400L
@@ -64,9 +64,9 @@ private const val RELABEL_DEBOUNCE_MS = 400L
 @Composable
 fun CustomizeScreen(
     config: ViewConfig,
-    onToggle: (WeatherField) -> Unit,
-    onRelabel: (WeatherField, String?) -> Unit,
-    onSetSpan: (WeatherField, ModuleSpan) -> Unit,
+    onToggle: (ModuleKey) -> Unit,
+    onRelabel: (ModuleKey, String?) -> Unit,
+    onSetSpan: (ModuleKey, ModuleSpan) -> Unit,
     onMoveUp: (Int) -> Unit,
     onMoveDown: (Int) -> Unit,
     onSetDensity: (Density) -> Unit,
@@ -74,7 +74,6 @@ fun CustomizeScreen(
     onSetDefaultForecastMode: (ForecastMode) -> Unit,
     onSetDailyStyle: (DailyStyle) -> Unit,
     onSetAlertBannerPosition: (AlertBannerPosition) -> Unit,
-    onSetShowSunTimes: (Boolean) -> Unit,
     theme: ThemeConfig,
     onThemeChange: (ThemeConfig) -> Unit,
     gadgetbridgeEnabled: Boolean,
@@ -125,9 +124,9 @@ fun CustomizeScreen(
                         setting = setting,
                         canMoveUp = index > 0,
                         canMoveDown = index < config.items.lastIndex,
-                        onToggle = { onToggle(setting.field) },
-                        onRelabel = { onRelabel(setting.field, it) },
-                        onSetSpan = { onSetSpan(setting.field, it) },
+                        onToggle = { onToggle(setting.module) },
+                        onRelabel = { onRelabel(setting.module, it) },
+                        onSetSpan = { onSetSpan(setting.module, it) },
                         onMoveUp = { onMoveUp(index) },
                         onMoveDown = { onMoveDown(index) },
                     )
@@ -143,7 +142,6 @@ fun CustomizeScreen(
                     position = config.alertBannerPosition,
                     onSelect = onSetAlertBannerPosition,
                 )
-                SunTimesToggle(enabled = config.showSunTimes, onChange = onSetShowSunTimes)
                 GadgetbridgeToggle(enabled = gadgetbridgeEnabled, onChange = onSetGadgetbridgeEnabled)
             }
         }
@@ -181,45 +179,6 @@ private fun GadgetbridgeToggle(
         Text(
             text = "Hands each new reading to Gadgetbridge, which passes it to a paired watch. " +
                 "Does nothing if Gadgetbridge isn't installed.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
-
-/**
- * The next sunrise and sunset on the glance. Off by default, like everything
- * optional here: the shipped view is the calm minimum.
- *
- * Says where the times come from, because "computed, not fetched" is the
- * answer to both questions this raises — why they work with no signal, and why
- * they might differ by a minute from another app's.
- */
-@Composable
-private fun SunTimesToggle(
-    enabled: Boolean,
-    onChange: (Boolean) -> Unit,
-) {
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        Text("Sun", style = MaterialTheme.typography.labelMedium)
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text("Show sunrise and sunset", style = MaterialTheme.typography.bodyLarge)
-            Switch(
-                checked = enabled,
-                onCheckedChange = onChange,
-                modifier = Modifier.testTag("sun-times-toggle"),
-            )
-        }
-        Text(
-            text = "The next sunrise and sunset for your location. Worked out on your device " +
-                "from the date and where you are, so they need no connection.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -425,7 +384,7 @@ private fun ForecastPicker(
 
 @Composable
 private fun FieldRow(
-    setting: FieldSetting,
+    setting: ModuleSetting,
     canMoveUp: Boolean,
     canMoveDown: Boolean,
     onToggle: () -> Unit,
@@ -436,7 +395,7 @@ private fun FieldRow(
 ) {
     // testTags (per field key) give UI tests a stable handle on controls
     // that otherwise carry only a glyph or no text.
-    val key = setting.field.key
+    val key = setting.module.key
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -459,7 +418,7 @@ private fun FieldRow(
             // Local edit state keyed by field so the cursor stays put while the
             // persisted config streams back in; the field's default name shows as
             // the placeholder, so an empty box clearly means "use the default".
-            var label by remember(setting.field) { mutableStateOf(setting.customLabel ?: "") }
+            var label by remember(setting.module) { mutableStateOf(setting.customLabel ?: "") }
             // Debounce persistence: typing only writes to DataStore once the user
             // pauses, instead of a disk write per keystroke. The delay is cancelled
             // and restarted on each change; the guard skips the no-op initial write.
@@ -475,7 +434,7 @@ private fun FieldRow(
             // guard compares against the current value and skips an already-saved one.
             val latestLabel by rememberUpdatedState(label)
             val latestSaved by rememberUpdatedState(setting.customLabel)
-            DisposableEffect(setting.field) {
+            DisposableEffect(setting.module) {
                 onDispose {
                     val normalized = latestLabel.ifBlank { null }
                     if (normalized != latestSaved) onRelabel(normalized)
@@ -484,7 +443,7 @@ private fun FieldRow(
             OutlinedTextField(
                 value = label,
                 onValueChange = { label = it },
-                placeholder = { Text(setting.field.defaultLabel) },
+                placeholder = { Text(setting.module.defaultLabel) },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 modifier = Modifier.weight(1f),

@@ -7,11 +7,11 @@ import kotlinx.serialization.json.Json
 
 /**
  * Pure JSON (de)serialisation for [ViewConfig], split out from the DataStore
- * repository so it tests on the JVM with no Android. Fields persist by their
- * string [WeatherField.key], not enum ordinal, so reordering or removing a
- * field in code never corrupts a saved config. Unknown keys (a field deleted
- * from the catalog) are dropped on read; missing keys (a field added) are
- * filled in as hidden by [ViewConfig.normalized].
+ * repository so it tests on the JVM with no Android. Modules persist by their
+ * string [ModuleKey.key], never an ordinal, so reordering or removing one in
+ * code cannot corrupt a saved config. Unknown keys (a module deleted from the
+ * catalog) are dropped on read; missing keys (a module added) are filled in as
+ * hidden by [ViewConfig.normalized].
  */
 object ViewConfigCodec {
     @Serializable
@@ -44,8 +44,12 @@ object ViewConfigCodec {
         // Defaulted like every field here, so a config written before the
         // safety banner existed still decodes.
         val alertBannerPosition: String = AlertBannerPosition.DEFAULT.key,
-        // Defaulted false so a config written before sun times existed decodes
-        // to the feature being off, rather than switching itself on.
+        // LEGACY, read-only: sun times used to be a screen-wide switch rather
+        // than a module with a place on the grid. It is folded on read into
+        // the "sun" module's visibility and never written again, so someone
+        // who had it on still sees it — as a tile they can now move and
+        // resize. Defaulted false: an opt-in that switches itself on during an
+        // app update is not opt-in.
         val showSunTimes: Boolean = false,
         val items: List<StoredSetting> = emptyList(),
     )
@@ -60,8 +64,7 @@ object ViewConfigCodec {
                 forecastMode = config.defaultForecastMode.key,
                 dailyStyle = config.dailyStyle.key,
                 alertBannerPosition = config.alertBannerPosition.key,
-                showSunTimes = config.showSunTimes,
-                items = config.items.map { StoredSetting(it.field.key, it.visible, it.customLabel, it.span.key) },
+                items = config.items.map { StoredSetting(it.module.key, it.visible, it.customLabel, it.span.key) },
             ),
         )
 
@@ -86,14 +89,14 @@ object ViewConfigCodec {
     private fun build(stored: StoredConfig): ViewConfig {
         val settings =
             stored.items.mapNotNull { s ->
-                WeatherField.byKey(s.key)?.let { field ->
-                    val span = s.span?.let(ModuleSpan::byKey) ?: field.defaultSpan
-                    FieldSetting(field, s.visible, s.label, span)
+                ModuleKey.byKey(s.key)?.let { module ->
+                    val span = s.span?.let(ModuleSpan::byKey) ?: module.defaultSpan
+                    ModuleSetting(module, s.visible, s.label, span)
                 }
             }
         // No recognised settings means this wasn't really a config — an empty or
         // foreign JSON object (`{}`, `{"version":2}`) that `ignoreUnknownKeys`
-        // happily accepts, or all-unknown field keys. normalize(emptyList) would
+        // happily accepts, or all-unknown module keys. normalize(emptyList) would
         // yield an all-hidden glance (hero "—", no rows), which is worse than the
         // documented contract; fall back to DEFAULT instead.
         if (settings.isEmpty()) return ViewConfig.DEFAULT
@@ -101,14 +104,23 @@ object ViewConfigCodec {
         val bannerPosition = AlertBannerPosition.byKey(stored.alertBannerPosition) ?: AlertBannerPosition.DEFAULT
         val (showForecast, forecastMode) = stored.forecastChoice()
         return ViewConfig.normalized(
-            settings,
+            // Fold the retired screen-wide sun switch into the module, unless
+            // this config already carries a "sun" entry of its own — a config
+            // written by THIS build is the authority on its own layout, and a
+            // leftover `showSunTimes` must not re-show a tile the user has
+            // since hidden.
+            settings.withLegacySunTimes(stored.showSunTimes),
             density,
             showForecast,
             forecastMode,
             DailyStyle.byKey(stored.dailyStyle) ?: DailyStyle.DEFAULT,
             bannerPosition,
-            stored.showSunTimes,
         )
+    }
+
+    private fun List<ModuleSetting>.withLegacySunTimes(showSunTimes: Boolean): List<ModuleSetting> {
+        if (!showSunTimes || any { it.module == ModuleKey.Sun }) return this
+        return this + ModuleSetting(ModuleKey.Sun, visible = true)
     }
 
     /**

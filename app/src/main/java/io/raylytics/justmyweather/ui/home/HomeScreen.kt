@@ -9,8 +9,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
@@ -38,9 +36,9 @@ import io.raylytics.justmyweather.data.WeatherSnapshot
 import io.raylytics.justmyweather.data.nws.ActiveAlert
 import io.raylytics.justmyweather.view.AlertBannerPosition
 import io.raylytics.justmyweather.view.ForecastMode
+import io.raylytics.justmyweather.view.ModuleKey
 import io.raylytics.justmyweather.view.RenderedView
 import io.raylytics.justmyweather.view.ViewConfig
-import io.raylytics.justmyweather.view.WeatherField
 import io.raylytics.justmyweather.view.render
 import kotlinx.coroutines.delay
 import java.time.Instant
@@ -62,10 +60,6 @@ internal val AGE_TICK = 30.seconds
  * boundary within a minute of crossing it. */
 internal val SUN_TICK = 1.minutes
 
-/** Width of each sun-time column, sized for "12:00 AM" at titleMedium so the
- * two columns stay aligned down the rows regardless of the times in them. */
-private val SUN_COLUMN_WIDTH = 92.dp
-
 /**
  * The home view. Out of the box it's a calm single glance; once the user edits
  * their config it's whatever they made it — same screen, driven by data. The
@@ -85,8 +79,8 @@ fun HomeScreen(
     onSetMode: (ForecastMode) -> Unit,
     onCustomize: () -> Unit,
     onAlerts: () -> Unit,
-    onCycleSpan: (WeatherField) -> Unit,
-    onMoveModule: (WeatherField, Int) -> Unit,
+    onCycleSpan: (ModuleKey) -> Unit,
+    onMoveModule: (ModuleKey, Int) -> Unit,
     onPlaces: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -156,8 +150,8 @@ private fun GlanceView(
     arranging: Boolean,
     onStartArranging: () -> Unit,
     onDoneArranging: () -> Unit,
-    onCycleSpan: (WeatherField) -> Unit,
-    onMoveModule: (WeatherField, Int) -> Unit,
+    onCycleSpan: (ModuleKey) -> Unit,
+    onMoveModule: (ModuleKey, Int) -> Unit,
     onPlaces: () -> Unit,
 ) {
     val snapshot = state.snapshot
@@ -200,6 +194,7 @@ private fun GlanceView(
         NowContent(
             snapshot = snapshot,
             config = config,
+            sunDays = state.sunDays,
             arranging = arranging,
             onStartArranging = onStartArranging,
             onCycleSpan = onCycleSpan,
@@ -213,13 +208,6 @@ private fun GlanceView(
                 Text("Done arranging")
             }
         }
-
-        // Its own element rather than two more label · value rows: these are
-        // computed, not measured, they come as a pair that reads as one fact,
-        // and sitting among the station's readings would imply the station
-        // reported them. Directly under the glance because the sun is part of
-        // "what is it like right now", not part of the forecast below.
-        if (state.sunDays.isNotEmpty()) SunTimesTable(days = state.sunDays)
 
         // Grid two of two: the forecast, carrying its own Hourly/Daily toggle.
         // Absent entirely when the user has turned it off — that is what the
@@ -299,12 +287,15 @@ private fun SafetyAlertBanner(alerts: List<ActiveAlert>) {
 private fun NowContent(
     snapshot: WeatherSnapshot,
     config: ViewConfig,
+    /** Not part of the snapshot: computed on the device, so the sun module
+     * works with no signal. */
+    sunDays: List<SunDay>,
     arranging: Boolean,
     onStartArranging: () -> Unit,
-    onCycleSpan: (WeatherField) -> Unit,
-    onMoveModule: (WeatherField, Int) -> Unit,
+    onCycleSpan: (ModuleKey) -> Unit,
+    onMoveModule: (ModuleKey, Int) -> Unit,
 ) {
-    val rendered: RenderedView = config.render(snapshot)
+    val rendered: RenderedView = config.render(snapshot, sunDays)
     val spec = config.density.spec()
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -418,91 +409,6 @@ internal fun ObservedLine(
 }
 
 /**
- * Sun times as day rows, laid out like the daily forecast: the date beside its
- * values, sunrise and sunset in columns.
- *
- * Day rows rather than "the next of each" because those two are not the same
- * day for most of the waking hours — between sunrise and sunset, tonight's
- * sunset is today's while the next sunrise is tomorrow's. A row that carries
- * its own date says which is which without hanging a "tomorrow" off a time.
- *
- * Sunrise takes the emphasis and sunset the quieter tone, the same pairing the
- * daily high and low use, so the column a value sits in is not the only thing
- * telling them apart.
- */
-@Composable
-internal fun SunTimesTable(days: List<SunDay>) {
-    val zone = ZoneId.systemDefault()
-    Column(
-        modifier = Modifier.widthIn(max = 320.dp).padding(top = 4.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        // Column headings once at the top, not repeated per row: with two
-        // values a row this is a small table, and repeating the words would
-        // outweigh the times they label.
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-            Text(
-                text = "Sunrise",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.End,
-                modifier = Modifier.width(SUN_COLUMN_WIDTH),
-            )
-            Text(
-                text = "Sunset",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.End,
-                modifier = Modifier.width(SUN_COLUMN_WIDTH),
-            )
-        }
-        days.forEach { day -> SunDayRow(day = day, zone = zone) }
-    }
-}
-
-@Composable
-private fun SunDayRow(day: SunDay, zone: ZoneId) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        // The same two-line date marker the hourly strip uses, so a date reads
-        // as a date wherever it appears on this screen.
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = day.date.format(weekdayFormat).uppercase(Locale.getDefault()),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                text = day.date.format(monthDayFormat),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        SunTimeCell(day.sunrise, zone, MaterialTheme.colorScheme.onBackground)
-        SunTimeCell(day.sunset, zone, MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}
-
-/** One time in its column. A missing event renders as "—": polar night is a
- * real state, and an empty gap would read as a value that failed to load. */
-@Composable
-private fun SunTimeCell(
-    event: Instant?,
-    zone: ZoneId,
-    color: androidx.compose.ui.graphics.Color,
-) {
-    Text(
-        text = event?.atZone(zone)?.format(timeFormat) ?: "—",
-        style = MaterialTheme.typography.titleMedium,
-        color = color,
-        textAlign = TextAlign.End,
-        modifier = Modifier.width(SUN_COLUMN_WIDTH),
-    )
-}
-
-/**
  * The controls, pinned below the glance.
  *
  * The failed-refresh message rides here rather than in the scroll. It belongs
@@ -562,14 +468,17 @@ private fun ErrorView(
     }
 }
 
-private val timeFormat = DateTimeFormatter.ofPattern("h:mm a", Locale.getDefault())
+// Internal, like hourFormat: the sun module formats the same kinds of value,
+// and two files disagreeing about how a time reads is exactly the drift a
+// shared constant prevents.
+internal val timeFormat: DateTimeFormatter = DateTimeFormatter.ofPattern("h:mm a", Locale.getDefault())
 
 // Internal: the forecast grid names its hour tiles with the same pattern, and
 // two screens showing "3 pm" and "3 PM" for the same hour is the kind of drift
 // a shared constant exists to prevent.
 internal val hourFormat: DateTimeFormatter = DateTimeFormatter.ofPattern("h a", Locale.getDefault())
-private val weekdayFormat = DateTimeFormatter.ofPattern("EEE", Locale.getDefault())
-private val monthDayFormat = DateTimeFormatter.ofPattern("MMM d", Locale.getDefault())
+internal val weekdayFormat: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE", Locale.getDefault())
+internal val monthDayFormat: DateTimeFormatter = DateTimeFormatter.ofPattern("MMM d", Locale.getDefault())
 
 /**
  * The time the STATION took the reading — never the time we fetched it.

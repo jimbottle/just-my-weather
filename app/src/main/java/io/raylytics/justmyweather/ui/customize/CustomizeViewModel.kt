@@ -8,9 +8,9 @@ import io.raylytics.justmyweather.view.AlertBannerPosition
 import io.raylytics.justmyweather.view.DailyStyle
 import io.raylytics.justmyweather.view.Density
 import io.raylytics.justmyweather.view.ForecastMode
+import io.raylytics.justmyweather.view.ModuleKey
 import io.raylytics.justmyweather.view.ModuleSpan
 import io.raylytics.justmyweather.view.ViewConfig
-import io.raylytics.justmyweather.view.WeatherField
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
@@ -41,11 +41,11 @@ class CustomizeViewModel(
         viewModelScope.launch { gadgetbridgeSettings.setEnabled(value) }
     }
 
-    fun toggle(field: WeatherField) = edit { it.toggle(field) }
+    fun toggle(module: ModuleKey) = edit { it.toggle(module) }
 
-    fun relabel(field: WeatherField, label: String?) = edit { it.relabel(field, label) }
+    fun relabel(module: ModuleKey, label: String?) = edit { it.relabel(module, label) }
 
-    fun setSpan(field: WeatherField, span: ModuleSpan) = edit { it.setSpan(field, span) }
+    fun setSpan(module: ModuleKey, span: ModuleSpan) = edit { it.setSpan(module, span) }
 
     fun moveUp(index: Int) = edit { it.moveUp(index) }
 
@@ -60,8 +60,6 @@ class CustomizeViewModel(
     fun setDailyStyle(style: DailyStyle) = edit { it.setDailyStyle(style) }
 
     fun setAlertBannerPosition(position: AlertBannerPosition) = edit { it.setAlertBannerPosition(position) }
-
-    fun setShowSunTimes(show: Boolean) = edit { it.setShowSunTimes(show) }
 
     // Through the repository's atomic update, not read-then-save: these edits
     // arrive at tap speed, but the home screen's arrange gestures write to the

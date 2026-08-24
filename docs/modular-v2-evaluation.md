@@ -46,11 +46,12 @@ What to keep judging:
   That asymmetry is intended (one is yours, one is NWS's) and the shared tile
   language is what should carry it. If people try to drag forecast tiles, the
   language is over-promising.
-- Sun times are still a table, not a module — the one part of the original
-  fold-in that has not happened. Folding it in needs a module catalog that
-  admits non-`WeatherField` modules, and the two-day table's day-row design was
-  a deliberate choice worth preserving rather than flattening into "next
-  sunrise / next sunset".
+- Sun times are now a module too, so nothing sits between the two grids. It
+  took the module catalog generalising past `WeatherField` (`ModuleKey`), and
+  the two-day table survived: the module is **span-adaptive**, drawing the
+  dated rows at full width and condensing to today's pair when narrower, rather
+  than being flattened into "next sunrise / next sunset". That is the pattern
+  for any future module whose content is not one string.
 
 ### 3. Accessibility parity
 

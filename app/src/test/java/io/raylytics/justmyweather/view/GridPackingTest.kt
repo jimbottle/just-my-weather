@@ -4,6 +4,10 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 
 class GridPackingTest {
+    /** Shorthand: every reading module is `ModuleKey.Reading(field)`, and
+     * spelling that out inline costs more width than it earns in clarity. */
+    private fun reading(field: WeatherField) = ModuleKey.Reading(field)
+
     private fun pack(vararg spans: Int): List<List<Int>> = packGridRows(spans.toList()) { it }
 
     @Test
@@ -27,8 +31,8 @@ class GridPackingTest {
     fun `the default config packs to hero row then conditions row`() {
         val rows = packGridRows(ViewConfig.DEFAULT.visible) { it.span.columns }
         assertEquals(
-            listOf(listOf(WeatherField.TEMPERATURE), listOf(WeatherField.CONDITIONS)),
-            rows.map { row -> row.map { it.field } },
+            listOf(listOf(reading(WeatherField.TEMPERATURE)), listOf(reading(WeatherField.CONDITIONS))),
+            rows.map { row -> row.map { it.module } },
         )
     }
 

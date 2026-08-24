@@ -1,36 +1,34 @@
 package io.raylytics.justmyweather.view
 
 /**
- * One field's place in the user's view: whether it shows, an optional label
- * override, and how wide its module sits on the grid. The effective [label]
- * falls back to the field's default.
+ * One module's place in the user's view: whether it shows, an optional label
+ * override, and how wide it sits on the grid. The effective [label] falls back
+ * to the module's default.
  */
-data class FieldSetting(
-    val field: WeatherField,
+data class ModuleSetting(
+    val module: ModuleKey,
     val visible: Boolean,
     val customLabel: String? = null,
-    val span: ModuleSpan = field.defaultSpan,
+    val span: ModuleSpan = module.defaultSpan,
 ) {
     val label: String
-        // `this.field` is required: a bare `field` inside an accessor is the
-        // backing-field keyword, not the constructor property of the same name.
-        get() = customLabel?.takeIf { it.isNotBlank() } ?: this.field.defaultLabel
+        get() = customLabel?.takeIf { it.isNotBlank() } ?: module.defaultLabel
 }
 
 /**
- * The user's view as data: an ordered list of every field's setting. The
- * visible fields flow onto the glance's grid in this order, each as wide as its
- * [FieldSetting.span] — size is what makes a module prominent, so promote a
- * field by widening it or moving it up; remove it by hiding it. All edits are
+ * The user's view as data: an ordered list of every module's setting. The
+ * visible modules flow onto the glance's grid in this order, each as wide as
+ * its [ModuleSetting.span] — size is what makes a module prominent, so promote
+ * one by widening it or moving it up; remove it by hiding it. All edits are
  * pure transforms returning a new config, so the customize screen and the
  * arrange gesture have no mutable state to get wrong and the logic is testable.
  *
- * The invariant: a ViewConfig always contains exactly one setting per
- * [WeatherField]. [normalized] enforces it, so loading an old or partial config
- * (e.g. after an app update adds a field) yields a complete, valid config.
+ * The invariant: a ViewConfig always contains exactly one setting per entry in
+ * [ModuleKey.catalog]. [normalized] enforces it, so loading an old or partial
+ * config (e.g. after an app update adds a module) yields a complete, valid one.
  */
 data class ViewConfig(
-    val items: List<FieldSetting>,
+    val items: List<ModuleSetting>,
     val density: Density = Density.DEFAULT,
     /**
      * Whether the forecast grid appears beneath the glance at all. On by
@@ -45,44 +43,42 @@ data class ViewConfig(
     val dailyStyle: DailyStyle = DailyStyle.DEFAULT,
     /** Where a safety-alert banner sits on the days there is one. */
     val alertBannerPosition: AlertBannerPosition = AlertBannerPosition.DEFAULT,
-    /**
-     * Whether the next sunrise and sunset show on the glance. Off by default,
-     * like every other addition: the shipped view is the calm minimum, and
-     * anything extra is something you go and turn on.
-     */
-    val showSunTimes: Boolean = false,
 ) {
-    val visible: List<FieldSetting> get() = items.filter { it.visible }
+    val visible: List<ModuleSetting> get() = items.filter { it.visible }
 
-    fun toggle(field: WeatherField): ViewConfig =
-        copy(items = items.map { if (it.field == field) it.copy(visible = !it.visible) else it })
+    /** Whether a module is on the glance — the question the ViewModel asks
+     * before working out data only that module needs. */
+    fun shows(module: ModuleKey): Boolean = items.any { it.module == module && it.visible }
 
-    fun relabel(field: WeatherField, label: String?): ViewConfig =
-        copy(items = items.map { if (it.field == field) it.copy(customLabel = label) else it })
+    fun toggle(module: ModuleKey): ViewConfig =
+        copy(items = items.map { if (it.module == module) it.copy(visible = !it.visible) else it })
 
-    fun setSpan(field: WeatherField, span: ModuleSpan): ViewConfig =
-        copy(items = items.map { if (it.field == field) it.copy(span = span) else it })
+    fun relabel(module: ModuleKey, label: String?): ViewConfig =
+        copy(items = items.map { if (it.module == module) it.copy(customLabel = label) else it })
 
-    /** Step the field's module to the next size — what tapping a wiggling tile
-     * does in arrange mode. */
-    fun cycleSpan(field: WeatherField): ViewConfig =
-        copy(items = items.map { if (it.field == field) it.copy(span = it.span.next()) else it })
+    fun setSpan(module: ModuleKey, span: ModuleSpan): ViewConfig =
+        copy(items = items.map { if (it.module == module) it.copy(span = span) else it })
+
+    /** Step the module to the next size — what tapping a wiggling tile does in
+     * arrange mode. */
+    fun cycleSpan(module: ModuleKey): ViewConfig =
+        copy(items = items.map { if (it.module == module) it.copy(span = it.span.next()) else it })
 
     /**
-     * Move a visible field so it lands at [toVisibleIndex] among the *visible*
-     * fields — the drop half of the drag gesture, which only ever sees the
-     * modules actually on the grid. Hidden settings keep their relative order;
-     * an unknown field or an out-of-range target clamps to a safe no-op rather
+     * Move a visible module so it lands at [toVisibleIndex] among the *visible*
+     * modules — the drop half of the drag gesture, which only ever sees the
+     * tiles actually on the grid. Hidden settings keep their relative order; an
+     * unknown module or an out-of-range target clamps to a safe no-op rather
      * than corrupting the list.
      */
-    fun moveVisible(field: WeatherField, toVisibleIndex: Int): ViewConfig {
-        val visibleFields = visible.map { it.field }
-        val from = visibleFields.indexOf(field)
-        if (from == -1 || visibleFields.size < 2) return this
-        val target = toVisibleIndex.coerceIn(0, visibleFields.lastIndex)
+    fun moveVisible(module: ModuleKey, toVisibleIndex: Int): ViewConfig {
+        val visibleModules = visible.map { it.module }
+        val from = visibleModules.indexOf(module)
+        if (from == -1 || visibleModules.size < 2) return this
+        val target = toVisibleIndex.coerceIn(0, visibleModules.lastIndex)
         if (target == from) return this
-        val moving = items.first { it.field == field }
-        val without = items.filterNot { it.field == field }
+        val moving = items.first { it.module == module }
+        val without = items.filterNot { it.module == module }
         val remainingVisible = without.filter { it.visible }
         // Insert before the setting that currently holds the target slot; past
         // the last slot means "after the final visible setting".
@@ -108,8 +104,6 @@ data class ViewConfig(
     fun setAlertBannerPosition(position: AlertBannerPosition): ViewConfig =
         copy(alertBannerPosition = position)
 
-    fun setShowSunTimes(show: Boolean): ViewConfig = copy(showSunTimes = show)
-
     fun moveUp(index: Int): ViewConfig = swap(index, index - 1)
 
     fun moveDown(index: Int): ViewConfig = swap(index, index + 1)
@@ -128,34 +122,38 @@ data class ViewConfig(
          * glance the app ships with. */
         val DEFAULT =
             ViewConfig(
-                listOf(
-                    FieldSetting(WeatherField.TEMPERATURE, visible = true),
-                    FieldSetting(WeatherField.CONDITIONS, visible = true),
-                    FieldSetting(WeatherField.WIND, visible = false),
-                    FieldSetting(WeatherField.PRECIPITATION, visible = false),
-                    FieldSetting(WeatherField.PRESSURE, visible = false),
-                ),
+                ModuleKey.catalog.map { module ->
+                    ModuleSetting(
+                        module = module,
+                        // Temperature and conditions are the shipped glance;
+                        // everything else is available but something you go
+                        // and turn on.
+                        visible =
+                            module == ModuleKey.Reading(WeatherField.TEMPERATURE) ||
+                                module == ModuleKey.Reading(WeatherField.CONDITIONS),
+                    )
+                },
             )
 
         /**
          * Complete a possibly-partial, possibly-stale list of settings into a
          * valid config: keep recognised settings in their stored order, drop
-         * duplicates, then append any field the list is missing (a newly-added
-         * data point) as hidden, in catalog order.
+         * duplicates, then append any module the list is missing (a newly-added
+         * data point, or one that did not exist in an older build) as hidden,
+         * in catalog order.
          */
         fun normalized(
-            settings: List<FieldSetting>,
+            settings: List<ModuleSetting>,
             density: Density = Density.DEFAULT,
             showForecast: Boolean = true,
             defaultForecastMode: ForecastMode = ForecastMode.DEFAULT,
             dailyStyle: DailyStyle = DailyStyle.DEFAULT,
             alertBannerPosition: AlertBannerPosition = AlertBannerPosition.DEFAULT,
-            showSunTimes: Boolean = false,
         ): ViewConfig {
-            val seen = LinkedHashMap<WeatherField, FieldSetting>()
-            settings.forEach { setting -> seen.putIfAbsent(setting.field, setting) }
-            WeatherField.entries.forEach { field ->
-                seen.putIfAbsent(field, FieldSetting(field, visible = false))
+            val seen = LinkedHashMap<ModuleKey, ModuleSetting>()
+            settings.forEach { setting -> seen.putIfAbsent(setting.module, setting) }
+            ModuleKey.catalog.forEach { module ->
+                seen.putIfAbsent(module, ModuleSetting(module, visible = false))
             }
             return ViewConfig(
                 seen.values.toList(),
@@ -164,7 +162,6 @@ data class ViewConfig(
                 defaultForecastMode,
                 dailyStyle,
                 alertBannerPosition,
-                showSunTimes,
             )
         }
     }

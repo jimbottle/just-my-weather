@@ -41,9 +41,10 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.zIndex
+import io.raylytics.justmyweather.view.ModuleContent
+import io.raylytics.justmyweather.view.ModuleKey
 import io.raylytics.justmyweather.view.ModuleSpan
 import io.raylytics.justmyweather.view.ModuleValue
-import io.raylytics.justmyweather.view.WeatherField
 
 /*
  * The modular glance: every visible field as a bordered tile on a 4-column
@@ -91,9 +92,9 @@ internal fun ModuleGrid(
     arranging: Boolean,
     spec: DensitySpec,
     onStartArranging: () -> Unit,
-    onCycleSpan: (WeatherField) -> Unit,
-    /** Move a field so it lands at this index among the visible modules. */
-    onMove: (WeatherField, Int) -> Unit,
+    onCycleSpan: (ModuleKey) -> Unit,
+    /** Move a module so it lands at this index among the visible ones. */
+    onMove: (ModuleKey, Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val haptics = LocalHapticFeedback.current
@@ -112,10 +113,10 @@ internal fun ModuleGrid(
     // which row anything is in. `bounds` is refreshed by layout after every
     // reorder, which is what keeps the dragged tile anchored under the finger
     // when its slot (and therefore its layout position) changes mid-drag.
-    var dragged by remember { mutableStateOf<WeatherField?>(null) }
+    var dragged by remember { mutableStateOf<ModuleKey?>(null) }
     var grabOffset by remember { mutableStateOf(Offset.Zero) }
     var dragPosition by remember { mutableStateOf(Offset.Zero) }
-    val bounds = remember { mutableStateMapOf<WeatherField, Rect>() }
+    val bounds = remember { mutableStateMapOf<ModuleKey, Rect>() }
     var gridCoords by remember { mutableStateOf<LayoutCoordinates?>(null) }
     // The hold that triggers the drag detector's long-press ALSO looks like a
     // tap to the tap detector once the finger lifts (a hold-then-release IS a
@@ -132,10 +133,10 @@ internal fun ModuleGrid(
     // Gesture positions arrive grid-local; tiles report window-root bounds.
     fun toRoot(local: Offset): Offset = gridCoords?.localToRoot(local) ?: local
 
-    fun tileAt(rootPos: Offset): WeatherField? =
-        currentModules.firstOrNull { bounds[it.field]?.contains(rootPos) == true }?.field
+    fun tileAt(rootPos: Offset): ModuleKey? =
+        currentModules.firstOrNull { bounds[it.module]?.contains(rootPos) == true }?.module
 
-    fun beginDrag(field: WeatherField, rootPos: Offset) {
+    fun beginDrag(field: ModuleKey, rootPos: Offset) {
         dragged = field
         dragPosition = rootPos
         grabOffset = rootPos - (bounds[field]?.topLeft ?: rootPos)
@@ -153,11 +154,11 @@ internal fun ModuleGrid(
     // land where the pointer already is.
     fun settleDrag() {
         val field = dragged ?: return
-        val current = currentModules.indexOfFirst { it.field == field }
+        val current = currentModules.indexOfFirst { it.module == field }
         if (current == -1) return
         val target =
             currentModules.indices.minByOrNull { i ->
-                val center = bounds[currentModules[i].field]?.center ?: return@minByOrNull Float.MAX_VALUE
+                val center = bounds[currentModules[i].module]?.center ?: return@minByOrNull Float.MAX_VALUE
                 (center - dragPosition).getDistanceSquared()
             } ?: return
         if (target != current && target != pendingTarget) {
@@ -214,9 +215,9 @@ internal fun ModuleGrid(
                 },
         // The dragged tile's row draws over its neighbours, or the tile slides
         // UNDER the next row on a long drag.
-        rowModifier = { row -> if (row.any { it.field == dragged }) Modifier.zIndex(1f) else Modifier },
+        rowModifier = { row -> if (row.any { it.module == dragged }) Modifier.zIndex(1f) else Modifier },
     ) { module, index, tileModifier ->
-        val field = module.field
+        val field = module.module
         val isDragged = dragged == field
         val wiggle = wiggleAngle(active = arranging && !isDragged, phase = index)
         ModuleTile(
@@ -286,8 +287,8 @@ private fun ModuleTile(
      * together they decide which move actions exist at the ends. */
     index: Int,
     lastIndex: Int,
-    onMove: (WeatherField, Int) -> Unit,
-    onCycleSpan: (WeatherField) -> Unit,
+    onMove: (ModuleKey, Int) -> Unit,
+    onCycleSpan: (ModuleKey) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val borderColor =
@@ -304,6 +305,10 @@ private fun ModuleTile(
             ModuleSpan.HALF -> MaterialTheme.typography.headlineMedium
             ModuleSpan.QUARTER -> MaterialTheme.typography.titleLarge
         }
+    // A full-width tile drops its label — the content is big enough to speak
+    // for itself, as the old hero did, and the sun table brings its own column
+    // headings.
+    val showLabel = module.span != ModuleSpan.FULL
     TileShell(
         borderColor = borderColor,
         modifier =
@@ -318,7 +323,7 @@ private fun ModuleTile(
                             if (index > 0) {
                                 add(
                                     CustomAccessibilityAction("Move up") {
-                                        onMove(module.field, index - 1)
+                                        onMove(module.module, index - 1)
                                         true
                                     },
                                 )
@@ -326,7 +331,7 @@ private fun ModuleTile(
                             if (index < lastIndex) {
                                 add(
                                     CustomAccessibilityAction("Move down") {
-                                        onMove(module.field, index + 1)
+                                        onMove(module.module, index + 1)
                                         true
                                     },
                                 )
@@ -336,7 +341,7 @@ private fun ModuleTile(
                             // three widths a tap will pick.
                             add(
                                 CustomAccessibilityAction("Resize to ${module.span.next().label.lowercase()}") {
-                                    onCycleSpan(module.field)
+                                    onCycleSpan(module.module)
                                     true
                                 },
                             )
@@ -344,7 +349,7 @@ private fun ModuleTile(
                 },
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            if (module.span != ModuleSpan.FULL) {
+            if (showLabel) {
                 Text(
                     text = module.label,
                     style = MaterialTheme.typography.labelSmall,
@@ -353,12 +358,19 @@ private fun ModuleTile(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            Text(
-                text = module.value,
-                style = valueStyle,
-                color = MaterialTheme.colorScheme.onBackground,
-                textAlign = TextAlign.Center,
-            )
+            when (val content = module.content) {
+                is ModuleContent.Reading ->
+                    Text(
+                        text = content.text,
+                        style = valueStyle,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        textAlign = TextAlign.Center,
+                    )
+                // Sun times draw themselves: they are a table at full width and
+                // today's pair when narrower. See SunModule.kt for why that is
+                // adaptation rather than two designs.
+                is ModuleContent.Sun -> SunModuleContent(days = content.days, span = module.span)
+            }
         }
     }
 }

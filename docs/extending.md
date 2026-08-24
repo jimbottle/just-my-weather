@@ -11,7 +11,9 @@ follow the errors and you're done.
 
 ## Add a data point
 
-Say you want **humidity** on the glance and as something to alert on.
+Say you want **humidity** on the glance and as something to alert on. A station
+reading needs nothing in the module catalog — `ModuleKey.Reading` wraps every
+`WeatherField` automatically.
 
 1. **`view/WeatherField.kt`** — add the catalog entry and handle the exhaustive
    `when`s the compiler flags:
@@ -29,8 +31,29 @@ Say you want **humidity** on the glance and as something to alert on.
    `NwsModels.CurrentObservation`, and read it in `NwsClient.getObservation`.
 4. **`data/WeatherRepository.kt`** — map it onto the `WeatherSnapshot` in `load`.
 
-The home view, the customize screen, and the alert builder all iterate
-`WeatherField`, so the new point shows up in each with no further wiring.
+The customize screen and the glance grid iterate `ModuleKey.catalog` (which
+includes every `WeatherField` through `ModuleKey.Reading`), and the alert
+builder iterates `WeatherField` directly, so the new point shows up in each with
+no further wiring.
+
+## Add a module that is not a station reading
+
+Sun times are the worked example: computed on the device, no threshold to alert
+on, and a table rather than a value.
+
+1. **`view/ModuleKey.kt`** — add a subtype. Give it a stable `key` (never rename
+   it), a `defaultLabel`, and a `defaultSpan`.
+2. **`view/ViewRender.kt`** — add a `ModuleContent` variant carrying whatever
+   the tile needs to draw, and a branch in `render`. If the data is not in
+   `WeatherSnapshot` (sun times are not), pass it into `render` as its own
+   parameter rather than forcing it into the snapshot.
+3. **`ui/home/`** — add a branch in `ModuleTile`'s `when` over the content, and
+   put the drawing in its own file (see `SunModule.kt`). A module whose content
+   changes shape with width should adapt there, not be flattened to fit.
+
+Every `when` involved is exhaustive with no `else`, so the compiler lists what
+you still owe. Persistence, arranging, resizing and the accessibility actions
+all follow from the catalog with no further work.
 
 ## Add an alert subject (a forecast-only metric)
 

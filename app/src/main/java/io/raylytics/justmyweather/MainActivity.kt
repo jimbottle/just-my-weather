@@ -259,7 +259,6 @@ private fun App(
                 onSetDefaultForecastMode = customizeViewModel::setDefaultForecastMode,
                 onSetDailyStyle = customizeViewModel::setDailyStyle,
                 onSetAlertBannerPosition = customizeViewModel::setAlertBannerPosition,
-                onSetShowSunTimes = customizeViewModel::setShowSunTimes,
                 theme = themeConfig,
                 onThemeChange = onThemeChange,
                 gadgetbridgeEnabled = gadgetbridgeEnabled,

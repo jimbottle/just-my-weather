@@ -17,6 +17,7 @@ import io.raylytics.justmyweather.data.nws.NwsClient
 import io.raylytics.justmyweather.location.LocationProvider
 import io.raylytics.justmyweather.location.LocationResolver
 import io.raylytics.justmyweather.view.ForecastMode
+import io.raylytics.justmyweather.view.ModuleKey
 import io.raylytics.justmyweather.view.ModuleSpan
 import io.raylytics.justmyweather.view.ViewConfig
 import io.raylytics.justmyweather.view.WeatherField
@@ -57,6 +58,10 @@ import java.time.ZoneId
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class HomeViewModelTest {
+    /** Shorthand: every reading module is `ModuleKey.Reading(field)`, and
+     * spelling that out inline costs more width than it earns in clarity. */
+    private fun reading(field: WeatherField) = ModuleKey.Reading(field)
+
     private val dispatcher = StandardTestDispatcher()
 
     @BeforeEach
@@ -469,7 +474,7 @@ class HomeViewModelTest {
         advanceUntilIdle()
         assertTrue(off.vm.ready().sunDays.isEmpty(), "the opt-in ships off")
 
-        val on = harness(config = ViewConfig.DEFAULT.setShowSunTimes(true))
+        val on = harness(config = ViewConfig.DEFAULT.toggle(ModuleKey.Sun))
         advanceUntilIdle()
         assertTrue(on.vm.ready().sunDays.isNotEmpty(), "switched on, the glance carries them")
     }
@@ -481,7 +486,7 @@ class HomeViewModelTest {
         // renders, then fail the observation.
         val snapshots = InMemorySnapshotCache()
         snapshots.put(remembered)
-        val h = harness(config = ViewConfig.DEFAULT.setShowSunTimes(true), snapshots = snapshots)
+        val h = harness(config = ViewConfig.DEFAULT.toggle(ModuleKey.Sun), snapshots = snapshots)
         h.transport.failObservation = true
         advanceUntilIdle()
 
@@ -497,7 +502,7 @@ class HomeViewModelTest {
             // there while it is still in flight.
             val snapshots = InMemorySnapshotCache()
             snapshots.put(remembered)
-            val h = harness(config = ViewConfig.DEFAULT.setShowSunTimes(true), snapshots = snapshots)
+            val h = harness(config = ViewConfig.DEFAULT.toggle(ModuleKey.Sun), snapshots = snapshots)
             h.transport.gateObservation = CompletableDeferred()
             val gate = h.transport.gateObservation!!
             advanceUntilIdle()
@@ -516,7 +521,7 @@ class HomeViewModelTest {
         var now = Instant.parse("2026-08-14T03:59:00Z") // 11:59 PM on the 13th
         val h =
             harness(
-                config = ViewConfig.DEFAULT.setShowSunTimes(true),
+                config = ViewConfig.DEFAULT.toggle(ModuleKey.Sun),
                 clock = { now },
                 zone = { zone },
             )
@@ -537,7 +542,7 @@ class HomeViewModelTest {
         val zone = ZoneId.of("America/New_York")
         val h =
             harness(
-                config = ViewConfig.DEFAULT.setShowSunTimes(true),
+                config = ViewConfig.DEFAULT.toggle(ModuleKey.Sun),
                 clock = { Instant.parse("2026-08-14T17:00:00Z") },
                 zone = { zone },
             )
@@ -580,24 +585,24 @@ class HomeViewModelTest {
     fun `cycleModuleSpan persists the next width for that field only`() = runTest(dispatcher) {
         val h = harness()
         advanceUntilIdle()
-        h.vm.cycleModuleSpan(WeatherField.CONDITIONS) // half -> full
+        h.vm.cycleModuleSpan(reading(WeatherField.CONDITIONS)) // half -> full
         advanceUntilIdle()
         val saved = h.configRepository.config.first()
-        assertEquals(ModuleSpan.FULL, saved.items.first { it.field == WeatherField.CONDITIONS }.span)
+        assertEquals(ModuleSpan.FULL, saved.items.first { it.module == reading(WeatherField.CONDITIONS) }.span)
         // The neighbour keeps its width — the transform touches one field.
-        assertEquals(ModuleSpan.FULL, saved.items.first { it.field == WeatherField.TEMPERATURE }.span)
-        assertEquals(ModuleSpan.QUARTER, saved.items.first { it.field == WeatherField.WIND }.span)
+        assertEquals(ModuleSpan.FULL, saved.items.first { it.module == reading(WeatherField.TEMPERATURE) }.span)
+        assertEquals(ModuleSpan.QUARTER, saved.items.first { it.module == reading(WeatherField.WIND) }.span)
     }
 
     @Test
     fun `moveModule persists the dropped order`() = runTest(dispatcher) {
         val h = harness()
         advanceUntilIdle()
-        h.vm.moveModule(WeatherField.TEMPERATURE, 1)
+        h.vm.moveModule(reading(WeatherField.TEMPERATURE), 1)
         advanceUntilIdle()
         assertEquals(
-            listOf(WeatherField.CONDITIONS, WeatherField.TEMPERATURE),
-            h.configRepository.config.first().visible.map { it.field },
+            listOf(reading(WeatherField.CONDITIONS), reading(WeatherField.TEMPERATURE)),
+            h.configRepository.config.first().visible.map { it.module },
         )
     }
 
@@ -612,21 +617,21 @@ class HomeViewModelTest {
         advanceUntilIdle()
         val gate = CompletableDeferred<Unit>()
         h.configStore.gate = gate
-        h.vm.moveModule(WeatherField.TEMPERATURE, 1)
-        h.vm.cycleModuleSpan(WeatherField.CONDITIONS)
+        h.vm.moveModule(reading(WeatherField.TEMPERATURE), 1)
+        h.vm.cycleModuleSpan(reading(WeatherField.CONDITIONS))
         runCurrent()
         h.configStore.gate = null
         gate.complete(Unit)
         advanceUntilIdle()
         val saved = h.configRepository.config.first()
         assertEquals(
-            listOf(WeatherField.CONDITIONS, WeatherField.TEMPERATURE),
-            saved.visible.map { it.field },
+            listOf(reading(WeatherField.CONDITIONS), reading(WeatherField.TEMPERATURE)),
+            saved.visible.map { it.module },
             "the move survived",
         )
         assertEquals(
             ModuleSpan.FULL,
-            saved.items.first { it.field == WeatherField.CONDITIONS }.span,
+            saved.items.first { it.module == reading(WeatherField.CONDITIONS) }.span,
             "the resize survived",
         )
     }

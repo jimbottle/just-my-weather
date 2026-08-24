@@ -6,12 +6,16 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class ViewConfigCodecTest {
+    /** Shorthand: every reading module is `ModuleKey.Reading(field)`, and
+     * spelling that out inline costs more width than it earns in clarity. */
+    private fun reading(field: WeatherField) = ModuleKey.Reading(field)
+
     @Test
     fun `round-trips a config through encode then decode`() {
         val original =
             ViewConfig.DEFAULT
-                .toggle(WeatherField.WIND)
-                .relabel(WeatherField.TEMPERATURE, "Temp")
+                .toggle(reading(WeatherField.WIND))
+                .relabel(reading(WeatherField.TEMPERATURE), "Temp")
                 .moveUp(2)
         val restored = ViewConfigCodec.decode(ViewConfigCodec.encode(original))
         assertEquals(original, restored)
@@ -87,7 +91,7 @@ class ViewConfigCodecTest {
         assertEquals(DailyStyle.DEFAULT, config.dailyStyle)
         // The rest of the config still came through — one bad token must not
         // cost the user their field layout.
-        assertTrue(config.items.first { it.field == WeatherField.WIND }.visible)
+        assertTrue(config.items.first { it.module == reading(WeatherField.WIND) }.visible)
     }
 
     @Test
@@ -109,7 +113,7 @@ class ViewConfigCodecTest {
         val config = ViewConfigCodec.decode(raw)
         assertEquals(Density.DEFAULT, config.density)
         // …and the field settings still come through.
-        assertEquals(WeatherField.TEMPERATURE, config.items.first().field)
+        assertEquals(reading(WeatherField.TEMPERATURE), config.items.first().module)
     }
 
     @Test
@@ -141,9 +145,9 @@ class ViewConfigCodecTest {
         val raw = """[{"key":"wind","visible":true},{"key":"humidity","visible":true}]"""
         val config = ViewConfigCodec.decode(raw)
         // Unknown "humidity" dropped; all real fields present.
-        assertEquals(WeatherField.entries.size, config.items.size)
-        assertEquals(WeatherField.WIND, config.items.first().field)
-        assertEquals(emptyList<WeatherField>(), config.items.map { it.field } - WeatherField.entries.toSet())
+        assertEquals(ModuleKey.catalog.size, config.items.size)
+        assertEquals(reading(WeatherField.WIND), config.items.first().module)
+        assertEquals(emptyList<ModuleKey>(), config.items.map { it.module } - ModuleKey.catalog.toSet())
     }
 
     @Test
@@ -167,35 +171,60 @@ class ViewConfigCodecTest {
 
     @Test
     fun `module spans round-trip, and older or unknown spans fall back per-field`() {
-        val resized = ViewConfig.DEFAULT.setSpan(WeatherField.TEMPERATURE, ModuleSpan.HALF)
+        val resized = ViewConfig.DEFAULT.setSpan(reading(WeatherField.TEMPERATURE), ModuleSpan.HALF)
         val restored = ViewConfigCodec.decode(ViewConfigCodec.encode(resized))
-        assertEquals(ModuleSpan.HALF, restored.items.first { it.field == WeatherField.TEMPERATURE }.span)
+        assertEquals(
+            ModuleSpan.HALF,
+            restored.items.first { it.module == reading(WeatherField.TEMPERATURE) }.span,
+        )
 
         // A config written before modules had widths carries no span key. Each
         // field falls back to ITS default — temperature full, wind quarter —
         // so an update reproduces the old hero-and-rows proportions.
         val legacy = """[{"key":"temperature","visible":true},{"key":"wind","visible":true}]"""
         val decoded = ViewConfigCodec.decode(legacy)
-        assertEquals(ModuleSpan.FULL, decoded.items.first { it.field == WeatherField.TEMPERATURE }.span)
-        assertEquals(ModuleSpan.QUARTER, decoded.items.first { it.field == WeatherField.WIND }.span)
+        assertEquals(
+            ModuleSpan.FULL,
+            decoded.items.first { it.module == reading(WeatherField.TEMPERATURE) }.span,
+        )
+        assertEquals(ModuleSpan.QUARTER, decoded.items.first { it.module == reading(WeatherField.WIND) }.span)
 
         // An unknown span token (a future size this build doesn't know) falls
         // back the same way rather than failing the whole config.
         val unknown = """{"items":[{"key":"wind","visible":true,"span":"three-quarters"}]}"""
-        val wind = ViewConfigCodec.decode(unknown).items.first { it.field == WeatherField.WIND }
+        val wind = ViewConfigCodec.decode(unknown).items.first { it.module == reading(WeatherField.WIND) }
         assertEquals(ModuleSpan.QUARTER, wind.span)
     }
 
     @Test
-    fun `sun times survive a round trip and default off for a config written before them`() {
-        val on = ViewConfig.DEFAULT.setShowSunTimes(true)
-        assertTrue(ViewConfigCodec.decode(ViewConfigCodec.encode(on)).showSunTimes)
-        assertFalse(ViewConfigCodec.decode(ViewConfigCodec.encode(ViewConfig.DEFAULT)).showSunTimes)
+    fun `the sun module round-trips, and stays off for a config written before it`() {
+        val on = ViewConfig.DEFAULT.toggle(ModuleKey.Sun)
+        assertTrue(ViewConfigCodec.decode(ViewConfigCodec.encode(on)).shows(ModuleKey.Sun))
+        assertFalse(ViewConfigCodec.decode(ViewConfigCodec.encode(ViewConfig.DEFAULT)).shows(ModuleKey.Sun))
 
-        // A config persisted before the option existed carries no such key.
-        // It must decode to OFF — an opt-in that switches itself on during an
-        // app update is not opt-in.
+        // A config persisted before the module existed carries neither the key
+        // nor the retired switch. It must decode to OFF — an opt-in that
+        // switches itself on during an app update is not opt-in.
         val legacy = """{"density":"cozy","items":[{"key":"temperature","visible":true}]}"""
-        assertFalse(ViewConfigCodec.decode(legacy).showSunTimes)
+        assertFalse(ViewConfigCodec.decode(legacy).shows(ModuleKey.Sun))
+    }
+
+    @Test
+    fun `the retired sun-times switch becomes the sun module, once`() {
+        // Someone who had sun times on must still see them after the update —
+        // as a tile they can now move and resize.
+        val legacy =
+            """{"showSunTimes":true,"items":[{"key":"temperature","visible":true}]}"""
+        val migrated = ViewConfigCodec.decode(legacy)
+        assertTrue(migrated.shows(ModuleKey.Sun))
+        assertEquals(1, migrated.items.count { it.module == ModuleKey.Sun }, "exactly one sun module")
+
+        // But a config that already carries its own sun entry is the authority
+        // on its own layout: a leftover switch must not re-show a tile the
+        // user has since hidden.
+        val bothWaysHidden =
+            """{"showSunTimes":true,"items":[
+               {"key":"temperature","visible":true},{"key":"sun","visible":false}]}"""
+        assertFalse(ViewConfigCodec.decode(bothWaysHidden).shows(ModuleKey.Sun))
     }
 }

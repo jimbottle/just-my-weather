@@ -43,10 +43,12 @@ shapes never leak past `WeatherRepository`.
   and repository hold what the user kept and which one is showing.
 - **`view/`** — the customization *data* (pure, no Compose): `WeatherField` (the
   data-point catalog), `ViewConfig` + `Density`, `ThemeConfig`, and their JSON
-  codecs, plus `ModuleSpan` (tile widths on the 4-column grid), `packGridRows`
-  (the pure flow-grid packing) and `ForecastMode` (the forecast grid's own
-  framing). `ViewRender` turns a config + snapshot into the rendered module
-  list.
+  codecs, plus `ModuleKey` (the catalog of things that can sit on the glance —
+  every `WeatherField` via `ModuleKey.Reading`, plus `Sun`), `ModuleSpan` (tile
+  widths on the 4-column grid), `packGridRows` (the pure flow-grid packing) and
+  `ForecastMode` (the forecast grid's own framing). `ViewRender` turns a config
+  + snapshot into the rendered module list, each module carrying a
+  `ModuleContent` — a formatted reading, or richer data the tile draws itself.
 - **`alerts/`** — personal alerting. `AlertRule` (subject + comparison +
   threshold + window), `AlertSubject` (a `WeatherField` or forecast-only
   `PrecipChance`), `AlertWindow` (now / forecast horizons / overnight). The pure

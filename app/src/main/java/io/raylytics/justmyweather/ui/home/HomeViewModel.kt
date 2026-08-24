@@ -14,8 +14,8 @@ import io.raylytics.justmyweather.data.nws.DailyPeriod
 import io.raylytics.justmyweather.data.nws.ForecastPoint
 import io.raylytics.justmyweather.location.LocationResolver
 import io.raylytics.justmyweather.view.ForecastMode
+import io.raylytics.justmyweather.view.ModuleKey
 import io.raylytics.justmyweather.view.ViewConfig
-import io.raylytics.justmyweather.view.WeatherField
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -154,7 +154,9 @@ class HomeViewModel(
                         refreshError = load.error,
                         // Gated here rather than in the composable so the
                         // screen renders exactly what the state says.
-                        sunDays = if (config.showSunTimes) sun else emptyList(),
+                        // Gated on the module being on the grid, not on a
+                        // separate switch: the sun module IS the switch now.
+                        sunDays = if (config.shows(ModuleKey.Sun)) sun else emptyList(),
                     )
             }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUiState.Loading)
@@ -298,10 +300,10 @@ class HomeViewModel(
     }
 
     /** A tap on a wiggling module: step it to the next grid width. */
-    fun cycleModuleSpan(field: WeatherField) = editConfig { it.cycleSpan(field) }
+    fun cycleModuleSpan(module: ModuleKey) = editConfig { it.cycleSpan(module) }
 
-    /** A drop from the arrange drag: land [field] at this visible slot. */
-    fun moveModule(field: WeatherField, toVisibleIndex: Int) = editConfig { it.moveVisible(field, toVisibleIndex) }
+    /** A drop from the arrange drag: land [module] at this visible slot. */
+    fun moveModule(module: ModuleKey, toVisibleIndex: Int) = editConfig { it.moveVisible(module, toVisibleIndex) }
 
     /**
      * Arrange-mode edits persist as atomic transforms of the stored config —

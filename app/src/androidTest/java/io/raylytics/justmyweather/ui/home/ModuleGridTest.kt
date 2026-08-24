@@ -12,10 +12,14 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.unit.DpRect
 import androidx.compose.ui.unit.dp
+import io.raylytics.justmyweather.data.SunDay
 import io.raylytics.justmyweather.ui.theme.JustMyWeatherTheme
 import io.raylytics.justmyweather.view.Density
+import io.raylytics.justmyweather.view.ModuleContent
+import io.raylytics.justmyweather.view.ModuleKey
 import io.raylytics.justmyweather.view.ModuleSpan
 import io.raylytics.justmyweather.view.ModuleValue
 import io.raylytics.justmyweather.view.WeatherField
@@ -24,6 +28,8 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import java.time.Instant
+import java.time.LocalDate
 
 /**
  * The two things about the module grid that only a device can answer: what the
@@ -42,6 +48,10 @@ import org.junit.Test
  * grid was debugged against.
  */
 class ModuleGridTest {
+    /** Shorthand: every reading module is `ModuleKey.Reading(field)`, and
+     * spelling that out inline costs more width than it earns in clarity. */
+    private fun reading(field: WeatherField) = ModuleKey.Reading(field)
+
     @get:Rule
     val compose = createAndroidComposeRule<ComponentActivity>()
 
@@ -49,8 +59,8 @@ class ModuleGridTest {
      * fixed so the expected column arithmetic below is exact. */
     private val gridWidth = 400.dp
 
-    private val moves = mutableListOf<Pair<WeatherField, Int>>()
-    private val resizes = mutableListOf<WeatherField>()
+    private val moves = mutableListOf<Pair<ModuleKey, Int>>()
+    private val resizes = mutableListOf<ModuleKey>()
 
     private fun show(vararg modules: ModuleValue) {
         compose.setContent {
@@ -73,12 +83,40 @@ class ModuleGridTest {
      * alias would read worse than the subtraction it hides. */
     private fun DpRect.span(): androidx.compose.ui.unit.Dp = right - left
 
-    private fun module(field: WeatherField, span: ModuleSpan) =
-        ModuleValue(field = field, label = field.defaultLabel, value = "—", span = span)
+    private fun module(field: WeatherField, span: ModuleSpan) = module(ModuleKey.Reading(field), span)
 
-    private fun actionsOn(field: WeatherField): List<CustomAccessibilityAction> =
+    private fun module(key: ModuleKey, span: ModuleSpan) =
+        ModuleValue(
+            module = key,
+            label = key.defaultLabel,
+            span = span,
+            content =
+                when (key) {
+                    is ModuleKey.Reading -> ModuleContent.Reading("—")
+                    ModuleKey.Sun -> ModuleContent.Sun(sunDays)
+                },
+        )
+
+    /** Two days, so the full-width table has rows to draw. */
+    private val sunDays =
+        listOf(
+            SunDay(
+                LocalDate.of(2026, 8, 15),
+                Instant.parse("2026-08-15T10:57:00Z"),
+                Instant.parse("2026-08-16T00:36:00Z"),
+            ),
+            SunDay(
+                LocalDate.of(2026, 8, 16),
+                Instant.parse("2026-08-16T10:58:00Z"),
+                Instant.parse("2026-08-17T00:35:00Z"),
+            ),
+        )
+
+    private fun actionsOn(field: WeatherField): List<CustomAccessibilityAction> = actionsOn(ModuleKey.Reading(field))
+
+    private fun actionsOn(key: ModuleKey): List<CustomAccessibilityAction> =
         compose
-            .onNodeWithTag("module_${field.key}")
+            .onNodeWithTag("module_${key.key}")
             .fetchSemanticsNode()
             .config
             .getOrNull(SemanticsActions.CustomActions)
@@ -140,7 +178,10 @@ class ModuleGridTest {
         // Named for where it lands, so the action itself says what it will do.
         invoke(WeatherField.TEMPERATURE, "Resize to quarter") // full wraps to quarter
         invoke(WeatherField.CONDITIONS, "Resize to full")
-        assertEquals(listOf(WeatherField.TEMPERATURE, WeatherField.CONDITIONS), resizes)
+        assertEquals(
+            listOf(reading(WeatherField.TEMPERATURE), reading(WeatherField.CONDITIONS)),
+            resizes,
+        )
     }
 
     @Test
@@ -153,7 +194,10 @@ class ModuleGridTest {
         invoke(WeatherField.CONDITIONS, "Move up")
         invoke(WeatherField.CONDITIONS, "Move down")
         assertEquals(
-            listOf(WeatherField.CONDITIONS to 0, WeatherField.CONDITIONS to 2),
+            listOf(
+                reading(WeatherField.CONDITIONS) to 0,
+                reading(WeatherField.CONDITIONS) to 2,
+            ),
             moves,
         )
         // The first tile cannot move up and the last cannot move down: an
@@ -176,6 +220,32 @@ class ModuleGridTest {
                 .getOrNull(SemanticsProperties.StateDescription)
         assertEquals("Quarter width", state)
         compose.onNodeWithTag("module_wind").assertIsDisplayed()
+    }
+
+    @Test
+    fun sunModuleKeepsBothDatedRowsAtFullWidth() {
+        // The reason sun times became a span-adaptive module rather than two
+        // value tiles: at full width the day rows survive, and each row says
+        // which date its times belong to. Between sunrise and sunset "the next
+        // sunrise" and "the next sunset" fall on different dates, which is
+        // exactly what flattening would lose.
+        show(module(ModuleKey.Sun, ModuleSpan.FULL))
+        compose.onNodeWithText("Sunrise").assertIsDisplayed()
+        compose.onNodeWithText("Sunset").assertIsDisplayed()
+        compose.onNodeWithText("Aug 15").assertIsDisplayed()
+        compose.onNodeWithText("Aug 16").assertIsDisplayed()
+    }
+
+    @Test
+    fun sunModuleCondensesToTodaysPairWhenNarrower() {
+        // Narrower: today's pair only — and still labelled in words rather
+        // than reduced to arrows, because at this size there is no column
+        // position left to carry the distinction. The second day's row is
+        // dropped rather than squeezed.
+        show(module(ModuleKey.Sun, ModuleSpan.QUARTER))
+        compose.onNodeWithText("Sunrise").assertIsDisplayed()
+        compose.onNodeWithText("Sunset").assertIsDisplayed()
+        compose.onNodeWithText("Aug 16").assertDoesNotExist()
     }
 
     @Test

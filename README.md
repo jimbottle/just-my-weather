@@ -36,7 +36,8 @@ Pre-1.0, but the core product is in place:
   show, set each module's width (width is prominence), reorder and relabel
   them, choose a density (spacious ↔ compact), and theme it
   (light/dark/system · accent · typeface). Long-press a module to arrange the
-  grid in place, launcher-style
+  grid in place, launcher-style. Sun times are a module too — full width draws
+  a two-day table, narrower condenses to today's pair
 - ✅ Personal rule-based alerting — thresholds on current conditions *and* the
   forecast ("overnight low below 35°", "chance of rain above 50% within 12h"),
   quiet by default, fires once per onset, with optional quiet hours and a
