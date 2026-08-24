@@ -93,6 +93,8 @@ class HomeScreenControlsTest {
                     onSetMode = {},
                     onCustomize = {},
                     onAlerts = {},
+                    onCycleSpan = {},
+                    onMoveModule = { _, _ -> },
                 )
             }
         }

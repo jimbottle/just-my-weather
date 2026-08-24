@@ -216,6 +216,8 @@ private fun App(
                 state = state,
                 onRefresh = homeViewModel::refresh,
                 onSetMode = homeViewModel::setMode,
+                onCycleSpan = homeViewModel::cycleModuleSpan,
+                onMoveModule = homeViewModel::moveModule,
                 onCustomize = { screen = Screen.CUSTOMIZE },
                 onAlerts = {
                     onEnterAlerts()
@@ -233,6 +235,7 @@ private fun App(
                 config = config,
                 onToggle = customizeViewModel::toggle,
                 onRelabel = customizeViewModel::relabel,
+                onSetSpan = customizeViewModel::setSpan,
                 onMoveUp = customizeViewModel::moveUp,
                 onMoveDown = customizeViewModel::moveDown,
                 onSetDensity = customizeViewModel::setDensity,

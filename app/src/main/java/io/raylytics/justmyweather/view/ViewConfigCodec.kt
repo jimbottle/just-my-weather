@@ -19,6 +19,9 @@ object ViewConfigCodec {
         val key: String,
         val visible: Boolean,
         val label: String? = null,
+        // Defaulted null so a config written before modules had widths decodes;
+        // null (or an unknown key) resolves to the field's own default span.
+        val span: String? = null,
     )
 
     @Serializable
@@ -53,7 +56,7 @@ object ViewConfigCodec {
                 hourlyLayout = config.hourlyLayout.key,
                 alertBannerPosition = config.alertBannerPosition.key,
                 showSunTimes = config.showSunTimes,
-                items = config.items.map { StoredSetting(it.field.key, it.visible, it.customLabel) },
+                items = config.items.map { StoredSetting(it.field.key, it.visible, it.customLabel, it.span.key) },
             ),
         )
 
@@ -78,7 +81,10 @@ object ViewConfigCodec {
     private fun build(stored: StoredConfig): ViewConfig {
         val settings =
             stored.items.mapNotNull { s ->
-                WeatherField.byKey(s.key)?.let { FieldSetting(it, s.visible, s.label) }
+                WeatherField.byKey(s.key)?.let { field ->
+                    val span = s.span?.let(ModuleSpan::byKey) ?: field.defaultSpan
+                    FieldSetting(field, s.visible, s.label, span)
+                }
             }
         // No recognised settings means this wasn't really a config — an empty or
         // foreign JSON object (`{}`, `{"version":2}`) that `ignoreUnknownKeys`

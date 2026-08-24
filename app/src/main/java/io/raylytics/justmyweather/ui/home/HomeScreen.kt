@@ -1,9 +1,9 @@
 package io.raylytics.justmyweather.ui.home
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -26,13 +26,13 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -44,11 +44,11 @@ import io.raylytics.justmyweather.data.nws.DailyPeriod
 import io.raylytics.justmyweather.data.nws.ForecastPoint
 import io.raylytics.justmyweather.view.AlertBannerPosition
 import io.raylytics.justmyweather.view.DailyStyle
-import io.raylytics.justmyweather.view.DisplayValue
 import io.raylytics.justmyweather.view.ForecastLayout
 import io.raylytics.justmyweather.view.RenderedView
 import io.raylytics.justmyweather.view.ViewConfig
 import io.raylytics.justmyweather.view.ViewMode
+import io.raylytics.justmyweather.view.WeatherField
 import io.raylytics.justmyweather.view.render
 import kotlinx.coroutines.delay
 import java.time.Instant
@@ -58,27 +58,6 @@ import java.util.Locale
 import kotlin.math.roundToInt
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
-
-/**
- * How much of a label/value row the label may occupy before it ellipsizes,
- * measured against the row MINUS [VALUE_GAP] — the gap is overhead both sides
- * share, and charging it to neither is how the value's guaranteed floor got
- * broken when the gap was introduced.
- *
- * Sized so the longest built-in label still fits ("Precip (last hr)" is about
- * 46% of the narrowest block) while a runaway custom label cannot crowd the
- * value out. Everything the label does not use goes to the value. Lowered from
- * 0.6 when the gap arrived: at the narrow end a 12dp gap plus a 60% label left
- * the value under the floor FieldRowsTest guarantees it.
- */
-private const val LABEL_WIDTH_SHARE = 0.55f
-
-/** The space between a field's label and its value. Wide enough to read as two
- * things, narrow enough that they still read as one row — the gap is what made
- * a value look like a button when it was the whole width of the block.
- * Internal so FieldRowsTest asserts against this value rather than a copy of
- * it that could drift. */
-internal val VALUE_GAP = 12.dp
 
 /** How often the observation age re-reads the clock. See [ObservedLine].
  * Internal so the instrumented test steps the clock by exactly one tick
@@ -99,8 +78,14 @@ private val SUN_COLUMN_WIDTH = 92.dp
 /**
  * The home view. Out of the box it's a calm single glance; once the user edits
  * their config it's whatever they made it — same screen, driven by data. The
- * first visible field is the hero (large), the rest are compact rows. Centred
- * in whitespace so the hero is readable in well under a second.
+ * visible fields sit as bordered modules on a flow grid, each as prominent as
+ * the user made it wide. Centred in whitespace so the glance is readable in
+ * well under a second.
+ *
+ * Arrange mode is session UI, not app state: long-pressing a module starts it,
+ * Done or system back ends it, and everything it changes lands in the persisted
+ * ViewConfig through [onCycleSpan]/[onMoveModule] — so there is nothing to save
+ * on exit and nothing lost if the process dies mid-arrange.
  */
 @Composable
 fun HomeScreen(
@@ -109,8 +94,14 @@ fun HomeScreen(
     onSetMode: (ViewMode) -> Unit,
     onCustomize: () -> Unit,
     onAlerts: () -> Unit,
+    onCycleSpan: (WeatherField) -> Unit,
+    onMoveModule: (WeatherField, Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var arranging by rememberSaveable { mutableStateOf(false) }
+    // Back leaves arrange mode before it leaves the screen — the launcher's
+    // contract, and the gesture a wiggling grid teaches you to expect.
+    BackHandler(enabled = arranging) { arranging = false }
     Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         // The controls are pinned, not scrolled. A tall day — an alert banner,
         // the sun table and an hourly strip all at once — used to push them
@@ -139,7 +130,15 @@ fun HomeScreen(
                         ErrorView(message = state.message, onRefresh = onRefresh)
 
                     is HomeUiState.Ready ->
-                        GlanceView(state = state, onSetMode = onSetMode)
+                        GlanceView(
+                            state = state,
+                            onSetMode = onSetMode,
+                            arranging = arranging,
+                            onStartArranging = { arranging = true },
+                            onDoneArranging = { arranging = false },
+                            onCycleSpan = onCycleSpan,
+                            onMoveModule = onMoveModule,
+                        )
                 }
             }
             // Only with a reading on screen: the error view carries its own
@@ -161,6 +160,11 @@ fun HomeScreen(
 private fun GlanceView(
     state: HomeUiState.Ready,
     onSetMode: (ViewMode) -> Unit,
+    arranging: Boolean,
+    onStartArranging: () -> Unit,
+    onDoneArranging: () -> Unit,
+    onCycleSpan: (WeatherField) -> Unit,
+    onMoveModule: (WeatherField, Int) -> Unit,
 ) {
     val snapshot = state.snapshot
     val config = state.config
@@ -189,7 +193,22 @@ private fun GlanceView(
 
         // The Now glance always leads — the framing below adds to it rather
         // than replacing it, so the screen answers "right now" AND "ahead".
-        NowContent(snapshot = snapshot, config = config)
+        NowContent(
+            snapshot = snapshot,
+            config = config,
+            arranging = arranging,
+            onStartArranging = onStartArranging,
+            onCycleSpan = onCycleSpan,
+            onMoveModule = onMoveModule,
+        )
+
+        // Only while arranging, right under the grid it ends: the wiggle says
+        // "editing", this says how editing stops. Back works too.
+        if (arranging) {
+            TextButton(onClick = onDoneArranging, modifier = Modifier.testTag("doneArranging")) {
+                Text("Done arranging")
+            }
+        }
 
         // Its own element rather than two more label · value rows: these are
         // computed, not measured, they come as a pair that reads as one fact,
@@ -248,91 +267,6 @@ private fun GlanceView(
 }
 
 /**
- * The label · value rows beneath the hero.
- *
- * Extracted and `internal` so the width rule below can be asserted directly:
- * it has now regressed twice (label starvation, then a hard 50/50 cap) with
- * nothing automated to catch either, because Maestro sees text but not
- * measured widths.
- *
- * The cap comes from [BoxWithConstraints.maxWidth] — the width this block was
- * ACTUALLY given — not from [blockMaxWidth], which is only the density's
- * nominal ceiling. The row is `min(screen - padding, blockMaxWidth)` wide, so
- * on a narrow screen or at a large display scale a cap computed from the
- * constant would exceed 60% of the real row; since the label is un-weighted it
- * would win that space and starve the value it is meant to protect.
- */
-@Composable
-internal fun FieldRows(
-    rows: List<DisplayValue>,
-    blockMaxWidth: Dp,
-    rowSpacing: Dp,
-    modifier: Modifier = Modifier,
-) {
-    BoxWithConstraints(modifier = modifier.widthIn(max = blockMaxWidth)) {
-        // The gap comes off the top: what the two of them then split is the
-        // space actually available to text, so the value's share is a share of
-        // something real rather than of a row it does not entirely get.
-        val labelCap = (maxWidth - VALUE_GAP) * LABEL_WIDTH_SHARE
-        Column(verticalArrangement = Arrangement.spacedBy(rowSpacing)) {
-            rows.forEach { row ->
-                // CAP the label, then give the value everything left over.
-                //
-                // Not weight() on both: a weighted child is measured with
-                // maxWidth = its share, and `fill = false` only relaxes
-                // minWidth — so two equal weights hard-cap EACH side at 50%
-                // even when the other is nearly empty. That was worse than the
-                // problem it fixed: a long NWS condition got half a row and
-                // wrapped further, with the other half blank.
-                //
-                // Un-weighted children are measured first, so the label —
-                // bounded here, and ellipsized at one line — takes only what it
-                // needs up to the cap, and the weighted value then receives ALL
-                // the remainder. A short label leaves the value nearly the whole
-                // row; a runaway custom label (uncapped free text) stops at the
-                // cap instead of starving the value. The label gives way rather
-                // than the value because the user chose the label and knows what
-                // it says.
-                // The value sits NEXT TO its label, not against the far edge.
-                //
-                // SpaceBetween put a short value — "Clear", "8 mph" — alone at
-                // the right of a 240-280dp block, a hand's width from the word
-                // it belongs to. That is the geometry of a settings row with a
-                // trailing action, and it was read as one twice: "Clear" was
-                // taken for a Clear/reset control both times, the second time
-                // even though the accent colour already marked the real
-                // controls. Colour was not enough because position spoke
-                // louder. Held together, the pair reads as one fact.
-                //
-                // The value still takes the remaining width (weight), so a long
-                // NWS condition has the whole row to wrap into — it simply
-                // starts at the label rather than ending at the edge.
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(VALUE_GAP),
-                ) {
-                    Text(
-                        text = row.label,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.widthIn(max = labelCap),
-                    )
-                    Text(
-                        text = row.value,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onBackground,
-                        textAlign = TextAlign.Start,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-            }
-        }
-    }
-}
-
-/**
  * Active safety alerts — tornado, severe storm, hurricane, dangerous heat,
  * poor air quality — worst first.
  *
@@ -382,6 +316,10 @@ private fun SafetyAlertBanner(alerts: List<ActiveAlert>) {
 private fun NowContent(
     snapshot: WeatherSnapshot,
     config: ViewConfig,
+    arranging: Boolean,
+    onStartArranging: () -> Unit,
+    onCycleSpan: (WeatherField) -> Unit,
+    onMoveModule: (WeatherField, Int) -> Unit,
 ) {
     val rendered: RenderedView = config.render(snapshot)
     val spec = config.density.spec()
@@ -389,20 +327,24 @@ private fun NowContent(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(spec.sectionSpacing),
     ) {
-        // Hero: the value speaks for itself, so no caption above it.
-        Text(
-            text = rendered.hero?.value ?: "—",
-            style = spec.heroStyle,
-            color = MaterialTheme.colorScheme.onBackground,
-            textAlign = TextAlign.Center,
-        )
-        // Secondary fields, in the user's order, as quiet label · value rows.
-        if (rendered.rows.isNotEmpty()) {
-            FieldRows(
-                rows = rendered.rows,
-                blockMaxWidth = spec.rowMaxWidth,
-                rowSpacing = spec.rowSpacing,
-                modifier = Modifier.padding(top = spec.sectionSpacing),
+        if (rendered.modules.isEmpty()) {
+            // Every field hidden is a legal config; an em-dash reads as "you
+            // chose nothing", where a blank screen reads as a failure.
+            Text(
+                text = "—",
+                style = spec.heroStyle,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
+        } else {
+            ModuleGrid(
+                modules = rendered.modules,
+                arranging = arranging,
+                spec = spec,
+                onStartArranging = onStartArranging,
+                onCycleSpan = onCycleSpan,
+                onMove = onMoveModule,
+                modifier = Modifier.fillMaxWidth(),
             )
         }
 

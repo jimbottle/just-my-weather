@@ -137,6 +137,27 @@ class ViewConfigCodecTest {
     }
 
     @Test
+    fun `module spans round-trip, and older or unknown spans fall back per-field`() {
+        val resized = ViewConfig.DEFAULT.setSpan(WeatherField.TEMPERATURE, ModuleSpan.HALF)
+        val restored = ViewConfigCodec.decode(ViewConfigCodec.encode(resized))
+        assertEquals(ModuleSpan.HALF, restored.items.first { it.field == WeatherField.TEMPERATURE }.span)
+
+        // A config written before modules had widths carries no span key. Each
+        // field falls back to ITS default — temperature full, wind quarter —
+        // so an update reproduces the old hero-and-rows proportions.
+        val legacy = """[{"key":"temperature","visible":true},{"key":"wind","visible":true}]"""
+        val decoded = ViewConfigCodec.decode(legacy)
+        assertEquals(ModuleSpan.FULL, decoded.items.first { it.field == WeatherField.TEMPERATURE }.span)
+        assertEquals(ModuleSpan.QUARTER, decoded.items.first { it.field == WeatherField.WIND }.span)
+
+        // An unknown span token (a future size this build doesn't know) falls
+        // back the same way rather than failing the whole config.
+        val unknown = """{"items":[{"key":"wind","visible":true,"span":"three-quarters"}]}"""
+        val wind = ViewConfigCodec.decode(unknown).items.first { it.field == WeatherField.WIND }
+        assertEquals(ModuleSpan.QUARTER, wind.span)
+    }
+
+    @Test
     fun `sun times survive a round trip and default off for a config written before them`() {
         val on = ViewConfig.DEFAULT.setShowSunTimes(true)
         assertTrue(ViewConfigCodec.decode(ViewConfigCodec.encode(on)).showSunTimes)

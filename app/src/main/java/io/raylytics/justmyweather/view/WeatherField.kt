@@ -29,6 +29,21 @@ enum class WeatherField(
      * Conditions is descriptive text, so it isn't. */
     val isNumeric: Boolean get() = this != CONDITIONS
 
+    /**
+     * The grid width this field's module ships at (the user resizes from
+     * there). Sized to the content: temperature is the hero the app opens on,
+     * conditions is free text that wants room to say "Chance Showers And
+     * Thunderstorms", pressure's value string is the longest of the numerics,
+     * and wind/precip are short enough for a quarter tile.
+     */
+    val defaultSpan: ModuleSpan
+        get() =
+            when (this) {
+                TEMPERATURE -> ModuleSpan.FULL
+                CONDITIONS, PRESSURE -> ModuleSpan.HALF
+                WIND, PRECIPITATION -> ModuleSpan.QUARTER
+            }
+
     /** Whether the hourly forecast carries this field, so a forecast-window
      * alert ("overnight low") can be built on it. The NWS hourly forecast only
      * gives temperature and wind. */

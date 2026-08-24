@@ -34,7 +34,9 @@ shapes never leak past `WeatherRepository`.
   (coarse only, no Play Services, so it builds from source anywhere).
 - **`view/`** — the customization *data* (pure, no Compose): `WeatherField` (the
   data-point catalog), `ViewConfig` + `Density`, `ThemeConfig`, and their JSON
-  codecs. `ViewRender` turns a config + snapshot into the rendered hero + rows.
+  codecs, plus `ModuleSpan` (module widths on the 4-column glance grid) and
+  `packGridRows` (the pure flow-grid packing). `ViewRender` turns a config +
+  snapshot into the rendered module list.
 - **`alerts/`** — personal alerting. `AlertRule` (subject + comparison +
   threshold + window), `AlertSubject` (a `WeatherField` or forecast-only
   `PrecipChance`), `AlertWindow` (now / forecast horizons / overnight). The pure
@@ -44,7 +46,10 @@ shapes never leak past `WeatherRepository`.
 - **`ui/theme/`** — the palette + type scale and `JustMyWeatherTheme`, which maps
   a pure `ThemeConfig` to a Material color scheme + typography in one place.
 - **`ui/home/`**, **`ui/customize/`**, **`ui/alerts/`** — one view model + one
-  screen each. `ui/home/DensitySpec` maps a `Density` to concrete sizes/spacing.
+  screen each. `ui/home/DensitySpec` maps a `Density` to concrete sizes/spacing;
+  `ui/home/ModuleGrid` draws the bordered module grid and owns all of arrange
+  mode's gesture/animation machinery (the criteria it answers to live in
+  `docs/modular-v2-evaluation.md`).
 
 ## Freshness
 

@@ -19,9 +19,11 @@ Say you want **humidity** on the glance and as something to alert on.
    HUMIDITY("humidity", "Humidity"),   // key is the stable persistence id — never rename it
    ```
    Add branches to `numericValue`, `formatValue` (e.g. `"${value.roundToInt()}%"`),
-   `format` if it needs special wording, and `forecastValue` (return `null` unless
-   the forecast carries it — also flip `isForecastable` if it does). `isNumeric`
-   is true for everything except `CONDITIONS`, so it's alertable automatically.
+   `format` if it needs special wording, `forecastValue` (return `null` unless
+   the forecast carries it — also flip `isForecastable` if it does), and
+   `defaultSpan` (how wide the module ships on the glance grid — quarter for a
+   short number, half for longer text). `isNumeric` is true for everything
+   except `CONDITIONS`, so it's alertable automatically.
 2. **`data/WeatherSnapshot.kt`** — add `val humidityPct: Double?`.
 3. **`data/nws/`** — add the field to `NwsWire.ObservationProps`, project it in
    `NwsModels.CurrentObservation`, and read it in `NwsClient.getObservation`.
@@ -64,8 +66,8 @@ Both appear as chips on the customize screen automatically.
 ## Add a density level
 
 Add a `Density` entry in `view/Density.kt` and a branch in `Density.spec()` in
-`ui/home/DensitySpec.kt` with the hero size and spacing. The customize chip row
-and home view read it from there.
+`ui/home/DensitySpec.kt` with the full-module value size, the grid gap and the
+section spacing. The customize chip row and home view read it from there.
 
 Density controls size and spacing only — not which facts appear. A level that
 hid a field would make the same fact discoverable at one setting and not

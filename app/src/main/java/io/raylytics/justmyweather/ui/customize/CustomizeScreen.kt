@@ -42,6 +42,7 @@ import io.raylytics.justmyweather.view.DailyStyle
 import io.raylytics.justmyweather.view.Density
 import io.raylytics.justmyweather.view.FieldSetting
 import io.raylytics.justmyweather.view.ForecastLayout
+import io.raylytics.justmyweather.view.ModuleSpan
 import io.raylytics.justmyweather.view.ThemeConfig
 import io.raylytics.justmyweather.view.ThemeMood
 import io.raylytics.justmyweather.view.TypeChoice
@@ -53,16 +54,20 @@ import kotlinx.coroutines.delay
 private const val RELABEL_DEBOUNCE_MS = 400L
 
 /**
- * The customization layer: pick which data points appear, reorder them (the top
- * visible one is the hero), and relabel them. Edits persist immediately and the
- * home view reflects them live. Deliberately a plain list — the power is in
- * editing down, not in a wall of controls.
+ * The customization layer: pick which data points appear, set how wide each
+ * sits on the glance grid, reorder and relabel them. Edits persist immediately
+ * and the home view reflects them live. Deliberately a plain list — the power
+ * is in editing down, not in a wall of controls. Everything here is also the
+ * grid's non-gesture path: the arrows and width chips do what arrange mode's
+ * drag and tap do, for anyone who can't or won't long-press
+ * (docs/modular-v2-evaluation.md, criterion 3).
  */
 @Composable
 fun CustomizeScreen(
     config: ViewConfig,
     onToggle: (WeatherField) -> Unit,
     onRelabel: (WeatherField, String?) -> Unit,
+    onSetSpan: (WeatherField, ModuleSpan) -> Unit,
     onMoveUp: (Int) -> Unit,
     onMoveDown: (Int) -> Unit,
     onSetDensity: (Density) -> Unit,
@@ -92,8 +97,9 @@ fun CustomizeScreen(
                 TextButton(onClick = onDone) { Text("Done") }
             }
             Text(
-                text = "Show the fields you care about, in the order you read them. The top " +
-                    "shown field is the big one.",
+                text = "Show the fields you care about, in the order you read them. Width is " +
+                    "prominence: a full-width tile is the big one. You can also long-press " +
+                    "any tile on the glance to drag and resize it in place.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
@@ -123,6 +129,7 @@ fun CustomizeScreen(
                         canMoveDown = index < config.items.lastIndex,
                         onToggle = { onToggle(setting.field) },
                         onRelabel = { onRelabel(setting.field, it) },
+                        onSetSpan = { onSetSpan(setting.field, it) },
                         onMoveUp = { onMoveUp(index) },
                         onMoveDown = { onMoveDown(index) },
                     )
@@ -417,67 +424,92 @@ private fun FieldRow(
     canMoveDown: Boolean,
     onToggle: () -> Unit,
     onRelabel: (String?) -> Unit,
+    onSetSpan: (ModuleSpan) -> Unit,
     onMoveUp: () -> Unit,
     onMoveDown: () -> Unit,
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        // Reorder controls. Arrows as text keep us off an icon dependency.
-        // testTags (per field key) give UI tests a stable handle on controls
-        // that otherwise carry only a glyph or no text.
-        val key = setting.field.key
-        Column {
-            TextButton(
-                onClick = onMoveUp,
-                enabled = canMoveUp,
-                modifier = Modifier.testTag("moveUp_$key"),
-            ) { Text("↑") }
-            TextButton(
-                onClick = onMoveDown,
-                enabled = canMoveDown,
-                modifier = Modifier.testTag("moveDown_$key"),
-            ) { Text("↓") }
+    // testTags (per field key) give UI tests a stable handle on controls
+    // that otherwise carry only a glyph or no text.
+    val key = setting.field.key
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            // Reorder controls. Arrows as text keep us off an icon dependency.
+            Column {
+                TextButton(
+                    onClick = onMoveUp,
+                    enabled = canMoveUp,
+                    modifier = Modifier.testTag("moveUp_$key"),
+                ) { Text("↑") }
+                TextButton(
+                    onClick = onMoveDown,
+                    enabled = canMoveDown,
+                    modifier = Modifier.testTag("moveDown_$key"),
+                ) { Text("↓") }
+            }
+            // Local edit state keyed by field so the cursor stays put while the
+            // persisted config streams back in; the field's default name shows as
+            // the placeholder, so an empty box clearly means "use the default".
+            var label by remember(setting.field) { mutableStateOf(setting.customLabel ?: "") }
+            // Debounce persistence: typing only writes to DataStore once the user
+            // pauses, instead of a disk write per keystroke. The delay is cancelled
+            // and restarted on each change; the guard skips the no-op initial write.
+            LaunchedEffect(label) {
+                delay(RELABEL_DEBOUNCE_MS)
+                val normalized = label.ifBlank { null }
+                if (normalized != setting.customLabel) onRelabel(normalized)
+            }
+            // Flush a still-pending edit if the row leaves composition before the
+            // debounce fires — tapping Done or pressing back. Without this, the last
+            // keystroke is silently dropped. rememberUpdatedState keeps onDispose
+            // reading the latest typed value and the latest persisted label, so the
+            // guard compares against the current value and skips an already-saved one.
+            val latestLabel by rememberUpdatedState(label)
+            val latestSaved by rememberUpdatedState(setting.customLabel)
+            DisposableEffect(setting.field) {
+                onDispose {
+                    val normalized = latestLabel.ifBlank { null }
+                    if (normalized != latestSaved) onRelabel(normalized)
+                }
+            }
+            OutlinedTextField(
+                value = label,
+                onValueChange = { label = it },
+                placeholder = { Text(setting.field.defaultLabel) },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                modifier = Modifier.weight(1f),
+            )
+            Switch(
+                checked = setting.visible,
+                onCheckedChange = { onToggle() },
+                modifier = Modifier.testTag("toggle_$key"),
+            )
         }
-        // Local edit state keyed by field so the cursor stays put while the
-        // persisted config streams back in; the field's default name shows as
-        // the placeholder, so an empty box clearly means "use the default".
-        var label by remember(setting.field) { mutableStateOf(setting.customLabel ?: "") }
-        // Debounce persistence: typing only writes to DataStore once the user
-        // pauses, instead of a disk write per keystroke. The delay is cancelled
-        // and restarted on each change; the guard skips the no-op initial write.
-        LaunchedEffect(label) {
-            delay(RELABEL_DEBOUNCE_MS)
-            val normalized = label.ifBlank { null }
-            if (normalized != setting.customLabel) onRelabel(normalized)
-        }
-        // Flush a still-pending edit if the row leaves composition before the
-        // debounce fires — tapping Done or pressing back. Without this, the last
-        // keystroke is silently dropped. rememberUpdatedState keeps onDispose
-        // reading the latest typed value and the latest persisted label, so the
-        // guard compares against the current value and skips an already-saved one.
-        val latestLabel by rememberUpdatedState(label)
-        val latestSaved by rememberUpdatedState(setting.customLabel)
-        DisposableEffect(setting.field) {
-            onDispose {
-                val normalized = latestLabel.ifBlank { null }
-                if (normalized != latestSaved) onRelabel(normalized)
+        // Width on the glance grid — the non-gesture twin of tapping the tile
+        // in arrange mode. Only for shown fields: a hidden field has no tile
+        // for the width to describe.
+        if (setting.visible) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    text = "Width",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                ChipRow(
+                    options = ModuleSpan.entries,
+                    selected = setting.span,
+                    label = { it.label },
+                    onSelect = onSetSpan,
+                    tag = { "span_${key}_${it.key}" },
+                )
             }
         }
-        OutlinedTextField(
-            value = label,
-            onValueChange = { label = it },
-            placeholder = { Text(setting.field.defaultLabel) },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-            modifier = Modifier.weight(1f),
-        )
-        Switch(
-            checked = setting.visible,
-            onCheckedChange = { onToggle() },
-            modifier = Modifier.testTag("toggle_$key"),
-        )
     }
 }

@@ -1,13 +1,15 @@
 package io.raylytics.justmyweather.view
 
 /**
- * One field's place in the user's view: whether it shows, and an optional label
- * override. The effective [label] falls back to the field's default.
+ * One field's place in the user's view: whether it shows, an optional label
+ * override, and how wide its module sits on the grid. The effective [label]
+ * falls back to the field's default.
  */
 data class FieldSetting(
     val field: WeatherField,
     val visible: Boolean,
     val customLabel: String? = null,
+    val span: ModuleSpan = field.defaultSpan,
 ) {
     val label: String
         // `this.field` is required: a bare `field` inside an accessor is the
@@ -16,11 +18,12 @@ data class FieldSetting(
 }
 
 /**
- * The user's view as data: an ordered list of every field's setting. Order is
- * the whole point — the first *visible* field is the hero (rendered large), the
- * rest follow as compact rows. Promote a field by moving it up; remove it by
- * hiding it. All edits are pure transforms returning a new config, so the
- * customize screen has no mutable state to get wrong and the logic is testable.
+ * The user's view as data: an ordered list of every field's setting. The
+ * visible fields flow onto the glance's grid in this order, each as wide as its
+ * [FieldSetting.span] — size is what makes a module prominent, so promote a
+ * field by widening it or moving it up; remove it by hiding it. All edits are
+ * pure transforms returning a new config, so the customize screen and the
+ * arrange gesture have no mutable state to get wrong and the logic is testable.
  *
  * The invariant: a ViewConfig always contains exactly one setting per
  * [WeatherField]. [normalized] enforces it, so loading an old or partial config
@@ -53,6 +56,43 @@ data class ViewConfig(
 
     fun relabel(field: WeatherField, label: String?): ViewConfig =
         copy(items = items.map { if (it.field == field) it.copy(customLabel = label) else it })
+
+    fun setSpan(field: WeatherField, span: ModuleSpan): ViewConfig =
+        copy(items = items.map { if (it.field == field) it.copy(span = span) else it })
+
+    /** Step the field's module to the next size — what tapping a wiggling tile
+     * does in arrange mode. */
+    fun cycleSpan(field: WeatherField): ViewConfig =
+        copy(items = items.map { if (it.field == field) it.copy(span = it.span.next()) else it })
+
+    /**
+     * Move a visible field so it lands at [toVisibleIndex] among the *visible*
+     * fields — the drop half of the drag gesture, which only ever sees the
+     * modules actually on the grid. Hidden settings keep their relative order;
+     * an unknown field or an out-of-range target clamps to a safe no-op rather
+     * than corrupting the list.
+     */
+    fun moveVisible(field: WeatherField, toVisibleIndex: Int): ViewConfig {
+        val visibleFields = visible.map { it.field }
+        val from = visibleFields.indexOf(field)
+        if (from == -1 || visibleFields.size < 2) return this
+        val target = toVisibleIndex.coerceIn(0, visibleFields.lastIndex)
+        if (target == from) return this
+        val moving = items.first { it.field == field }
+        val without = items.filterNot { it.field == field }
+        val remainingVisible = without.filter { it.visible }
+        // Insert before the setting that currently holds the target slot; past
+        // the last slot means "after the final visible setting".
+        val insertAt =
+            if (target < remainingVisible.size) {
+                without.indexOf(remainingVisible[target])
+            } else {
+                without.indexOfLast { it.visible } + 1
+            }
+        val next = without.toMutableList()
+        next.add(insertAt, moving)
+        return copy(items = next)
+    }
 
     fun setDensity(density: Density): ViewConfig = copy(density = density)
 

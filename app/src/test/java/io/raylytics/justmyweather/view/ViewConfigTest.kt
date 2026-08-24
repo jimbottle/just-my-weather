@@ -79,17 +79,66 @@ class ViewConfigTest {
     }
 
     @Test
-    fun `render puts the first visible field as hero and the rest as rows`() {
+    fun `render projects the visible fields, in order, with their spans`() {
         val config = ViewConfig.DEFAULT.toggle(WeatherField.WIND) // temp, conditions, wind visible
         val rendered = config.render(snapshot)
-        assertEquals("72°", rendered.hero?.value)
-        assertEquals(listOf("Mostly Clear", "Calm"), rendered.rows.map { it.value })
+        assertEquals(listOf("72°", "Mostly Clear", "Calm"), rendered.modules.map { it.value })
+        assertEquals(
+            listOf(ModuleSpan.FULL, ModuleSpan.HALF, ModuleSpan.QUARTER),
+            rendered.modules.map { it.span },
+        )
     }
 
     @Test
     fun `render shows an em-dash for an enabled but empty field`() {
         val rendered = ViewConfig.DEFAULT.render(snapshot.copy(temperatureF = null))
-        assertEquals("—", rendered.hero?.value)
+        assertEquals("—", rendered.modules.first().value)
+    }
+
+    @Test
+    fun `fields ship at their default spans and setSpan changes one field only`() {
+        assertEquals(ModuleSpan.FULL, ViewConfig.DEFAULT.items.first { it.field == WeatherField.TEMPERATURE }.span)
+        val resized = ViewConfig.DEFAULT.setSpan(WeatherField.TEMPERATURE, ModuleSpan.QUARTER)
+        assertEquals(ModuleSpan.QUARTER, resized.items.first { it.field == WeatherField.TEMPERATURE }.span)
+        assertEquals(ModuleSpan.HALF, resized.items.first { it.field == WeatherField.CONDITIONS }.span)
+    }
+
+    @Test
+    fun `cycleSpan steps around the size ring`() {
+        val once = ViewConfig.DEFAULT.cycleSpan(WeatherField.WIND) // quarter -> half
+        assertEquals(ModuleSpan.HALF, once.items.first { it.field == WeatherField.WIND }.span)
+        val around =
+            once.cycleSpan(WeatherField.WIND) // -> full
+                .cycleSpan(WeatherField.WIND) // -> back to quarter
+        assertEquals(ModuleSpan.QUARTER, around.items.first { it.field == WeatherField.WIND }.span)
+    }
+
+    @Test
+    fun `moveVisible lands a field at the requested visible slot`() {
+        // temp, conditions, wind visible; precipitation and pressure hidden between them.
+        val config = ViewConfig.DEFAULT.toggle(WeatherField.WIND)
+        val moved = config.moveVisible(WeatherField.TEMPERATURE, 2)
+        assertEquals(
+            listOf(WeatherField.CONDITIONS, WeatherField.WIND, WeatherField.TEMPERATURE),
+            moved.visible.map { it.field },
+        )
+        // Hidden fields are still present exactly once each.
+        assertEquals(WeatherField.entries.size, moved.items.size)
+    }
+
+    @Test
+    fun `moveVisible clamps out-of-range targets and ignores hidden fields`() {
+        val config = ViewConfig.DEFAULT // temp, conditions visible
+        // Past the end clamps to the last slot.
+        val toEnd = config.moveVisible(WeatherField.TEMPERATURE, 99)
+        assertEquals(
+            listOf(WeatherField.CONDITIONS, WeatherField.TEMPERATURE),
+            toEnd.visible.map { it.field },
+        )
+        // A hidden field has no slot on the grid to move to.
+        assertEquals(config, config.moveVisible(WeatherField.PRESSURE, 0))
+        // Same slot is a no-op.
+        assertEquals(config, config.moveVisible(WeatherField.TEMPERATURE, 0))
     }
 
     @Test

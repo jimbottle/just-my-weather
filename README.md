@@ -32,9 +32,11 @@ Pre-1.0, but the core product is in place:
   grid resolution is cached across launches
 - ✅ The default minimalist home view: location · big temperature · one line of
   conditions
-- ✅ View customization — pick which data points show, reorder them (the top one
-  is the hero), relabel them, choose a density (spacious ↔ compact), and theme
-  it (light/dark/system · accent · typeface)
+- ✅ View customization — the glance is a modular grid: pick which data points
+  show, set each module's width (width is prominence), reorder and relabel
+  them, choose a density (spacious ↔ compact), and theme it
+  (light/dark/system · accent · typeface). Long-press a module to arrange the
+  grid in place, launcher-style
 - ✅ Personal rule-based alerting — thresholds on current conditions *and* the
   forecast ("overnight low below 35°", "chance of rain above 50% within 12h"),
   quiet by default, fires once per onset, with optional quiet hours and a

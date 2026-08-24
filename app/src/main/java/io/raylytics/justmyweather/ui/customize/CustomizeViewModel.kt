@@ -8,6 +8,7 @@ import io.raylytics.justmyweather.view.AlertBannerPosition
 import io.raylytics.justmyweather.view.DailyStyle
 import io.raylytics.justmyweather.view.Density
 import io.raylytics.justmyweather.view.ForecastLayout
+import io.raylytics.justmyweather.view.ModuleSpan
 import io.raylytics.justmyweather.view.ViewConfig
 import io.raylytics.justmyweather.view.ViewMode
 import io.raylytics.justmyweather.view.WeatherField
@@ -44,6 +45,8 @@ class CustomizeViewModel(
     fun toggle(field: WeatherField) = edit { it.toggle(field) }
 
     fun relabel(field: WeatherField, label: String?) = edit { it.relabel(field, label) }
+
+    fun setSpan(field: WeatherField, span: ModuleSpan) = edit { it.setSpan(field, span) }
 
     fun moveUp(index: Int) = edit { it.moveUp(index) }
 

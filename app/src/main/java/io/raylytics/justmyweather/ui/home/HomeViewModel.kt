@@ -13,11 +13,14 @@ import io.raylytics.justmyweather.data.nws.ActiveAlert
 import io.raylytics.justmyweather.data.nws.DailyPeriod
 import io.raylytics.justmyweather.data.nws.ForecastPoint
 import io.raylytics.justmyweather.location.LocationResolver
+import io.raylytics.justmyweather.view.ViewConfig
 import io.raylytics.justmyweather.view.ViewMode
+import io.raylytics.justmyweather.view.WeatherField
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -44,7 +47,7 @@ private const val SUN_DAYS = 2
 class HomeViewModel(
     private val repository: WeatherRepository,
     private val locationResolver: LocationResolver,
-    configRepository: ViewConfigRepository,
+    private val configRepository: ViewConfigRepository,
     /**
      * Invoked with each freshly loaded snapshot. A plain function rather than a
      * named collaborator so this ViewModel stays ignorant of who else wants the
@@ -270,6 +273,22 @@ class HomeViewModel(
         val location = sunLocation ?: return
         val today = clock().atZone(zone()).toLocalDate()
         sunEvents.value = SunTimes.daysFrom(location.latitude, location.longitude, today, zone(), SUN_DAYS)
+    }
+
+    /** A tap on a wiggling module: step it to the next grid width. */
+    fun cycleModuleSpan(field: WeatherField) = editConfig { it.cycleSpan(field) }
+
+    /** A drop from the arrange drag: land [field] at this visible slot. */
+    fun moveModule(field: WeatherField, toVisibleIndex: Int) = editConfig { it.moveVisible(field, toVisibleIndex) }
+
+    /**
+     * Arrange-mode edits persist exactly the way the customize screen's do — a
+     * pure transform of the latest stored config, saved back. The glance
+     * observes the same flow, so the grid reflects the edit as soon as it
+     * lands; there is no separate in-memory arrangement to reconcile.
+     */
+    private fun editConfig(transform: (ViewConfig) -> ViewConfig) {
+        viewModelScope.launch { configRepository.save(transform(configRepository.config.first())) }
     }
 
     /** The mode collector in `init` triggers the fetch on every mode change.
