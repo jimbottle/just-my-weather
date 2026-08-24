@@ -14,8 +14,8 @@ import io.raylytics.justmyweather.data.SunDay
 import io.raylytics.justmyweather.data.WeatherSnapshot
 import io.raylytics.justmyweather.data.nws.ActiveAlert
 import io.raylytics.justmyweather.data.nws.ForecastPoint
+import io.raylytics.justmyweather.view.ForecastMode
 import io.raylytics.justmyweather.view.ViewConfig
-import io.raylytics.justmyweather.view.ViewMode
 import org.junit.Rule
 import org.junit.Test
 import java.time.Instant
@@ -59,7 +59,7 @@ class HomeScreenControlsTest {
                     observedAt = at(18, 10),
                 ),
             config = ViewConfig.DEFAULT,
-            mode = ViewMode.HOURLY,
+            forecastMode = ForecastMode.HOURLY,
             hourly =
                 (0..11).map {
                     ForecastPoint(

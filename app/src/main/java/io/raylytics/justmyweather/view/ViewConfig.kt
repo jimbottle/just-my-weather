@@ -32,14 +32,17 @@ data class FieldSetting(
 data class ViewConfig(
     val items: List<FieldSetting>,
     val density: Density = Density.DEFAULT,
-    /** Which time framing the home screen opens on; the toggle there can still
-     * switch away for the session. */
-    val defaultMode: ViewMode = ViewMode.DEFAULT,
-    /** How the Daily framing draws each day, and which way each framing's
-     * list runs. */
+    /**
+     * Whether the forecast grid appears beneath the glance at all. On by
+     * default, which is what the app has always shown; turning it off is the
+     * calm minimum — just the glance — and is what the old NOW view mode meant.
+     */
+    val showForecast: Boolean = true,
+    /** Which framing the forecast grid opens on; its toggle can still switch
+     * away for the session. */
+    val defaultForecastMode: ForecastMode = ForecastMode.DEFAULT,
+    /** How the Daily framing draws each period. */
     val dailyStyle: DailyStyle = DailyStyle.DEFAULT,
-    val dailyLayout: ForecastLayout = ForecastLayout.DEFAULT,
-    val hourlyLayout: ForecastLayout = ForecastLayout.DEFAULT,
     /** Where a safety-alert banner sits on the days there is one. */
     val alertBannerPosition: AlertBannerPosition = AlertBannerPosition.DEFAULT,
     /**
@@ -96,13 +99,11 @@ data class ViewConfig(
 
     fun setDensity(density: Density): ViewConfig = copy(density = density)
 
-    fun setDefaultMode(mode: ViewMode): ViewConfig = copy(defaultMode = mode)
+    fun setShowForecast(show: Boolean): ViewConfig = copy(showForecast = show)
+
+    fun setDefaultForecastMode(mode: ForecastMode): ViewConfig = copy(defaultForecastMode = mode)
 
     fun setDailyStyle(style: DailyStyle): ViewConfig = copy(dailyStyle = style)
-
-    fun setDailyLayout(layout: ForecastLayout): ViewConfig = copy(dailyLayout = layout)
-
-    fun setHourlyLayout(layout: ForecastLayout): ViewConfig = copy(hourlyLayout = layout)
 
     fun setAlertBannerPosition(position: AlertBannerPosition): ViewConfig =
         copy(alertBannerPosition = position)
@@ -145,10 +146,9 @@ data class ViewConfig(
         fun normalized(
             settings: List<FieldSetting>,
             density: Density = Density.DEFAULT,
-            defaultMode: ViewMode = ViewMode.DEFAULT,
+            showForecast: Boolean = true,
+            defaultForecastMode: ForecastMode = ForecastMode.DEFAULT,
             dailyStyle: DailyStyle = DailyStyle.DEFAULT,
-            dailyLayout: ForecastLayout = ForecastLayout.DEFAULT,
-            hourlyLayout: ForecastLayout = ForecastLayout.DEFAULT,
             alertBannerPosition: AlertBannerPosition = AlertBannerPosition.DEFAULT,
             showSunTimes: Boolean = false,
         ): ViewConfig {
@@ -160,10 +160,9 @@ data class ViewConfig(
             return ViewConfig(
                 seen.values.toList(),
                 density,
-                defaultMode,
+                showForecast,
+                defaultForecastMode,
                 dailyStyle,
-                dailyLayout,
-                hourlyLayout,
                 alertBannerPosition,
                 showSunTimes,
             )

@@ -31,10 +31,16 @@ object ViewConfigCodec {
         val density: String = Density.DEFAULT.key,
         // Same defaulting story: configs written before an option existed
         // decode to that option's shipped default.
-        val mode: String = ViewMode.DEFAULT.key,
+        //
+        // `mode` is the LEGACY key, kept read-only for migration: it held a
+        // screen-wide NOW/HOURLY/DAILY, where "now" meant no forecast at all.
+        // It is split on read into showForecast + forecastMode below and never
+        // written again, so a config saved by this build carries the new pair
+        // and an older one still opens the way its owner left it.
+        val mode: String? = null,
+        val showForecast: Boolean? = null,
+        val forecastMode: String? = null,
         val dailyStyle: String = DailyStyle.DEFAULT.key,
-        val dailyLayout: String = ForecastLayout.DEFAULT.key,
-        val hourlyLayout: String = ForecastLayout.DEFAULT.key,
         // Defaulted like every field here, so a config written before the
         // safety banner existed still decodes.
         val alertBannerPosition: String = AlertBannerPosition.DEFAULT.key,
@@ -50,10 +56,9 @@ object ViewConfigCodec {
         json.encodeToString(
             StoredConfig(
                 density = config.density.key,
-                mode = config.defaultMode.key,
+                showForecast = config.showForecast,
+                forecastMode = config.defaultForecastMode.key,
                 dailyStyle = config.dailyStyle.key,
-                dailyLayout = config.dailyLayout.key,
-                hourlyLayout = config.hourlyLayout.key,
                 alertBannerPosition = config.alertBannerPosition.key,
                 showSunTimes = config.showSunTimes,
                 items = config.items.map { StoredSetting(it.field.key, it.visible, it.customLabel, it.span.key) },
@@ -93,20 +98,34 @@ object ViewConfigCodec {
         // documented contract; fall back to DEFAULT instead.
         if (settings.isEmpty()) return ViewConfig.DEFAULT
         val density = Density.byKey(stored.density) ?: Density.DEFAULT
-        val mode = ViewMode.byKey(stored.mode) ?: ViewMode.DEFAULT
-        val dailyStyle = DailyStyle.byKey(stored.dailyStyle) ?: DailyStyle.DEFAULT
-        val dailyLayout = ForecastLayout.byKey(stored.dailyLayout) ?: ForecastLayout.DEFAULT
-        val hourlyLayout = ForecastLayout.byKey(stored.hourlyLayout) ?: ForecastLayout.DEFAULT
         val bannerPosition = AlertBannerPosition.byKey(stored.alertBannerPosition) ?: AlertBannerPosition.DEFAULT
+        val (showForecast, forecastMode) = stored.forecastChoice()
         return ViewConfig.normalized(
             settings,
             density,
-            mode,
-            dailyStyle,
-            dailyLayout,
-            hourlyLayout,
+            showForecast,
+            forecastMode,
+            DailyStyle.byKey(stored.dailyStyle) ?: DailyStyle.DEFAULT,
             bannerPosition,
             stored.showSunTimes,
         )
+    }
+
+    /**
+     * Resolve "does the forecast show, and in which framing" from either
+     * shape. The new pair wins when present; otherwise the legacy `mode` is
+     * split — "now" meant the forecast was hidden, and hourly/daily meant it
+     * was shown in that framing. Absent both (a config older than either), the
+     * shipped default: shown, hourly.
+     */
+    private fun StoredConfig.forecastChoice(): Pair<Boolean, ForecastMode> {
+        showForecast?.let { shown ->
+            return shown to (forecastMode?.let(ForecastMode::byKey) ?: ForecastMode.DEFAULT)
+        }
+        return when (mode) {
+            null -> true to ForecastMode.DEFAULT
+            "now" -> false to ForecastMode.DEFAULT
+            else -> true to (ForecastMode.byKey(mode) ?: ForecastMode.DEFAULT)
+        }
     }
 }

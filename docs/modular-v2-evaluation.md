@@ -23,18 +23,34 @@ install:
   long-presses.
 - Nothing animates, pulses, or invites interaction on the ordinary open.
 
-### 2. Grid vs. mode toggle coherence
+### 2. Grid vs. mode toggle coherence — **resolved, now a standing limit**
 
-v2 grids only the Now glance; the Hourly/Daily framings and the sun table keep
-their existing rendering. That split is deliberate scoping, and it is also the
-first thing to re-evaluate:
+The screen is now **two grids and no more**: the glance (arrangeable) and the
+forecast (data-driven), both drawn by one engine (`ui/home/TileGrid`). The
+screen-wide Now/Hourly/Daily toggle is gone. Its three states split into the two
+questions they actually were:
 
-- Does the seam show? A user who can drag the temperature around but not the
-  hourly strip has been given two mental models on one screen.
-- The end state to test toward: forecast surfaces and sun times as grid modules
-  (just-my-weather-8zo), at which point the Now/Hourly/Daily toggle may retire.
-- Judge by whether the toggle starts feeling like a second, competing
-  customization system.
+- *Does the forecast show at all?* → `ViewConfig.showForecast`, on the customize
+  screen. This is what the old NOW meant.
+- *Which framing does it show?* → `ForecastMode`, as a toggle **on the forecast
+  grid itself**.
+
+Two settings died in the move: `ForecastLayout` (side-by-side vs stacked) is
+subsumed — the grid flows its tiles, so there is no direction left to choose.
+
+What to keep judging:
+
+- **Two grids is the ceiling.** A third grid is a design change, not an
+  increment; it is the point at which the page stops being "now, and next".
+- Does the seam still show? A user can arrange the glance but not the forecast.
+  That asymmetry is intended (one is yours, one is NWS's) and the shared tile
+  language is what should carry it. If people try to drag forecast tiles, the
+  language is over-promising.
+- Sun times are still a table, not a module — the one part of the original
+  fold-in that has not happened. Folding it in needs a module catalog that
+  admits non-`WeatherField` modules, and the two-day table's day-row design was
+  a deliberate choice worth preserving rather than flattening into "next
+  sunrise / next sunset".
 
 ### 3. Accessibility parity
 
@@ -62,7 +78,8 @@ it, so it is held to structural rules:
 - Grid math (span model, row packing, reorder transforms) is pure Kotlin in
   `view/`, JVM-tested, no Compose types.
 - The gesture/animation machinery lives in one file (`ui/home/ModuleGrid.kt`)
-  and does not leak drag state elsewhere.
+  and does not leak drag state elsewhere; `ui/home/TileGrid.kt` holds only what
+  both grids share (packing + the tile shell) and knows nothing about either.
 - Judge by whether "add a module size" or "change the wiggle" is a one-file
   change a newcomer can find.
 
@@ -74,8 +91,10 @@ Worth stating plainly, because the gaps are where the shipped bugs lived:
   persistence path including overlapping edits (`HomeViewModelTest`).
 - **Instrumented** (`ModuleGridTest`) covers what only a device measures —
   spans in real dp, gaps left empty — and the accessibility actions.
-- **Maestro** (`06-arrange.yaml`) covers the real touch path: long-press entry,
-  tap-to-cycle, exit, and persistence across a restart.
+- **Maestro** covers the real touch paths: `06-arrange.yaml` for long-press
+  entry, tap-to-cycle, exit and persistence across a restart; `07-forecast.yaml`
+  for the framing toggle and for hiding/showing the second grid without
+  disturbing the first.
 - **Nothing automated covers the drag reorder.** Maestro 2.5.0 has no
   hold-then-move gesture, and a slow coordinate swipe never satisfies the
   long-press (probed on-device). Verify it by hand with `adb shell input

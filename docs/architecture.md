@@ -34,9 +34,10 @@ shapes never leak past `WeatherRepository`.
   (coarse only, no Play Services, so it builds from source anywhere).
 - **`view/`** — the customization *data* (pure, no Compose): `WeatherField` (the
   data-point catalog), `ViewConfig` + `Density`, `ThemeConfig`, and their JSON
-  codecs, plus `ModuleSpan` (module widths on the 4-column glance grid) and
-  `packGridRows` (the pure flow-grid packing). `ViewRender` turns a config +
-  snapshot into the rendered module list.
+  codecs, plus `ModuleSpan` (tile widths on the 4-column grid), `packGridRows`
+  (the pure flow-grid packing) and `ForecastMode` (the forecast grid's own
+  framing). `ViewRender` turns a config + snapshot into the rendered module
+  list.
 - **`alerts/`** — personal alerting. `AlertRule` (subject + comparison +
   threshold + window), `AlertSubject` (a `WeatherField` or forecast-only
   `PrecipChance`), `AlertWindow` (now / forecast horizons / overnight). The pure
@@ -46,10 +47,13 @@ shapes never leak past `WeatherRepository`.
 - **`ui/theme/`** — the palette + type scale and `JustMyWeatherTheme`, which maps
   a pure `ThemeConfig` to a Material color scheme + typography in one place.
 - **`ui/home/`**, **`ui/customize/`**, **`ui/alerts/`** — one view model + one
-  screen each. `ui/home/DensitySpec` maps a `Density` to concrete sizes/spacing;
-  `ui/home/ModuleGrid` draws the bordered module grid and owns all of arrange
-  mode's gesture/animation machinery (the criteria it answers to live in
-  `docs/modular-v2-evaluation.md`).
+  screen each. `ui/home/DensitySpec` maps a `Density` to concrete sizes/spacing.
+  The home screen is **two grids over one engine**: `ui/home/TileGrid` is the
+  engine (row packing + the bordered tile shell), `ui/home/ModuleGrid` is the
+  arrangeable glance built on it — it owns all of arrange mode's
+  gesture/animation machinery — and `ui/home/ForecastGrid` is the data-driven
+  forecast, carrying its own Hourly/Daily toggle. The criteria all of this
+  answers to live in `docs/modular-v2-evaluation.md`.
 
 ## Freshness
 

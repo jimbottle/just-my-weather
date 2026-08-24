@@ -41,13 +41,12 @@ import io.raylytics.justmyweather.view.AlertBannerPosition
 import io.raylytics.justmyweather.view.DailyStyle
 import io.raylytics.justmyweather.view.Density
 import io.raylytics.justmyweather.view.FieldSetting
-import io.raylytics.justmyweather.view.ForecastLayout
+import io.raylytics.justmyweather.view.ForecastMode
 import io.raylytics.justmyweather.view.ModuleSpan
 import io.raylytics.justmyweather.view.ThemeConfig
 import io.raylytics.justmyweather.view.ThemeMood
 import io.raylytics.justmyweather.view.TypeChoice
 import io.raylytics.justmyweather.view.ViewConfig
-import io.raylytics.justmyweather.view.ViewMode
 import io.raylytics.justmyweather.view.WeatherField
 import kotlinx.coroutines.delay
 
@@ -71,10 +70,9 @@ fun CustomizeScreen(
     onMoveUp: (Int) -> Unit,
     onMoveDown: (Int) -> Unit,
     onSetDensity: (Density) -> Unit,
-    onSetDefaultMode: (ViewMode) -> Unit,
+    onSetShowForecast: (Boolean) -> Unit,
+    onSetDefaultForecastMode: (ForecastMode) -> Unit,
     onSetDailyStyle: (DailyStyle) -> Unit,
-    onSetDailyLayout: (ForecastLayout) -> Unit,
-    onSetHourlyLayout: (ForecastLayout) -> Unit,
     onSetAlertBannerPosition: (AlertBannerPosition) -> Unit,
     onSetShowSunTimes: (Boolean) -> Unit,
     theme: ThemeConfig,
@@ -109,13 +107,13 @@ fun CustomizeScreen(
             // sections have outgrown a fixed header on small screens.
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                 DensityPicker(selected = config.density, onSelect = onSetDensity)
-                DefaultModePicker(selected = config.defaultMode, onSelect = onSetDefaultMode)
-                HourlyViewPicker(layout = config.hourlyLayout, onSetLayout = onSetHourlyLayout)
-                DailyViewPicker(
-                    style = config.dailyStyle,
-                    layout = config.dailyLayout,
-                    onSetStyle = onSetDailyStyle,
-                    onSetLayout = onSetDailyLayout,
+                ForecastPicker(
+                    show = config.showForecast,
+                    mode = config.defaultForecastMode,
+                    dailyStyle = config.dailyStyle,
+                    onSetShow = onSetShowForecast,
+                    onSetMode = onSetDefaultForecastMode,
+                    onSetDailyStyle = onSetDailyStyle,
                 )
                 HorizontalDivider(
                     color = MaterialTheme.colorScheme.surfaceVariant,
@@ -356,64 +354,72 @@ private fun DensityPicker(
     }
 }
 
-/** Which way the hourly list runs: the side-by-side scroll or stacked rows. */
+/**
+ * Everything about the second grid, in one block: whether it appears, which
+ * framing it opens on, and how a day is drawn.
+ *
+ * These used to be three separate sections — "Opens on", "Hourly view", "Daily
+ * view" — because the framing was a property of the whole screen. It is a
+ * property of the forecast now, so its settings sit together, and the two
+ * "which direction does the list run" pickers are gone entirely: the grid flows
+ * its tiles, so there is no longer a direction to choose.
+ */
 @Composable
-private fun HourlyViewPicker(
-    layout: ForecastLayout,
-    onSetLayout: (ForecastLayout) -> Unit,
+private fun ForecastPicker(
+    show: Boolean,
+    mode: ForecastMode,
+    dailyStyle: DailyStyle,
+    onSetShow: (Boolean) -> Unit,
+    onSetMode: (ForecastMode) -> Unit,
+    onSetDailyStyle: (DailyStyle) -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 10.dp)) {
-        Text("Hourly view", style = MaterialTheme.typography.labelMedium)
-        ChipRow(
-            options = ForecastLayout.entries,
-            selected = layout,
-            label = { it.label },
-            onSelect = onSetLayout,
-        )
-    }
-}
-
-/** How the Daily framing draws: one high/low per day or NWS's day-and-night
- * halves, and side-by-side (the scroll) or stacked rows. */
-@Composable
-private fun DailyViewPicker(
-    style: DailyStyle,
-    layout: ForecastLayout,
-    onSetStyle: (DailyStyle) -> Unit,
-    onSetLayout: (ForecastLayout) -> Unit,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 10.dp)) {
-        Text("Daily view", style = MaterialTheme.typography.labelMedium)
-        ChipRow(
-            options = DailyStyle.entries,
-            selected = style,
-            label = { it.label },
-            onSelect = onSetStyle,
-        )
-        ChipRow(
-            options = ForecastLayout.entries,
-            selected = layout,
-            label = { it.label },
-            onSelect = onSetLayout,
-        )
-    }
-}
-
-/** Which time framing the home screen opens on. The home toggle can still
- * switch away for the session; this sets where it starts. */
-@Composable
-private fun DefaultModePicker(
-    selected: ViewMode,
-    onSelect: (ViewMode) -> Unit,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 10.dp)) {
-        Text("Opens on", style = MaterialTheme.typography.labelMedium)
-        ChipRow(
-            options = ViewMode.entries,
-            selected = selected,
-            label = { it.label },
-            onSelect = onSelect,
-        )
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text("Forecast", style = MaterialTheme.typography.labelMedium)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("Show the forecast", style = MaterialTheme.typography.bodyLarge)
+            Switch(
+                checked = show,
+                onCheckedChange = onSetShow,
+                modifier = Modifier.testTag("show-forecast-toggle"),
+            )
+        }
+        // The framing options only mean something when there is a forecast to
+        // frame; offered under an off switch they read as controls that do
+        // nothing.
+        if (show) {
+            Text(
+                text = "Opens on",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            ChipRow(
+                options = ForecastMode.entries,
+                selected = mode,
+                label = { it.label },
+                onSelect = onSetMode,
+                tag = { "forecast_default_${it.key}" },
+            )
+            Text(
+                text = "Each day shows",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+            ChipRow(
+                options = DailyStyle.entries,
+                selected = dailyStyle,
+                label = { it.label },
+                onSelect = onSetDailyStyle,
+                tag = { "daily_style_${it.key}" },
+            )
+        }
     }
 }
 

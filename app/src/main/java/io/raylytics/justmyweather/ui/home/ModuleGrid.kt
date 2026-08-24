@@ -7,22 +7,10 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -52,12 +40,10 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import io.raylytics.justmyweather.view.ModuleSpan
 import io.raylytics.justmyweather.view.ModuleValue
 import io.raylytics.justmyweather.view.WeatherField
-import io.raylytics.justmyweather.view.packGridRows
 
 /*
  * The modular glance: every visible field as a bordered tile on a 4-column
@@ -67,21 +53,6 @@ import io.raylytics.justmyweather.view.packGridRows
  * in view/, and the rest of the app only ever sees a ViewConfig change.
  * docs/modular-v2-evaluation.md holds the criteria this design is judged by.
  */
-
-/** Corner radius of a tile's border. Rounded just enough to read as a tile,
- * not enough to read as a button. */
-private val TILE_CORNER = 10.dp
-
-/** Air between a tile's border and its content. */
-private val TILE_PADDING = 10.dp
-
-/** Floor for a tile's height, so a quarter tile with a short value is still a
- * comfortable touch target for the long-press. */
-private val TILE_MIN_HEIGHT = 64.dp
-
-/** The grid stops growing here — on a tablet a quarter tile the width of a
- * phone screen stops being a tile. */
-private val GRID_MAX_WIDTH = 480.dp
 
 /** Wiggle amplitude, degrees. Visible without being carnival. */
 private const val WIGGLE_DEGREES = 1.6f
@@ -195,10 +166,10 @@ internal fun ModuleGrid(
         }
     }
 
-    val rows = packGridRows(modules) { it.span.columns }
-    var moduleIndex = 0
-    Column(
-        verticalArrangement = Arrangement.spacedBy(spec.moduleGap),
+    TileGrid(
+        items = modules,
+        span = { it.span },
+        gap = spec.moduleGap,
         modifier =
             modifier
                 .widthIn(max = GRID_MAX_WIDTH)
@@ -241,69 +212,51 @@ internal fun ModuleGrid(
                         },
                     )
                 },
-    ) {
-        rows.forEach { row ->
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(spec.moduleGap),
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        // Equal-height tiles per row, sized by the tallest.
-                        .height(IntrinsicSize.Min)
-                        // The dragged tile's row draws over its neighbours, or
-                        // the tile slides UNDER the next row on a long drag.
-                        .zIndex(if (row.any { it.field == dragged }) 1f else 0f),
-            ) {
-                row.forEach { module ->
-                    val index = moduleIndex++
-                    val field = module.field
-                    val isDragged = dragged == field
-                    val wiggle = wiggleAngle(active = arranging && !isDragged, phase = index)
-                    ModuleTile(
-                        index = index,
-                        lastIndex = modules.lastIndex,
-                        onMove = onMove,
-                        onCycleSpan = onCycleSpan,
-                        module = module,
-                        arranging = arranging,
-                        heroStyle = spec.heroStyle,
-                        modifier =
-                            Modifier
-                                .weight(module.span.columns.toFloat())
-                                .fillMaxHeight()
-                                .zIndex(if (isDragged) 1f else 0f)
-                                .onGloballyPositioned { bounds[field] = it.boundsInRoot() }
-                                .graphicsLayer {
-                                    // Every property is written on every pass,
-                                    // both branches: the layer keeps its last
-                                    // values between invocations, so a branch
-                                    // that "doesn't touch" translation would
-                                    // freeze the drag's offset onto the tile.
-                                    if (isDragged) {
-                                        // Anchor the grab point under the finger,
-                                        // wherever layout put the tile this frame.
-                                        val base = bounds[field]?.topLeft ?: (dragPosition - grabOffset)
-                                        val shift = dragPosition - grabOffset - base
-                                        translationX = shift.x
-                                        translationY = shift.y
-                                        scaleX = DRAG_SCALE
-                                        scaleY = DRAG_SCALE
-                                        rotationZ = 0f
-                                    } else {
-                                        translationX = 0f
-                                        translationY = 0f
-                                        scaleX = 1f
-                                        scaleY = 1f
-                                        rotationZ = wiggle.value
-                                    }
-                                }
-                                .testTag("module_${field.key}"),
-                    )
-                }
-                val leftover = (ModuleSpan.COLUMNS - row.sumOf { it.span.columns }).coerceAtLeast(0)
-                if (leftover > 0) Spacer(Modifier.weight(leftover.toFloat()))
-            }
-        }
+        // The dragged tile's row draws over its neighbours, or the tile slides
+        // UNDER the next row on a long drag.
+        rowModifier = { row -> if (row.any { it.field == dragged }) Modifier.zIndex(1f) else Modifier },
+    ) { module, index, tileModifier ->
+        val field = module.field
+        val isDragged = dragged == field
+        val wiggle = wiggleAngle(active = arranging && !isDragged, phase = index)
+        ModuleTile(
+            index = index,
+            lastIndex = modules.lastIndex,
+            onMove = onMove,
+            onCycleSpan = onCycleSpan,
+            module = module,
+            arranging = arranging,
+            heroStyle = spec.heroStyle,
+            modifier =
+                tileModifier
+                    .zIndex(if (isDragged) 1f else 0f)
+                    .onGloballyPositioned { bounds[field] = it.boundsInRoot() }
+                    .graphicsLayer {
+                        // Every property is written on every pass, both
+                        // branches: the layer keeps its last values between
+                        // invocations, so a branch that "doesn't touch"
+                        // translation would freeze the drag's offset onto the
+                        // tile.
+                        if (isDragged) {
+                            // Anchor the grab point under the finger, wherever
+                            // layout put the tile this frame.
+                            val base = bounds[field]?.topLeft ?: (dragPosition - grabOffset)
+                            val shift = dragPosition - grabOffset - base
+                            translationX = shift.x
+                            translationY = shift.y
+                            scaleX = DRAG_SCALE
+                            scaleY = DRAG_SCALE
+                            rotationZ = 0f
+                        } else {
+                            translationX = 0f
+                            translationY = 0f
+                            scaleX = 1f
+                            scaleY = 1f
+                            rotationZ = wiggle.value
+                        }
+                    }
+                    .testTag("module_${field.key}"),
+        )
     }
 }
 
@@ -351,13 +304,10 @@ private fun ModuleTile(
             ModuleSpan.HALF -> MaterialTheme.typography.headlineMedium
             ModuleSpan.QUARTER -> MaterialTheme.typography.titleLarge
         }
-    Box(
-        contentAlignment = Alignment.Center,
+    TileShell(
+        borderColor = borderColor,
         modifier =
             modifier
-                .heightIn(min = TILE_MIN_HEIGHT)
-                .border(1.dp, borderColor, RoundedCornerShape(TILE_CORNER))
-                .padding(TILE_PADDING)
                 .semantics(mergeDescendants = true) {
                     // The width is state, not a label: it changes under the
                     // user and is what Resize acts on, so it belongs where a

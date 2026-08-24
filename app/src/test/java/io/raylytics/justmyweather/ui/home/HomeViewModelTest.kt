@@ -16,9 +16,9 @@ import io.raylytics.justmyweather.data.nws.HttpTransport
 import io.raylytics.justmyweather.data.nws.NwsClient
 import io.raylytics.justmyweather.location.LocationProvider
 import io.raylytics.justmyweather.location.LocationResolver
+import io.raylytics.justmyweather.view.ForecastMode
 import io.raylytics.justmyweather.view.ModuleSpan
 import io.raylytics.justmyweather.view.ViewConfig
-import io.raylytics.justmyweather.view.ViewMode
 import io.raylytics.justmyweather.view.WeatherField
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -178,13 +178,13 @@ class HomeViewModelTest {
         val h = harness()
         advanceUntilIdle()
 
-        h.vm.setMode(ViewMode.HOURLY)
+        h.vm.setForecastMode(ForecastMode.HOURLY)
         advanceUntilIdle()
         assertEquals(1, h.transport.hourlyFetches)
         assertNotNull(h.vm.ready().hourly)
 
-        h.vm.setMode(ViewMode.NOW)
-        h.vm.setMode(ViewMode.HOURLY)
+        h.vm.setForecastMode(ForecastMode.HOURLY)
+        h.vm.setForecastMode(ForecastMode.HOURLY)
         advanceUntilIdle()
         assertEquals(1, h.transport.hourlyFetches)
     }
@@ -193,7 +193,7 @@ class HomeViewModelTest {
     fun `refresh clears forecasts and refetches the active framing`() = runTest(dispatcher) {
         val h = harness()
         advanceUntilIdle()
-        h.vm.setMode(ViewMode.DAILY)
+        h.vm.setForecastMode(ForecastMode.DAILY)
         advanceUntilIdle()
         assertEquals(1, h.transport.dailyFetches)
 
@@ -207,24 +207,24 @@ class HomeViewModelTest {
     fun `a failed framing keeps its error to itself and retries on re-entry`() = runTest(dispatcher) {
         val h = harness()
         advanceUntilIdle()
-        h.vm.setMode(ViewMode.HOURLY)
+        h.vm.setForecastMode(ForecastMode.HOURLY)
         advanceUntilIdle()
 
         h.transport.failDaily = true
-        h.vm.setMode(ViewMode.DAILY)
+        h.vm.setForecastMode(ForecastMode.DAILY)
         advanceUntilIdle()
         assertNotNull(h.vm.ready().forecastError)
         assertNull(h.vm.ready().daily)
 
         // Back on Hourly the loaded strip shows — Daily's error stays Daily's.
-        h.vm.setMode(ViewMode.HOURLY)
+        h.vm.setForecastMode(ForecastMode.HOURLY)
         advanceUntilIdle()
         assertNull(h.vm.ready().forecastError)
         assertNotNull(h.vm.ready().hourly)
 
         // A failed framing stayed null, so re-entering retries — and succeeds.
         h.transport.failDaily = false
-        h.vm.setMode(ViewMode.DAILY)
+        h.vm.setForecastMode(ForecastMode.DAILY)
         advanceUntilIdle()
         assertEquals(2, h.transport.dailyFetches)
         assertNotNull(h.vm.ready().daily)
@@ -237,13 +237,13 @@ class HomeViewModelTest {
         advanceUntilIdle()
 
         h.transport.failDaily = true
-        h.vm.setMode(ViewMode.DAILY)
+        h.vm.setForecastMode(ForecastMode.DAILY)
         advanceUntilIdle()
         assertNotNull(h.vm.ready().forecastError)
 
         // Same-chip tap: the mode doesn't change, so this is the retry path.
         h.transport.failDaily = false
-        h.vm.setMode(ViewMode.DAILY)
+        h.vm.setForecastMode(ForecastMode.DAILY)
         advanceUntilIdle()
         assertEquals(2, h.transport.dailyFetches)
         assertNotNull(h.vm.ready().daily)
@@ -251,7 +251,7 @@ class HomeViewModelTest {
 
         // The other half of the same-chip contract: once data is loaded,
         // tapping the selected chip again must NOT re-hit the API.
-        h.vm.setMode(ViewMode.DAILY)
+        h.vm.setForecastMode(ForecastMode.DAILY)
         advanceUntilIdle()
         assertEquals(2, h.transport.dailyFetches)
     }
@@ -264,7 +264,7 @@ class HomeViewModelTest {
         // Park the daily fetch mid-flight, then refresh while it's suspended.
         val gate = CompletableDeferred<Unit>()
         h.transport.gateDaily = gate
-        h.vm.setMode(ViewMode.DAILY)
+        h.vm.setForecastMode(ForecastMode.DAILY)
         runCurrent()
         assertEquals(1, h.transport.dailyFetches)
 
@@ -282,16 +282,16 @@ class HomeViewModelTest {
 
     @Test
     fun `the config default drives the opening framing until setMode overrides it`() = runTest(dispatcher) {
-        val h = harness(config = ViewConfig.DEFAULT.setDefaultMode(ViewMode.DAILY))
+        val h = harness(config = ViewConfig.DEFAULT.setDefaultForecastMode(ForecastMode.DAILY))
         advanceUntilIdle()
 
         // The persisted default opened Daily — and fetched it, unprompted.
-        assertEquals(ViewMode.DAILY, h.vm.ready().mode)
+        assertEquals(ForecastMode.DAILY, h.vm.ready().forecastMode)
         assertEquals(1, h.transport.dailyFetches)
 
-        h.vm.setMode(ViewMode.NOW)
+        h.vm.setForecastMode(ForecastMode.HOURLY)
         advanceUntilIdle()
-        assertEquals(ViewMode.NOW, h.vm.ready().mode)
+        assertEquals(ForecastMode.HOURLY, h.vm.ready().forecastMode)
     }
 
     @Test
@@ -546,6 +546,34 @@ class HomeViewModelTest {
             assertEquals(day.date, day.sunrise!!.atZone(zone).toLocalDate(), "sunrise on its own date")
             assertEquals(day.date, day.sunset!!.atZone(zone).toLocalDate(), "sunset on its own date")
         }
+    }
+
+    @Test
+    fun `a hidden forecast grid fetches nothing at all`() = runTest(dispatcher) {
+        // The reason "off" is worth having: a view nobody is looking at should
+        // not cost a round trip. The old NOW mode already skipped the fetch;
+        // that must survive the move from screen mode to config flag.
+        val h = harness(config = ViewConfig.DEFAULT.setShowForecast(false))
+        advanceUntilIdle()
+        assertEquals(0, h.transport.hourlyFetches)
+        assertEquals(0, h.transport.dailyFetches)
+        // …and switching it back on fetches for the framing it opens in.
+        h.configRepository.update { it.setShowForecast(true) }
+        advanceUntilIdle()
+        assertEquals(1, h.transport.hourlyFetches)
+    }
+
+    @Test
+    fun `a hidden forecast reports no error even when a fetch failed earlier`() = runTest(dispatcher) {
+        // A stale message about a grid that is not on screen is a message with
+        // nothing to point at.
+        val h = harness(config = ViewConfig.DEFAULT.setDefaultForecastMode(ForecastMode.DAILY))
+        h.transport.failDaily = true
+        advanceUntilIdle()
+        assertNotNull(h.vm.ready().forecastError)
+        h.configRepository.update { it.setShowForecast(false) }
+        advanceUntilIdle()
+        assertNull(h.vm.ready().forecastError)
     }
 
     @Test

@@ -7,10 +7,9 @@ import io.raylytics.justmyweather.data.ViewConfigRepository
 import io.raylytics.justmyweather.view.AlertBannerPosition
 import io.raylytics.justmyweather.view.DailyStyle
 import io.raylytics.justmyweather.view.Density
-import io.raylytics.justmyweather.view.ForecastLayout
+import io.raylytics.justmyweather.view.ForecastMode
 import io.raylytics.justmyweather.view.ModuleSpan
 import io.raylytics.justmyweather.view.ViewConfig
-import io.raylytics.justmyweather.view.ViewMode
 import io.raylytics.justmyweather.view.WeatherField
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -54,13 +53,11 @@ class CustomizeViewModel(
 
     fun setDensity(density: Density) = edit { it.setDensity(density) }
 
-    fun setDefaultMode(mode: ViewMode) = edit { it.setDefaultMode(mode) }
+    fun setShowForecast(show: Boolean) = edit { it.setShowForecast(show) }
+
+    fun setDefaultForecastMode(mode: ForecastMode) = edit { it.setDefaultForecastMode(mode) }
 
     fun setDailyStyle(style: DailyStyle) = edit { it.setDailyStyle(style) }
-
-    fun setDailyLayout(layout: ForecastLayout) = edit { it.setDailyLayout(layout) }
-
-    fun setHourlyLayout(layout: ForecastLayout) = edit { it.setHourlyLayout(layout) }
 
     fun setAlertBannerPosition(position: AlertBannerPosition) = edit { it.setAlertBannerPosition(position) }
 

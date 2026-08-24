@@ -25,52 +25,81 @@ class ViewConfigCodecTest {
     }
 
     @Test
-    fun `round-trips the default view mode`() {
-        val original = ViewConfig.DEFAULT.setDefaultMode(ViewMode.DAILY)
-        val restored = ViewConfigCodec.decode(ViewConfigCodec.encode(original))
-        assertEquals(ViewMode.DAILY, restored.defaultMode)
-    }
-
-    @Test
-    fun `a config saved before view modes existed opens on the shipped default`() {
-        val raw = """{"density":"comfortable","items":[{"key":"temperature","visible":true}]}"""
-        assertEquals(ViewMode.DEFAULT, ViewConfigCodec.decode(raw).defaultMode)
-    }
-
-    @Test
-    fun `round-trips the daily style and both layouts independently`() {
+    fun `round-trips whether the forecast shows and which framing it opens on`() {
         val original =
             ViewConfig.DEFAULT
+                .setDefaultForecastMode(ForecastMode.DAILY)
                 .setDailyStyle(DailyStyle.HALF_DAY)
-                .setDailyLayout(ForecastLayout.COLUMN)
-                .setHourlyLayout(ForecastLayout.ROW)
         val restored = ViewConfigCodec.decode(ViewConfigCodec.encode(original))
+        assertEquals(ForecastMode.DAILY, restored.defaultForecastMode)
         assertEquals(DailyStyle.HALF_DAY, restored.dailyStyle)
-        assertEquals(ForecastLayout.COLUMN, restored.dailyLayout)
-        // The two layouts persist separately — stacking daily must not stack hourly.
-        assertEquals(ForecastLayout.ROW, restored.hourlyLayout)
-        val flipped = ViewConfigCodec.decode(ViewConfigCodec.encode(original.setHourlyLayout(ForecastLayout.COLUMN)))
-        assertEquals(ForecastLayout.COLUMN, flipped.hourlyLayout)
+        assertTrue(restored.showForecast)
+
+        val hidden = ViewConfigCodec.decode(ViewConfigCodec.encode(original.setShowForecast(false)))
+        assertFalse(hidden.showForecast)
+        // Hiding the grid must not forget which framing to reopen on.
+        assertEquals(ForecastMode.DAILY, hidden.defaultForecastMode)
     }
 
     @Test
-    fun `a config saved before layout options existed gets the defaults, and unknown keys fall back`() {
-        val legacy = """{"mode":"daily","items":[{"key":"temperature","visible":true}]}"""
-        assertEquals(DailyStyle.DEFAULT, ViewConfigCodec.decode(legacy).dailyStyle)
-        assertEquals(ForecastLayout.DEFAULT, ViewConfigCodec.decode(legacy).dailyLayout)
-        assertEquals(ForecastLayout.DEFAULT, ViewConfigCodec.decode(legacy).hourlyLayout)
-        val unknown =
-            """{"dailyStyle":"spiral","dailyLayout":"3d","hourlyLayout":"4d",
+    fun `a legacy view mode splits into show-the-forecast plus a framing`() {
+        // The old shape was one screen-wide mode, where "now" meant no forecast
+        // at all. Each value has to land on the arrangement that looks the same
+        // to its owner after the update, or the app silently rearranges itself.
+        fun decode(mode: String) =
+            ViewConfigCodec.decode("""{"mode":"$mode","items":[{"key":"temperature","visible":true}]}""")
+
+        assertFalse(decode("now").showForecast, "now meant no forecast")
+        assertTrue(decode("hourly").showForecast)
+        assertEquals(ForecastMode.HOURLY, decode("hourly").defaultForecastMode)
+        assertTrue(decode("daily").showForecast)
+        assertEquals(ForecastMode.DAILY, decode("daily").defaultForecastMode)
+        // An unknown legacy mode still means "a forecast was showing".
+        assertTrue(decode("biweekly").showForecast)
+        assertEquals(ForecastMode.DEFAULT, decode("biweekly").defaultForecastMode)
+    }
+
+    @Test
+    fun `the new keys win over a stale legacy mode, and neither means the default`() {
+        // A config written by this build carries both if it was migrated and
+        // re-saved; the pair is the authority, so a leftover "mode":"now" can
+        // never re-hide a forecast the user has since switched back on.
+        val both =
+            """{"mode":"now","showForecast":true,"forecastMode":"daily",
                "items":[{"key":"temperature","visible":true}]}"""
-        assertEquals(DailyStyle.DEFAULT, ViewConfigCodec.decode(unknown).dailyStyle)
-        assertEquals(ForecastLayout.DEFAULT, ViewConfigCodec.decode(unknown).dailyLayout)
-        assertEquals(ForecastLayout.DEFAULT, ViewConfigCodec.decode(unknown).hourlyLayout)
+        assertTrue(ViewConfigCodec.decode(both).showForecast)
+        assertEquals(ForecastMode.DAILY, ViewConfigCodec.decode(both).defaultForecastMode)
+
+        // Older than either key: the shipped default, which shows an hourly
+        // forecast — what the app has always done out of the box.
+        val neither = """{"density":"comfortable","items":[{"key":"temperature","visible":true}]}"""
+        assertTrue(ViewConfigCodec.decode(neither).showForecast)
+        assertEquals(ForecastMode.DEFAULT, ViewConfigCodec.decode(neither).defaultForecastMode)
     }
 
     @Test
-    fun `an unknown mode key falls back to the shipped default`() {
-        val raw = """{"mode":"biweekly","items":[{"key":"temperature","visible":true}]}"""
-        assertEquals(ViewMode.DEFAULT, ViewConfigCodec.decode(raw).defaultMode)
+    fun `unknown framing and daily-style keys fall back rather than failing the config`() {
+        val unknown =
+            """{"showForecast":true,"forecastMode":"biweekly","dailyStyle":"spiral",
+               "items":[{"key":"wind","visible":true}]}"""
+        val config = ViewConfigCodec.decode(unknown)
+        assertEquals(ForecastMode.DEFAULT, config.defaultForecastMode)
+        assertEquals(DailyStyle.DEFAULT, config.dailyStyle)
+        // The rest of the config still came through — one bad token must not
+        // cost the user their field layout.
+        assertTrue(config.items.first { it.field == WeatherField.WIND }.visible)
+    }
+
+    @Test
+    fun `the retired forecast-layout keys are ignored, not fatal`() {
+        // ForecastLayout (side-by-side vs stacked) was subsumed by the grid.
+        // Configs still carrying it must decode, dropping only that choice.
+        val legacy =
+            """{"dailyLayout":"column","hourlyLayout":"row","mode":"daily",
+               "items":[{"key":"temperature","visible":true}]}"""
+        val config = ViewConfigCodec.decode(legacy)
+        assertEquals(ForecastMode.DAILY, config.defaultForecastMode)
+        assertTrue(config.showForecast)
     }
 
     @Test

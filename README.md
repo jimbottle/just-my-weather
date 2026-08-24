@@ -31,7 +31,7 @@ Pre-1.0, but the core product is in place:
   battle-tested reference — retries, unit conversion, fully unit-tested; the
   grid resolution is cached across launches
 - ✅ The default minimalist home view: location · big temperature · one line of
-  conditions
+  conditions, with an hourly forecast beneath it — two grids, and no more
 - ✅ View customization — the glance is a modular grid: pick which data points
   show, set each module's width (width is prominence), reorder and relabel
   them, choose a density (spacious ↔ compact), and theme it

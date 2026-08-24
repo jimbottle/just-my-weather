@@ -47,6 +47,18 @@ Subjects that aren't view fields — like chance of rain — are `AlertSubject`s
 The evaluator compares whatever the subject reports against the threshold, so no
 evaluator changes are needed.
 
+## Add a forecast framing
+
+**`view/ForecastMode.kt`** — add an entry (stable `key`, chip `label`), give it
+data in `HomeViewModel.ensureForecast`, and render it in `ForecastGrid`'s
+`when`. Both `when`s are exhaustive, so the compiler lists what you still owe.
+The toggle on the forecast grid and the customize picker both iterate `entries`,
+so neither needs touching.
+
+Note there is no "no forecast" framing: whether the grid appears at all is
+`ViewConfig.showForecast`, not a member of this enum. That split is deliberate —
+see the file's own comment.
+
 ## Add a forecast window
 
 **`alerts/AlertWindow.kt`** — add an entry with its `key`, chip `label`, and

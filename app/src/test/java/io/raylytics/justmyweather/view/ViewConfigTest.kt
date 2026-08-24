@@ -142,6 +142,17 @@ class ViewConfigTest {
     }
 
     @Test
+    fun `the shipped default shows an hourly forecast, and hiding it keeps the framing`() {
+        assertTrue(ViewConfig.DEFAULT.showForecast)
+        assertEquals(ForecastMode.HOURLY, ViewConfig.DEFAULT.defaultForecastMode)
+        // Turning the grid off is not the same as forgetting the choice: it
+        // must reopen the way the user left it.
+        val hidden = ViewConfig.DEFAULT.setDefaultForecastMode(ForecastMode.DAILY).setShowForecast(false)
+        assertFalse(hidden.showForecast)
+        assertEquals(ForecastMode.DAILY, hidden.defaultForecastMode)
+    }
+
+    @Test
     fun `the default config ships at the comfortable density`() {
         assertEquals(Density.COMFORTABLE, ViewConfig.DEFAULT.density)
     }

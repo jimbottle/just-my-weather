@@ -13,8 +13,8 @@ import io.raylytics.justmyweather.data.nws.ActiveAlert
 import io.raylytics.justmyweather.data.nws.DailyPeriod
 import io.raylytics.justmyweather.data.nws.ForecastPoint
 import io.raylytics.justmyweather.location.LocationResolver
+import io.raylytics.justmyweather.view.ForecastMode
 import io.raylytics.justmyweather.view.ViewConfig
-import io.raylytics.justmyweather.view.ViewMode
 import io.raylytics.justmyweather.view.WeatherField
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -87,8 +87,9 @@ class HomeViewModel(
      */
     private var sunLocation: WeatherLocation? = null
 
-    /** null = follow the config's default; set once the user taps a chip. */
-    private val chosenMode = MutableStateFlow<ViewMode?>(null)
+    /** null = follow the config's default; set once the user taps a chip on
+     * the forecast grid. */
+    private val chosenMode = MutableStateFlow<ForecastMode?>(null)
 
     // One fetch per framing at a time; re-entering a mode whose data already
     // arrived is a no-op, so chip-hopping never stampedes the API. Declared
@@ -96,18 +97,36 @@ class HomeViewModel(
     // synchronously, and Kotlin initialises properties in declaration order.
     private val forecastMutex = Mutex()
 
-    private val mode: StateFlow<ViewMode> =
+    /**
+     * Which framing the forecast grid shows, and whether it shows at all. The
+     * pair travels together because they decide one thing between them — what,
+     * if anything, to fetch — and splitting them let a hidden forecast keep
+     * fetching on every config change.
+     *
+     * NULL until the stored config arrives, and deliberately so: an eager
+     * "shown, hourly" placeholder is a guess, and [refresh] runs in `init`
+     * against whatever this holds. A user who had turned the forecast off paid
+     * for one hourly fetch on every cold start, before their own config landed
+     * and switched it back off. Null means "not known yet", nothing is fetched
+     * on a guess, and the collector below fetches the moment the truth arrives.
+     */
+    private val forecast: StateFlow<ForecastChoice?> =
         combine(chosenMode, configRepository.config) { chosen, config ->
-            chosen ?: config.defaultMode
-        }.stateIn(viewModelScope, SharingStarted.Eagerly, ViewMode.DEFAULT)
+            ForecastChoice(config.showForecast, chosen ?: config.defaultForecastMode)
+        }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     /** Paired so the five-flow limit of the typed [combine] still fits: these
      * two are the "what to show for right now" half of the screen. */
     private val glance = combine(weather, sunEvents) { load, sun -> load to sun }
 
     val state: StateFlow<HomeUiState> =
-        combine(glance, configRepository.config, mode, forecasts, safetyAlerts) {
-                (load, sun), config, mode, forecasts, alerts ->
+        combine(glance, configRepository.config, forecast, forecasts, safetyAlerts) {
+                (load, sun), config, forecastChoice, forecasts, alerts ->
+            // Before the stored config lands, fall back to what it will say:
+            // the config flow itself has already emitted by the time a Ready
+            // state can exist, so this only covers the first frame.
+            val shown = forecastChoice?.shown ?: config.showForecast
+            val framing = forecastChoice?.mode ?: config.defaultForecastMode
             when (load) {
                 is WeatherLoad.Loading -> HomeUiState.Loading
                 is WeatherLoad.Error -> HomeUiState.Error(load.message)
@@ -116,16 +135,20 @@ class HomeViewModel(
                         snapshot = load.snapshot,
                         config = config,
                         refreshing = load.refreshing,
-                        mode = mode,
+                        forecastMode = framing,
                         hourly = forecasts.hourly,
                         daily = forecasts.daily,
                         // Only the visible framing's own error — a Daily
-                        // failure must never mask loaded Hourly data.
+                        // failure must never mask loaded Hourly data — and
+                        // nothing at all when the grid is switched off.
                         forecastError =
-                            when (mode) {
-                                ViewMode.NOW -> null
-                                ViewMode.HOURLY -> forecasts.hourlyError
-                                ViewMode.DAILY -> forecasts.dailyError
+                            if (!shown) {
+                                null
+                            } else {
+                                when (framing) {
+                                    ForecastMode.HOURLY -> forecasts.hourlyError
+                                    ForecastMode.DAILY -> forecasts.dailyError
+                                }
                             },
                         safetyAlerts = alerts,
                         refreshError = load.error,
@@ -143,7 +166,7 @@ class HomeViewModel(
         // the persisted default arriving from DataStore after first paint.
         // (StateFlow already skips duplicate values, so no distinct operator.)
         viewModelScope.launch {
-            mode.collect { ensureForecast(it) }
+            forecast.collect { ensureForecast(it) }
         }
     }
 
@@ -251,7 +274,7 @@ class HomeViewModel(
             safetyAlerts.value =
                 runCatching { SafetyAlerts.filter(repository.loadActiveAlerts(location)) }
                     .getOrDefault(emptyList())
-            ensureForecast(mode.value)
+            ensureForecast(forecast.value)
         }
     }
 
@@ -297,42 +320,47 @@ class HomeViewModel(
      * exactly then we fetch directly — that's tap-to-retry for a failed
      * framing, and a no-op on loaded data thanks to the needed-check. The two
      * triggers can never both fire for one tap, so no double-fetch. */
-    fun setMode(mode: ViewMode) {
-        val sameChip = this.mode.value == mode
+    fun setForecastMode(mode: ForecastMode) {
+        val sameChip = forecast.value?.mode == mode
         chosenMode.value = mode
-        if (sameChip) viewModelScope.launch { ensureForecast(mode) }
+        if (sameChip) viewModelScope.launch { ensureForecast(forecast.value) }
     }
 
-    private suspend fun ensureForecast(mode: ViewMode) {
+    /** No fetch at all while the forecast grid is switched off, nor before the
+     * config says whether it is: the network cost of a view nobody is looking
+     * at is the reason "off" is worth having. */
+    private suspend fun ensureForecast(choice: ForecastChoice?) {
+        if (choice == null || !choice.shown) return
+        val mode = choice.mode
         forecastMutex.withLock {
             val current = forecasts.value
             val needed =
                 when (mode) {
-                    ViewMode.NOW -> return
-                    ViewMode.HOURLY -> current.hourly == null
-                    ViewMode.DAILY -> current.daily == null
+                    ForecastMode.HOURLY -> current.hourly == null
+                    ForecastMode.DAILY -> current.daily == null
                 }
             if (!needed) return
             val location = currentLocation()
             runCatching {
                 forecasts.value =
                     when (mode) {
-                        ViewMode.HOURLY ->
+                        ForecastMode.HOURLY ->
                             current.copy(hourly = repository.loadForecast(location), hourlyError = null)
-                        ViewMode.DAILY ->
+                        ForecastMode.DAILY ->
                             current.copy(daily = repository.loadDailyForecast(location), dailyError = null)
-                        ViewMode.NOW -> current
                     }
             }.onFailure { e ->
                 forecasts.value =
                     when (mode) {
-                        ViewMode.HOURLY -> current.copy(hourlyError = e.toUserMessage())
-                        ViewMode.DAILY -> current.copy(dailyError = e.toUserMessage())
-                        ViewMode.NOW -> current
+                        ForecastMode.HOURLY -> current.copy(hourlyError = e.toUserMessage())
+                        ForecastMode.DAILY -> current.copy(dailyError = e.toUserMessage())
                     }
             }
         }
     }
+
+    /** Whether the forecast grid is on screen, and which framing it shows. */
+    private data class ForecastChoice(val shown: Boolean, val mode: ForecastMode)
 
     /** Where to ask about, resolved through the one seam that remembers a
      * real fix — never a bare fallback to the built-in default. */
