@@ -1,13 +1,17 @@
 package io.raylytics.justmyweather.ui.home
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -40,16 +44,26 @@ import kotlin.math.roundToInt
  */
 
 /**
- * How many hours the Hourly framing shows. Twelve is three rows of four — a
- * useful look ahead that still fits the calm the app is built around, where
- * NWS's full ~156 points would be thirty-nine rows of tiles.
+ * How many hours the Hourly framing offers. A day's worth: six rows of four,
+ * of which the viewport shows a couple and the rest is a scroll away.
  *
- * No date labels come with it, deliberately: within twelve hours the times are
- * unambiguous on their own ("11 pm" then "1 am" reads as tonight), and headings
- * between rows would break the one thing a grid promises — that its rows are
- * the same kind of thing all the way down.
+ * This is bounded rather than NWS's full ~156 points because the grid is drawn
+ * eagerly, not lazily — thirty-nine rows of tiles would be composed whether or
+ * not anyone scrolled to them. Twenty-four is the span people actually plan
+ * against, and one midnight crossing needs no date labels to read: "11 pm"
+ * then "12 am" is plainly tonight.
  */
-private const val HOURLY_TILES = 12
+private const val HOURLY_TILES = 24
+
+/**
+ * How tall the forecast is allowed to be before it scrolls inside itself.
+ *
+ * The forecast is a BOX on the page, not a run of content that pushes
+ * everything below it off screen. Sized to show about two and a half rows, so
+ * the cut-off row is visibly cut off — that is what says "there is more here"
+ * without a scrollbar to point at it.
+ */
+private val FORECAST_VIEWPORT = 260.dp
 
 /** Hours are terse enough for a quarter tile; a period's name ("Monday Night",
  * "This Afternoon") needs half a row to survive without ellipsis. */
@@ -85,12 +99,14 @@ internal fun ForecastGrid(
         when (mode) {
             ForecastMode.HOURLY ->
                 ForecastFrame(items = hours, error = error) { list ->
-                    TileGrid(
-                        items = list.take(HOURLY_TILES),
-                        span = { HOUR_SPAN },
-                        gap = gap,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) { hour, _, tileModifier -> HourTile(hour, zone, tileModifier) }
+                    ForecastViewport {
+                        TileGrid(
+                            items = list.take(HOURLY_TILES),
+                            span = { HOUR_SPAN },
+                            gap = gap,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { hour, _, tileModifier -> HourTile(hour, zone, tileModifier) }
+                    }
                 }
 
             ForecastMode.DAILY ->
@@ -100,25 +116,54 @@ internal fun ForecastGrid(
                         remember(list, dailyStyle) {
                             if (dailyStyle == DailyStyle.COMBINED) combineDays(list) else emptyList()
                         }
-                    when (dailyStyle) {
-                        DailyStyle.COMBINED ->
-                            TileGrid(
-                                items = days,
-                                span = { DAY_SPAN },
-                                gap = gap,
-                                modifier = Modifier.fillMaxWidth(),
-                            ) { day, _, tileModifier -> CombinedDayTile(day, tileModifier) }
+                    ForecastViewport {
+                        when (dailyStyle) {
+                            DailyStyle.COMBINED ->
+                                TileGrid(
+                                    items = days,
+                                    span = { DAY_SPAN },
+                                    gap = gap,
+                                    modifier = Modifier.fillMaxWidth(),
+                                ) { day, _, tileModifier -> CombinedDayTile(day, tileModifier) }
 
-                        DailyStyle.HALF_DAY ->
-                            TileGrid(
-                                items = list,
-                                span = { DAY_SPAN },
-                                gap = gap,
-                                modifier = Modifier.fillMaxWidth(),
-                            ) { period, _, tileModifier -> HalfDayTile(period, tileModifier) }
+                            DailyStyle.HALF_DAY ->
+                                TileGrid(
+                                    items = list,
+                                    span = { DAY_SPAN },
+                                    gap = gap,
+                                    modifier = Modifier.fillMaxWidth(),
+                                ) { period, _, tileModifier -> HalfDayTile(period, tileModifier) }
+                        }
                     }
                 }
         }
+    }
+}
+
+/**
+ * The box the forecast lives in: a bounded height with its own scroll.
+ *
+ * Without this the forecast is a run of content that grows with however many
+ * periods NWS returned, pushing the glance up and the controls down — a day of
+ * hourly tiles is six rows, and half-day periods are seven. Capping it keeps
+ * the forecast's footprint on the page stable whatever the data does, and the
+ * scroll is where the rest of it lives.
+ *
+ * Nesting a vertical scroll inside the glance's own is deliberate and already
+ * the pattern here (the old stacked daily list did the same): the inner one
+ * takes the gesture when the pointer is over it, so the box scrolls first and
+ * the page scrolls once the box is at its end.
+ */
+@Composable
+private fun ForecastViewport(content: @Composable () -> Unit) {
+    Box(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .heightIn(max = FORECAST_VIEWPORT)
+                .verticalScroll(rememberScrollState()),
+    ) {
+        content()
     }
 }
 
@@ -186,12 +231,24 @@ private fun HourTile(hour: ForecastPoint, zone: ZoneId, modifier: Modifier = Mod
                 color = MaterialTheme.colorScheme.onBackground,
             )
             // Only when there is a chance worth mentioning: a "0%" on every dry
-            // hour is twelve tiles of noise for no information.
+            // hour is a screen of noise carrying no information.
             hour.precipProbabilityPercent?.takeIf { it > 0 }?.let {
                 Text(
                     text = "${it.roundToInt()}%",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.primary,
+                )
+            }
+            // What it will actually be like — the half of an hourly forecast a
+            // temperature cannot tell you, and NWS sends it per hour.
+            hour.shortForecast?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center,
                 )
             }
         }
