@@ -617,13 +617,13 @@ class HomeViewModelTest {
         val h = harness(config = ViewConfig.DEFAULT.toggle(ModuleKey.Sun))
         advanceUntilIdle()
         val ready = h.vm.ready()
-        assertEquals(ZoneId.of("America/New_York"), ready.sunZone)
+        assertEquals(ZoneId.of("America/New_York"), ready.zone)
         // Every row's date is a date IN that zone — the check that fails if
         // the two are ever sourced independently.
         ready.sunDays.forEach { day ->
             val sunrise = day.sunrise
             if (sunrise != null) {
-                assertEquals(day.date, sunrise.atZone(ready.sunZone).toLocalDate(), "sunrise on its own date")
+                assertEquals(day.date, sunrise.atZone(ready.zone).toLocalDate(), "sunrise on its own date")
             }
         }
     }
@@ -645,7 +645,7 @@ class HomeViewModelTest {
                     zone = { ZoneId.of("Asia/Tokyo") },
                 )
             advanceUntilIdle()
-            assertEquals(ZoneId.of("America/New_York"), h.vm.ready().sunZone, "settled on the first place")
+            assertEquals(ZoneId.of("America/New_York"), h.vm.ready().zone, "settled on the first place")
 
             // Switch, and hold the fetch open so the old reading stays up.
             val gate = CompletableDeferred<Unit>()
@@ -661,11 +661,11 @@ class HomeViewModelTest {
             // reported in it. The stale snapshot's New York must not leak in.
             val midSwitch = h.vm.ready()
             assertTrue(midSwitch.refreshing, "the old reading is still on screen")
-            assertEquals(ZoneId.of("Asia/Tokyo"), midSwitch.sunZone, "rows and zone agree mid-switch")
+            assertEquals(ZoneId.of("Asia/Tokyo"), midSwitch.zone, "rows and zone agree mid-switch")
 
             gate.complete(Unit)
             advanceUntilIdle()
-            assertEquals(ZoneId.of("America/Los_Angeles"), h.vm.ready().sunZone, "settles on the new place")
+            assertEquals(ZoneId.of("America/Los_Angeles"), h.vm.ready().zone, "settles on the new place")
         }
 
     @Test

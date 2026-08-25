@@ -195,7 +195,7 @@ private fun GlanceView(
             snapshot = snapshot,
             config = config,
             sunDays = state.sunDays,
-            sunZone = state.sunZone,
+            zone = state.zone,
             arranging = arranging,
             onStartArranging = onStartArranging,
             onCycleSpan = onCycleSpan,
@@ -292,14 +292,15 @@ private fun NowContent(
     /** Not part of the snapshot: computed on the device, so the sun module
      * works with no signal. */
     sunDays: List<SunDay>,
-    /** The zone the sun rows were computed in — carried with them. */
-    sunZone: ZoneId,
+    /** The place's zone, and the one the sun rows were computed in — the same
+     * value, published together. */
+    zone: ZoneId,
     arranging: Boolean,
     onStartArranging: () -> Unit,
     onCycleSpan: (ModuleKey) -> Unit,
     onMoveModule: (ModuleKey, Int) -> Unit,
 ) {
-    val rendered: RenderedView = config.render(snapshot, sunDays, sunZone)
+    val rendered: RenderedView = config.render(snapshot, sunDays, zone)
     val spec = config.density.spec()
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
