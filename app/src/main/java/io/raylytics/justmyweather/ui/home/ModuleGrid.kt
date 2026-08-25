@@ -7,6 +7,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Column
@@ -60,6 +61,17 @@ private const val WIGGLE_DEGREES = 1.6f
 
 /** One half-cycle of the wiggle. */
 private const val WIGGLE_PERIOD_MS = 160
+
+/**
+ * Which gesture detector is driving a drag.
+ *
+ * Both are live while arranging — the hold that enters the mode and carries
+ * straight on into a drag, and the plain drag that works once the tiles are
+ * already wiggling — and a slow press that then moves can look like the start
+ * of either. Without an owner they would both add to the drag position and the
+ * tile would travel at double speed.
+ */
+private enum class DragOwner { LONG_PRESS, IMMEDIATE }
 
 /** The dragged tile lifts slightly, the way a launcher icon does. */
 private const val DRAG_SCALE = 1.04f
@@ -125,6 +137,13 @@ internal fun ModuleGrid(
     // modes were hit on-device). The drag detector flags its long-press here;
     // the tap handler, which runs first on the shared release, skips one tap.
     var suppressTap by remember { mutableStateOf(false) }
+    // Which detector is driving the current drag. While arranging BOTH are
+    // live — the launcher gesture and the plain one — and a slow press that
+    // then moves can look like the start of either. Without an owner they
+    // would both add to dragPosition and the tile would travel at double
+    // speed; with one, the second detector sees a drag already in progress
+    // and keeps out of it.
+    var dragOwner by remember { mutableStateOf<DragOwner?>(null) }
     // The move already requested but not yet reflected in the modules list —
     // the save round-trips through DataStore, and re-requesting the same move
     // on every drag event in that window would thrash.
@@ -136,16 +155,23 @@ internal fun ModuleGrid(
     fun tileAt(rootPos: Offset): ModuleKey? =
         currentModules.firstOrNull { bounds[it.module]?.contains(rootPos) == true }?.module
 
-    fun beginDrag(field: ModuleKey, rootPos: Offset) {
+    /** Claim the drag for [owner], or return false if someone else has it. */
+    fun beginDrag(owner: DragOwner, field: ModuleKey, rootPos: Offset): Boolean {
+        if (dragOwner != null) return false
+        dragOwner = owner
         dragged = field
         dragPosition = rootPos
         grabOffset = rootPos - (bounds[field]?.topLeft ?: rootPos)
         pendingTarget = null
+        return true
     }
 
-    fun endDrag() {
+    fun endDrag(owner: DragOwner) {
+        if (dragOwner != owner) return
+        dragOwner = null
         dragged = null
         pendingTarget = null
+        suppressTap = false
     }
 
     // Nearest-center wins, not rect containment: once a tile moves under the
@@ -188,21 +214,47 @@ internal fun ModuleGrid(
                                 haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                                 startArranging()
                             }
-                            beginDrag(field, rootPos)
+                            beginDrag(DragOwner.LONG_PRESS, field, rootPos)
                         },
                         onDrag = { change, amount ->
+                            if (dragOwner != DragOwner.LONG_PRESS) return@detectDragGesturesAfterLongPress
                             change.consume()
                             dragPosition += amount
                             settleDrag()
                         },
-                        onDragEnd = {
-                            endDrag()
-                            suppressTap = false
+                        onDragEnd = { endDrag(DragOwner.LONG_PRESS) },
+                        onDragCancel = { endDrag(DragOwner.LONG_PRESS) },
+                    )
+                }
+                // Once the tiles are wiggling, a plain drag moves one — no
+                // second long-press. That is what a launcher does, and holding
+                // again for every tile you want to nudge is the kind of
+                // friction people read as the gesture not having worked.
+                //
+                // Keyed on `arranging` so the detector does not EXIST outside
+                // arrange mode: an always-on drag detector over the grid would
+                // swallow the glance's vertical scroll. Keying it is safe here
+                // in a way it is not for the block above — that one is running
+                // the very gesture that flips `arranging`, and restarting it
+                // mid-hold is what once killed the drag and froze a tile
+                // mid-air. This one is only ever created BEFORE its gesture
+                // starts.
+                .pointerInput(arranging) {
+                    if (!arranging) return@pointerInput
+                    detectDragGestures(
+                        onDragStart = { local ->
+                            val rootPos = toRoot(local)
+                            val field = tileAt(rootPos) ?: return@detectDragGestures
+                            if (beginDrag(DragOwner.IMMEDIATE, field, rootPos)) suppressTap = true
                         },
-                        onDragCancel = {
-                            endDrag()
-                            suppressTap = false
+                        onDrag = { change, amount ->
+                            if (dragOwner != DragOwner.IMMEDIATE) return@detectDragGestures
+                            change.consume()
+                            dragPosition += amount
+                            settleDrag()
                         },
+                        onDragEnd = { endDrag(DragOwner.IMMEDIATE) },
+                        onDragCancel = { endDrag(DragOwner.IMMEDIATE) },
                     )
                 }
                 .pointerInput(Unit) {

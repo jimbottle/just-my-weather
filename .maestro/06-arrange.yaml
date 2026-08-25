@@ -8,16 +8,17 @@
 # reorder re-targeted its composable, so the drop event never arrived. Only a
 # real pointer stream reaches them.
 #
-# What this flow deliberately does NOT cover: the drag-to-reorder itself.
-# Reordering requires hold-then-move, and Maestro 2.5.0 has no such gesture —
-# `dragAndDrop` does not exist, and a coordinate `swipe`, even at 2500ms, moves
-# from the first frame and so never satisfies the long-press (probed on-device:
-# the swipe reported COMPLETED and the tile order was unchanged). Until that
-# gap closes (just-my-weather-csa), verify a drag by hand with:
-#   adb -s <serial> shell input draganddrop <x1> <y1> <x2> <y2> 1200
-# which does synthesise a real hold-then-move. Do NOT reach for
-# `adb shell input motionevent` — separate shell calls carry mismatched
-# downTimes and the stream is rejected as a broken gesture.
+# The drag IS covered now. It could not be while reordering needed
+# hold-then-move for every tile: Maestro 2.5.0 has no such gesture (no
+# `dragAndDrop`, and a coordinate `swipe` moves from the first frame so it
+# never satisfies a long-press — probed on-device, the swipe reported COMPLETED
+# and the order was unchanged). Once the tiles are wiggling a plain drag moves
+# them, which is both the launcher behaviour and something a `swipe` can do.
+#
+# If you ever need a hold-then-move from the shell, use
+# `adb shell input draganddrop` — NOT `adb shell input motionevent`, whose
+# separate calls carry mismatched downTimes and are rejected as a broken
+# gesture.
 appId: io.raylytics.justmyweather
 ---
 - launchApp:
@@ -54,6 +55,22 @@ appId: io.raylytics.justmyweather
 # A second tap cycles again — the mode stays live across taps rather than
 # falling out of arrange after one edit.
 - tapOn:
+    id: "module_conditions"
+- assertVisible: "Done arranging"
+
+# Drag a tile with a PLAIN swipe — no second long-press, because the tiles are
+# already wiggling. Both must still be on the grid afterwards and the mode
+# still live: a drop that froze mid-air (the bug this gesture path shipped with
+# once) leaves the grid looking intact in a screenshot while a tile sits
+# outside its slot, so the flow keeps acting on them rather than stopping at a
+# visibility check.
+- swipe:
+    start: "50%, 32%"
+    end: "50%, 46%"
+    duration: 800
+- assertVisible:
+    id: "module_temperature"
+- assertVisible:
     id: "module_conditions"
 - assertVisible: "Done arranging"
 
