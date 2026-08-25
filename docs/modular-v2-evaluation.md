@@ -96,11 +96,20 @@ Worth stating plainly, because the gaps are where the shipped bugs lived:
   entry, tap-to-cycle, exit and persistence across a restart; `07-forecast.yaml`
   for the framing toggle and for hiding/showing the second grid without
   disturbing the first.
-- **Nothing automated covers the drag reorder.** Maestro 2.5.0 has no
-  hold-then-move gesture, and a slow coordinate swipe never satisfies the
-  long-press (probed on-device). Verify it by hand with `adb shell input
-  draganddrop`; just-my-weather-csa proposes the UX change that would close
-  this.
+- **The drag reorder is now automatable** — once the tiles wiggle a plain
+  swipe moves them, so `06-arrange.yaml` asserts it (added with
+  just-my-weather-csa). It has not actually run yet: Maestro's on-device
+  driver is broken (just-my-weather-p6t).
+- **One path has no automated cover at all: a drag interrupted mid-flight by
+  arrange mode ending** (system Back, or a second finger reaching "Done
+  arranging"). It cannot be synthesised with the tools here — Compose's test
+  gestures do not drive this grid's detectors at all (a plain-swipe control
+  test produced no drag), and `adb shell input motionevent` cannot hold a drag
+  open across a separate key event. The code is written so the path cannot
+  strand state (the detector cleans up in a `finally`, which cancellation
+  runs), but that is reasoning, not a measurement. **Verify by hand:** enter
+  arrange mode, start dragging a tile, and press Back without lifting — the
+  tile should snap back and reordering must still work afterwards.
 
 ### 5. Runtime behaviour
 

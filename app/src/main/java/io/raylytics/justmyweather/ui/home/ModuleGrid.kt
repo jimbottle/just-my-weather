@@ -241,21 +241,41 @@ internal fun ModuleGrid(
                 // starts.
                 .pointerInput(arranging) {
                     if (!arranging) return@pointerInput
-                    detectDragGestures(
-                        onDragStart = { local ->
-                            val rootPos = toRoot(local)
-                            val field = tileAt(rootPos) ?: return@detectDragGestures
-                            if (beginDrag(DragOwner.IMMEDIATE, field, rootPos)) suppressTap = true
-                        },
-                        onDrag = { change, amount ->
-                            if (dragOwner != DragOwner.IMMEDIATE) return@detectDragGestures
-                            change.consume()
-                            dragPosition += amount
-                            settleDrag()
-                        },
-                        onDragEnd = { endDrag(DragOwner.IMMEDIATE) },
-                        onDragCancel = { endDrag(DragOwner.IMMEDIATE) },
-                    )
+                    // The `finally` is load-bearing. Keying this detector on
+                    // `arranging` means Compose CANCELS it the moment arrange
+                    // mode ends — and that can happen with a finger still
+                    // down, through a channel this detector never sees: system
+                    // Back is wired to leave arrange mode, and a second finger
+                    // can reach "Done arranging". A cancelled coroutine
+                    // unwinds through its suspension point; it does NOT run
+                    // onDragEnd or onDragCancel. Without cleanup here the
+                    // drag state would simply be abandoned mid-flight: the
+                    // tile stranded at its drag offset and scale with nothing
+                    // left to clear it, and dragOwner still claimed, so
+                    // beginDrag would refuse every later drag for the life of
+                    // the process. That is the same "frozen tile" failure the
+                    // long-press detector is kept on pointerInput(Unit) to
+                    // avoid, arriving by a different road.
+                    try {
+                        detectDragGestures(
+                            onDragStart = { local ->
+                                val rootPos = toRoot(local)
+                                val field = tileAt(rootPos) ?: return@detectDragGestures
+                                if (beginDrag(DragOwner.IMMEDIATE, field, rootPos)) suppressTap = true
+                            },
+                            onDrag = { change, amount ->
+                                if (dragOwner != DragOwner.IMMEDIATE) return@detectDragGestures
+                                change.consume()
+                                dragPosition += amount
+                                settleDrag()
+                            },
+                            onDragEnd = { endDrag(DragOwner.IMMEDIATE) },
+                            onDragCancel = { endDrag(DragOwner.IMMEDIATE) },
+                        )
+                    } finally {
+                        // A no-op when this detector did not own the drag.
+                        endDrag(DragOwner.IMMEDIATE)
+                    }
                 }
                 .pointerInput(Unit) {
                     detectTapGestures(
