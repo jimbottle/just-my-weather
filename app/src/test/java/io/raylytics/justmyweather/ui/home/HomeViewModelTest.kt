@@ -90,6 +90,10 @@ class HomeViewModelTest {
      * the daily endpoint on demand or park one daily (or observation) response
      * on a gate so a test can act while that fetch is genuinely in flight. */
     private class RoutingTransport(private val points: String = POINTS) : HttpTransport {
+        /** Coordinates that resolve to the WEST point instead of the default
+         * one — how a test gets two places in two different zones. */
+        var westLatPrefix: String? = null
+
         var hourlyFetches = 0
         var dailyFetches = 0
         var failDaily = false
@@ -109,7 +113,8 @@ class HomeViewModelTest {
                         OBSERVATION
                     }
                     url.endsWith("/stations") -> STATIONS
-                    "/points/" in url -> points
+                    "/points/" in url ->
+                        if (westLatPrefix?.let { url.contains(it) } == true) POINTS_WEST else points
                     url.endsWith("/forecast/hourly") -> {
                         hourlyFetches++
                         HOURLY
@@ -142,6 +147,9 @@ class HomeViewModelTest {
     private fun TestScope.harness(
         config: ViewConfig? = null,
         points: String = POINTS,
+        /** The saved place the resolver should answer with, read on every
+         * resolve so a test can switch places mid-flight. */
+        place: () -> WeatherLocation? = { null },
         snapshots: SnapshotCache = InMemorySnapshotCache(),
         onSnapshotLoaded: suspend (WeatherSnapshot) -> Unit = {},
         // A lambda, not an Instant: a test that steps time needs the clock to
@@ -167,6 +175,7 @@ class HomeViewModelTest {
                     LocationResolver(
                         mock<LocationProvider> { on { lastKnownLocation() } doReturn null },
                         InMemoryLastLocationStore(),
+                        chosenPlace = { place() },
                     ),
                 configRepository = configRepository,
                 onSnapshotLoaded = onSnapshotLoaded,
@@ -595,6 +604,82 @@ class HomeViewModelTest {
     }
 
     @Test
+    fun `sun rows and the zone they read in never disagree, even mid-switch`() = runTest(dispatcher) {
+        // The frame this guards: switching places keeps the PREVIOUS place's
+        // reading on screen while the new fetch is in flight, but republishes
+        // sun rows for the new place immediately. If the zone were re-derived
+        // downstream — from the stale snapshot, or from a separately-published
+        // flow — that frame would format the new place's instants at the old
+        // place's offset, which is the very bug the zone work removes.
+        //
+        // Asserted as an invariant rather than a sequence: whatever the state
+        // is, the rows and their zone came from one value.
+        val h = harness(config = ViewConfig.DEFAULT.toggle(ModuleKey.Sun))
+        advanceUntilIdle()
+        val ready = h.vm.ready()
+        assertEquals(ZoneId.of("America/New_York"), ready.sunZone)
+        // Every row's date is a date IN that zone — the check that fails if
+        // the two are ever sourced independently.
+        ready.sunDays.forEach { day ->
+            val sunrise = day.sunrise
+            if (sunrise != null) {
+                assertEquals(day.date, sunrise.atZone(ready.sunZone).toLocalDate(), "sunrise on its own date")
+            }
+        }
+    }
+
+    @Test
+    fun `switching places never shows the new place's sun rows at the old place's offset`() =
+        runTest(dispatcher) {
+            // The reviewed frame: `refresh` deliberately keeps the PREVIOUS
+            // place's reading on screen while the new fetch is in flight, but
+            // republishes sun rows for the new place straight away. If the sun
+            // zone were re-derived from that stale snapshot, the new place's
+            // instants would be formatted at the old place's offset for a full
+            // network round trip.
+            var place: WeatherLocation? = null
+            val h =
+                harness(
+                    config = ViewConfig.DEFAULT.toggle(ModuleKey.Sun),
+                    place = { place },
+                    zone = { ZoneId.of("Asia/Tokyo") },
+                )
+            advanceUntilIdle()
+            assertEquals(ZoneId.of("America/New_York"), h.vm.ready().sunZone, "settled on the first place")
+
+            // Switch, and hold the fetch open so the old reading stays up.
+            val gate = CompletableDeferred<Unit>()
+            h.transport.gateObservation = gate
+            h.transport.westLatPrefix = "47.6"
+            place = WeatherLocation(47.6, -122.3, "Seattle, WA")
+            h.vm.refresh()
+            runCurrent()
+
+            // Mid-switch: the reading on screen is still the old place's, and
+            // the new place's zone is not known yet (nothing cached for it), so
+            // the rows were computed in the DEVICE's zone — and must be
+            // reported in it. The stale snapshot's New York must not leak in.
+            val midSwitch = h.vm.ready()
+            assertTrue(midSwitch.refreshing, "the old reading is still on screen")
+            assertEquals(ZoneId.of("Asia/Tokyo"), midSwitch.sunZone, "rows and zone agree mid-switch")
+
+            gate.complete(Unit)
+            advanceUntilIdle()
+            assertEquals(ZoneId.of("America/Los_Angeles"), h.vm.ready().sunZone, "settles on the new place")
+        }
+
+    @Test
+    fun `the observed time is formatted in the reading's own zone`() = runTest(dispatcher) {
+        // Not the screen's zone: during a place switch the reading on screen is
+        // still the previous place's, and formatting it at the new place's
+        // offset would put a time on it that never happened.
+        val h = harness(zone = { ZoneId.of("Asia/Tokyo") })
+        advanceUntilIdle()
+        assertEquals("America/New_York", h.vm.ready().snapshot.timeZone)
+        assertEquals(ZoneId.of("America/New_York"), h.vm.ready().snapshot.zone)
+    }
+
+    @Test
     fun `an unknown zone falls back to the device's rather than failing`() = runTest(dispatcher) {
         // A point that carries no zone (an older cached lookup) must leave the
         // app exactly as it always behaved.
@@ -708,6 +793,13 @@ class HomeViewModelTest {
                 "forecastZone":"https://api.weather.gov/zones/forecast/NYZ072",
                 "timeZone":"America/New_York",
                 "relativeLocation":{"properties":{"city":"Brooklyn","state":"NY"}}}}"""
+
+        /** A point in another zone, for testing a switch between places. */
+        const val POINTS_WEST =
+            """{"properties":{"gridId":"SEW","gridX":124,"gridY":67,
+                "forecastZone":"https://api.weather.gov/zones/forecast/WAZ558",
+                "timeZone":"America/Los_Angeles",
+                "relativeLocation":{"properties":{"city":"Seattle","state":"WA"}}}}"""
 
         /** The same point with no timeZone — an older cached lookup, or a
          * response that simply omits it. */

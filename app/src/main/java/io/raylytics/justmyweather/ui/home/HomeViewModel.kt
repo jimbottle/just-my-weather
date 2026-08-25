@@ -77,7 +77,7 @@ class HomeViewModel(
      * it is held separately from the weather because it has no dependency on
      * the fetch succeeding.
      */
-    private val sunEvents = MutableStateFlow<List<SunDay>>(emptyList())
+    private val sunEvents = MutableStateFlow(SunView(emptyList(), ZoneId.systemDefault()))
 
     /**
      * The coordinate the sun times were last worked out for, so [refreshSunTimes]
@@ -169,11 +169,17 @@ class HomeViewModel(
                         // screen renders exactly what the state says.
                         // Gated on the module being on the grid, not on a
                         // separate switch: the sun module IS the switch now.
-                        sunDays = if (config.shows(ModuleKey.Sun)) sun else emptyList(),
-                        // The reading's own zone wins over the flow's, so the
-                        // first frame after a fetch is never formatted in the
-                        // previous place's time.
-                        zone = (load as? WeatherLoad.Ready)?.snapshot?.zone ?: placeZone ?: zone(),
+                        sunDays = if (config.shows(ModuleKey.Sun)) sun.days else emptyList(),
+                        // Carried with the days, never re-derived here.
+                        sunZone = sun.zone,
+                        // The CURRENT place's zone, for data that belongs to
+                        // the current place — the forecast, which `refresh`
+                        // clears on a place switch so nothing stale survives
+                        // to be mis-formatted. Deliberately NOT the snapshot's:
+                        // during a switch the snapshot on screen is still the
+                        // previous place's, and it formats its own observed
+                        // time from its own zone (see ObservedLine).
+                        zone = placeZone ?: zone(),
                     )
             }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUiState.Loading)
@@ -332,8 +338,27 @@ class HomeViewModel(
         // whole point of the day rows is saying which date a time belongs to.
         val zone = placeZone.value ?: zone()
         val today = clock().atZone(zone).toLocalDate()
-        sunEvents.value = SunTimes.daysFrom(location.latitude, location.longitude, today, zone, SUN_DAYS)
+        // Published as ONE value. Days and the zone they were computed in
+        // cannot be allowed to disagree even for a frame: switching places
+        // writes the new zone and the new days, and as two separate flow
+        // emissions there is an instant between them carrying one place's
+        // instants formatted at the other's offset — which is the very bug
+        // the zone work exists to remove.
+        sunEvents.value =
+            SunView(
+                days = SunTimes.daysFrom(location.latitude, location.longitude, today, zone, SUN_DAYS),
+                zone = zone,
+            )
     }
+
+    /**
+     * Sun rows and the zone they read in, travelling together.
+     *
+     * The pairing is the point: these instants are only meaningful alongside
+     * the offset they were worked out for, so nothing downstream has to get an
+     * ordering right to render them honestly.
+     */
+    private data class SunView(val days: List<SunDay>, val zone: ZoneId)
 
     /** An id this JVM does not recognise costs a fallback, never a crash. */
     private fun parseZone(id: String): ZoneId? = runCatching { ZoneId.of(id) }.getOrNull()

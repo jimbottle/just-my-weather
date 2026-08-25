@@ -56,12 +56,25 @@ sealed interface HomeUiState {
          */
         val sunDays: List<SunDay> = emptyList(),
         /**
-         * The zone every time on screen is formatted in: the PLACE's, from the
-         * NWS point lookup, falling back to the device's when unknown. A saved
-         * place can be hours away, and "Sunset 10:48 PM" for somewhere the sun
-         * sets at 7:48 is wrong rather than merely surprising.
+         * The CURRENT place's zone, from the NWS point lookup, falling back to
+         * the device's when unknown. A saved place can be hours away, and
+         * "Sunset 10:48 PM" for somewhere the sun sets at 7:48 is wrong rather
+         * than merely surprising.
+         *
+         * Used for data that belongs to the current place — the forecast. NOT
+         * for [snapshot], which during a place switch is still the previous
+         * place's and formats its own observed time from its own zone, and not
+         * for [sunDays], which carry [sunZone].
          */
         val zone: ZoneId = ZoneId.systemDefault(),
+        /**
+         * The zone [sunDays] were computed in. Travels with them rather than
+         * being re-derived, because those instants are only meaningful at the
+         * offset they were worked out for — and a place switch republishes the
+         * two together, so any re-derivation here could pair one place's days
+         * with another's offset for a frame.
+         */
+        val sunZone: ZoneId = ZoneId.systemDefault(),
     ) : HomeUiState
 
     /** Network or NWS failure, with a short plain-language message. */
