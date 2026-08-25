@@ -333,8 +333,9 @@ class HomeViewModel(
      * anything downstream to get wrong.
      *
      * A null [zone] means the place's own is not known yet; the rows are then
-     * worked out in the device's, which is the honest stand-in and is what the
-     * screen will format them with too.
+     * worked out in the device's, which is the honest stand-in — and it is
+     * that resolved zone that gets stored, so the screen formats with the same
+     * one rather than resolving its own.
      */
     private fun publishPlaceTimes(zone: ZoneId?) {
         val location = sunLocation
@@ -349,7 +350,15 @@ class HomeViewModel(
                 val today = clock().atZone(effective).toLocalDate()
                 SunTimes.daysFrom(location.latitude, location.longitude, today, effective, SUN_DAYS)
             }
-        placeTimes.value = PlaceTimes(zone, days)
+        // The RESOLVED zone, not the nullable one that came in. Storing the
+        // null would leave the screen to re-resolve the device's zone for
+        // itself at render time — a second, independent reading of a value
+        // that can genuinely change between the two (travel, a DST boundary, a
+        // settings change), and unlike two writes in one function body these
+        // are separated by real time and by unrelated flow emissions. The rows
+        // were computed at THIS offset, so this is the offset that has to
+        // travel with them.
+        placeTimes.value = PlaceTimes(effective, days)
     }
 
     /**
@@ -359,7 +368,14 @@ class HomeViewModel(
      * out for, and the forecast below them belongs to the same place — so one
      * value carries the lot and nothing downstream has to order anything.
      */
-    private data class PlaceTimes(val zone: ZoneId? = null, val sunDays: List<SunDay> = emptyList())
+    private data class PlaceTimes(
+        /** Null ONLY before the first publish, when there are no rows to
+         * format either. After that it is always the resolved zone the rows
+         * were computed in — never the "unknown" that would send the screen
+         * off to resolve one of its own. */
+        val zone: ZoneId? = null,
+        val sunDays: List<SunDay> = emptyList(),
+    )
 
     /** An id this JVM does not recognise costs a fallback, never a crash. */
     private fun parseZone(id: String): ZoneId? = runCatching { ZoneId.of(id) }.getOrNull()

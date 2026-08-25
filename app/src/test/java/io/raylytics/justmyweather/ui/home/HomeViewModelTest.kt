@@ -16,6 +16,7 @@ import io.raylytics.justmyweather.data.nws.HttpTransport
 import io.raylytics.justmyweather.data.nws.NwsClient
 import io.raylytics.justmyweather.location.LocationProvider
 import io.raylytics.justmyweather.location.LocationResolver
+import io.raylytics.justmyweather.view.Density
 import io.raylytics.justmyweather.view.ForecastMode
 import io.raylytics.justmyweather.view.ModuleKey
 import io.raylytics.justmyweather.view.ModuleSpan
@@ -677,6 +678,48 @@ class HomeViewModelTest {
         advanceUntilIdle()
         assertEquals("America/New_York", h.vm.ready().snapshot.timeZone)
         assertEquals(ZoneId.of("America/New_York"), h.vm.ready().snapshot.zone)
+    }
+
+    @Test
+    fun `a device zone that changes later cannot re-format rows already computed`() = runTest(dispatcher) {
+        // The place's zone is unknown here (this point carries none), so the
+        // rows are worked out in the DEVICE's zone. That resolved zone has to
+        // be stored with them: if only the "unknown" were kept, the screen
+        // would resolve the device zone AGAIN at render time — a second
+        // reading of a value that really can change in between (travel, a DST
+        // boundary, a settings change), leaving the rows computed at one
+        // offset and labelled at another.
+        //
+        // Unlike two writes inside one function body, these two readings are
+        // separated by real time and by unrelated flow emissions, so nothing
+        // conflates the gap away.
+        var deviceZone = ZoneId.of("America/Los_Angeles")
+        val h =
+            harness(
+                config = ViewConfig.DEFAULT.toggle(ModuleKey.Sun),
+                points = POINTS_NO_ZONE,
+                zone = { deviceZone },
+            )
+        advanceUntilIdle()
+        assertEquals(ZoneId.of("America/Los_Angeles"), h.vm.ready().zone, "rows were computed in the device zone")
+        val rows = h.vm.ready().sunDays
+        assertTrue(rows.isNotEmpty())
+
+        // The phone moves. Nothing republishes the rows — but an unrelated
+        // config edit makes the state re-emit, which is where a re-resolved
+        // fallback would leak in.
+        deviceZone = ZoneId.of("Asia/Tokyo")
+        h.configRepository.update { it.setDensity(Density.COMPACT) }
+        advanceUntilIdle()
+
+        val after = h.vm.ready()
+        assertEquals(Density.COMPACT, after.config.density, "the unrelated edit did land")
+        assertEquals(
+            ZoneId.of("America/Los_Angeles"),
+            after.zone,
+            "the rows still read in the zone they were computed in",
+        )
+        assertEquals(rows, after.sunDays, "and they are the same rows")
     }
 
     @Test
