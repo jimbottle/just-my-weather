@@ -2,6 +2,7 @@ package io.raylytics.justmyweather.ui.home
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,6 +25,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -101,7 +103,20 @@ fun HomeScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Box(
-                modifier = Modifier.weight(1f).fillMaxWidth(),
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        // A tap on empty ground leaves arrange mode, as it
+                        // does on a launcher. Anything that handles its own
+                        // tap — a tile, the place name, a chip, Done — has
+                        // consumed it before it reaches here, so this only
+                        // ever sees the taps nothing else wanted. Keyed on
+                        // `arranging` so the detector does not exist the rest
+                        // of the time.
+                        .pointerInput(arranging) {
+                            if (arranging) detectTapGestures { arranging = false }
+                        },
                 contentAlignment = Alignment.Center,
             ) {
                 when (state) {
@@ -202,13 +217,13 @@ private fun GlanceView(
             onMoveModule = onMoveModule,
         )
 
-        // Only while arranging, right under the grid it ends: the wiggle says
-        // "editing", this says how editing stops. Back works too.
-        if (arranging) {
-            TextButton(onClick = onDoneArranging, modifier = Modifier.testTag("doneArranging")) {
-                Text("Done arranging")
-            }
-        }
+        // Only while arranging, right under the grid it edits. The wiggle
+        // says "editing"; this says what editing IS and how it stops. The
+        // hint earns its line because half of the grammar is not borrowed:
+        // drag-to-move is the launcher's and needs no telling, but no
+        // launcher resizes on a tap, and a gesture nobody would guess is a
+        // feature nobody has. Back and a tap on empty ground end it too.
+        if (arranging) ArrangeBar(onDone = onDoneArranging)
 
         // Grid two of two: the forecast, carrying its own Hourly/Daily toggle.
         // Absent entirely when the user has turned it off — that is what the
@@ -235,6 +250,23 @@ private fun GlanceView(
 
         if (config.alertBannerPosition == AlertBannerPosition.BOTTOM) {
             SafetyAlertBanner(alerts = state.safetyAlerts)
+        }
+    }
+}
+
+/** The one piece of editor chrome: what the gestures do, and the way out. */
+@Composable
+private fun ArrangeBar(onDone: () -> Unit) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = "Drag to move · Tap to resize",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.testTag("arrangeHint"),
+        )
+        TextButton(onClick = onDone, modifier = Modifier.testTag("doneArranging")) {
+            Text("Done arranging")
         }
     }
 }

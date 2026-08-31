@@ -22,6 +22,20 @@ install:
   only new pixels. No handles, no affordances, no editor chrome until the user
   long-presses.
 - Nothing animates, pulses, or invites interaction on the ordinary open.
+- **Width is prominence, literally.** A tile's value is *fitted* to its tile
+  (`ui/home/FittedText`): it draws at the largest size between a per-span
+  ceiling (hero at full, ~40% of that at half, ~25% at quarter — set in
+  `DensitySpec.valueCeiling`) and a 14sp floor that fits the width in two
+  lines with no word broken. Before this the sizes were a cliff (120 → 28 →
+  22sp), a full-width Conditions tile was a five-line tower of 120sp words,
+  and "30.12 inHg" spilled out of a quarter tile. Judge by cycling Conditions
+  through all three widths: the phrase should re-flow, never break mid-word,
+  and never cross its border.
+- **The face survives resizing.** Every style in the type scale carries the
+  chosen family (`ui/theme/Type.kt`; pinned by `TypographyTest`). Material's
+  defaults are hard-wired to sans, and the scale used to re-face only four
+  styles — so a Serif user's temperature turned sans the moment they made it
+  half-width.
 
 ### 2. Grid vs. mode toggle coherence — **resolved, now a standing limit**
 
@@ -40,6 +54,18 @@ subsumed — the grid flows its tiles, so there is no direction left to choose.
 
 What to keep judging:
 
+- **Arrange mode carries one line of chrome, and only then.** Under the
+  wiggling grid: "Drag to move · Tap to resize", then Done. Drag-to-move is
+  the launcher's and needs no telling, but no launcher resizes on a tap, and a
+  gesture nobody would guess is a feature nobody has. Three ways out, all
+  launcher-native: Done, Back, or a tap on empty ground.
+- **Motion is legible and layer-only.** A dropped tile springs into its slot
+  (scale and offset together); a tile whose slot changed — under a drag, or
+  from an accessibility Move — slides from where it was to where it is. No
+  bounce, ~250ms, driven from the tile's layout callback and applied in its
+  graphics layer, so nothing recomposes for it. Slot and width changes tick
+  (`TextHandleMove`), the launcher's way of letting the thumb feel the grid
+  under itself.
 - **Two grids is the ceiling.** A third grid is a design change, not an
   increment; it is the point at which the page stops being "now, and next".
 - Does the seam still show? A user can arrange the glance but not the forecast.
@@ -100,6 +126,13 @@ Worth stating plainly, because the gaps are where the shipped bugs lived:
   swipe moves them, so `06-arrange.yaml` asserts it (added with
   just-my-weather-csa). It has not actually run yet: Maestro's on-device
   driver is broken (just-my-weather-p6t).
+- **The fit is measured on-device** (`ModuleGridTest.aLongValueShrinksToStayInsideItsTile`):
+  a conditions phrase in a quarter tile must end inside the tile's bounds.
+  The motion — lift, settle, slide — has no automated cover: it lives in
+  graphics-layer reads of Animatables, which neither semantics nor screenshots
+  in this suite observe. **Verify by hand:** drop a tile and watch it land
+  rather than appear; drag one across a neighbour and watch the neighbour
+  slide, not jump.
 - **One path has no automated cover at all: a drag interrupted mid-flight by
   arrange mode ending** (system Back, or a second finger reaching "Done
   arranging"). It cannot be synthesised with the tools here — Compose's test
@@ -128,5 +161,6 @@ Measured on the API 35+ emulator (edge-to-edge enforced), per the device rules:
 | --- | --- | --- |
 | Placement | Flow grid: order + span, rows pack greedily, no gaps | Free 2D placement with persistent empty cells needs a custom layout plus collision/reflow. Revisit only if users ask for deliberate whitespace. |
 | Spans | Quarter, half, full (1/2/4 of 4 columns) | Three-quarter width exists on launchers; it earns its place only when a module's content wants it. |
-| Resize | Tap a wiggling tile to cycle its span | Launcher-style drag handles. Revisit if cycling feels like a slot machine once spans grow beyond three. |
+| Resize | Tap a wiggling tile to cycle its span, with the hint line saying so | Launcher-style drag handles. Revisit if cycling feels like a slot machine once spans grow beyond three. |
+| Value size | Fitted per tile: span sets the ceiling, content sets the size | A fixed size per span reads more uniformly across tiles of the same width but cannot hold a long phrase. Revisit only if fitted neighbours look ragged in practice. |
 | Row heights | Intrinsic — a row is as tall as its tallest tile | Fixed square cells (true "4 square wide"). Revisit when forecast modules arrive and want 2-row heights. |

@@ -250,6 +250,28 @@ class ModuleGridTest {
     }
 
     @Test
+    fun aLongValueShrinksToStayInsideItsTile() {
+        // The value is fitted, not styled per span: a conditions phrase in a
+        // quarter tile would otherwise break "Thunderstorms" across lines or
+        // run past the border. Width is prominence, and a value that escapes
+        // its tile has no width to be prominent within.
+        val phrase = "Chance Showers And Thunderstorms"
+        show(
+            ModuleValue(
+                module = reading(WeatherField.CONDITIONS),
+                label = "Conditions",
+                span = ModuleSpan.QUARTER,
+                content = ModuleContent.Reading(phrase),
+            ),
+        )
+        val tile = compose.onNodeWithTag("module_conditions").getUnclippedBoundsInRoot()
+        val value = compose.onNodeWithText(phrase, useUnmergedTree = true).getUnclippedBoundsInRoot()
+        assertTrue("value starts inside its tile", value.left >= tile.left)
+        assertTrue("value ends inside its tile, ${value.right} vs ${tile.right}", value.right <= tile.right)
+        assertTrue("value is not taller than its tile", value.bottom <= tile.bottom)
+    }
+
+    @Test
     fun theSoleTileHasNoMoveActionsAtAll() {
         // One module is a legal config; offering "Move up"/"Move down" on a
         // grid of one would be offering to reorder nothing.

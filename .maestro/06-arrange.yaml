@@ -41,6 +41,9 @@ appId: io.raylytics.justmyweather
 - longPressOn:
     id: "module_temperature"
 - assertVisible: "Done arranging"
+# The hint is the other half of the editor chrome: tap-to-resize is not a
+# launcher gesture, so the mode has to say it.
+- assertVisible: "Drag to move · Tap to resize"
 
 # A tap while arranging cycles that tile's width. The tile stays present at its
 # new size — what must NOT happen is the tap being swallowed by the long-press
@@ -77,6 +80,7 @@ appId: io.raylytics.justmyweather
 # Done leaves arrange mode; the grid stays, the editing affordance goes.
 - tapOn: "Done arranging"
 - assertNotVisible: "Done arranging"
+- assertNotVisible: "Drag to move · Tap to resize"
 - assertVisible:
     id: "module_temperature"
 - assertVisible: "Refresh"
