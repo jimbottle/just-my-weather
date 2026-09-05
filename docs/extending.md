@@ -76,14 +76,15 @@ evaluator changes are needed.
 ## Add a forecast framing
 
 **`view/ForecastMode.kt`** — add an entry (stable `key`, chip `label`), give it
-data in `HomeViewModel.ensureForecast`, and render it in `ForecastGrid`'s
+data in `HomeViewModel.ensureForecast`, and render it in `ForecastModule`'s
 `when`. Both `when`s are exhaustive, so the compiler lists what you still owe.
-The toggle on the forecast grid and the customize picker both iterate `entries`,
-so neither needs touching.
+The toggle in the forecast module's header and the customize picker both
+iterate `entries`, so neither needs touching.
 
-Note there is no "no forecast" framing: whether the grid appears at all is
-`ViewConfig.showForecast`, not a member of this enum. That split is deliberate —
-see the file's own comment.
+Note there is no "no forecast" framing: whether the forecast appears at all is
+the forecast *module's* visibility (`ModuleKey.Forecast`, switched like any
+other tile), not a member of this enum. That split is deliberate — see the
+file's own comment.
 
 ## Add a forecast window
 

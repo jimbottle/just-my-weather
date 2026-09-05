@@ -55,7 +55,7 @@ class ViewConfigTest {
     fun `default config reproduces the calm glance`() {
         val visible = ViewConfig.DEFAULT.visible.map { it.module }
         assertEquals(
-            listOf(reading(WeatherField.TEMPERATURE), reading(WeatherField.CONDITIONS)),
+            listOf(reading(WeatherField.TEMPERATURE), reading(WeatherField.CONDITIONS), ModuleKey.Forecast),
             visible,
         )
     }
@@ -90,16 +90,22 @@ class ViewConfigTest {
 
     @Test
     fun `render projects the visible modules, in order, with their sizes`() {
-        val config = ViewConfig.DEFAULT.toggle(reading(WeatherField.WIND)) // temp, conditions, wind visible
+        // temp, conditions, wind and the forecast visible, in catalog order
+        val config = ViewConfig.DEFAULT.toggle(reading(WeatherField.WIND))
         val rendered = config.render(snapshot)
         assertEquals(
             listOf("72°", "Mostly Clear", "Calm"),
-            rendered.modules.map { (it.content as ModuleContent.Reading).text },
+            rendered.modules.mapNotNull { (it.content as? ModuleContent.Reading)?.text },
         )
         assertEquals(
-            listOf(ModuleSize(4, 2), ModuleSize(2, 1), ModuleSize(1, 1)),
+            listOf(ModuleSize(4, 2), ModuleSize(2, 1), ModuleSize(1, 1), ModuleSize(4, 4)),
             rendered.modules.map { it.size },
         )
+        // The forecast is a module like the others: last in a fresh config,
+        // carrying the framing and data it was handed rather than a string.
+        val forecast = rendered.modules.last()
+        assertEquals(ModuleKey.Forecast, forecast.module)
+        assertEquals(ForecastMode.DEFAULT, (forecast.content as ModuleContent.Forecast).mode)
     }
 
     @Test
@@ -174,11 +180,17 @@ class ViewConfigTest {
 
     @Test
     fun `moveVisible lands a field at the requested visible slot`() {
-        // temp, conditions, wind visible; precipitation and pressure hidden between them.
+        // temp, conditions, wind, forecast visible; precipitation, pressure
+        // and sun hidden between them.
         val config = ViewConfig.DEFAULT.toggle(reading(WeatherField.WIND))
         val moved = config.moveVisible(reading(WeatherField.TEMPERATURE), 2)
         assertEquals(
-            listOf(reading(WeatherField.CONDITIONS), reading(WeatherField.WIND), reading(WeatherField.TEMPERATURE)),
+            listOf(
+                reading(WeatherField.CONDITIONS),
+                reading(WeatherField.WIND),
+                reading(WeatherField.TEMPERATURE),
+                ModuleKey.Forecast,
+            ),
             moved.visible.map { it.module },
         )
         // Hidden fields are still present exactly once each.
@@ -187,11 +199,11 @@ class ViewConfigTest {
 
     @Test
     fun `moveVisible clamps out-of-range targets and ignores hidden fields`() {
-        val config = ViewConfig.DEFAULT // temp, conditions visible
+        val config = ViewConfig.DEFAULT // temp, conditions, forecast visible
         // Past the end clamps to the last slot.
         val toEnd = config.moveVisible(reading(WeatherField.TEMPERATURE), 99)
         assertEquals(
-            listOf(reading(WeatherField.CONDITIONS), reading(WeatherField.TEMPERATURE)),
+            listOf(reading(WeatherField.CONDITIONS), ModuleKey.Forecast, reading(WeatherField.TEMPERATURE)),
             toEnd.visible.map { it.module },
         )
         // A hidden field has no slot on the grid to move to.
@@ -202,13 +214,24 @@ class ViewConfigTest {
 
     @Test
     fun `the shipped default shows an hourly forecast, and hiding it keeps the framing`() {
-        assertTrue(ViewConfig.DEFAULT.showForecast)
+        assertTrue(ViewConfig.DEFAULT.shows(ModuleKey.Forecast))
         assertEquals(ForecastMode.HOURLY, ViewConfig.DEFAULT.defaultForecastMode)
-        // Turning the grid off is not the same as forgetting the choice: it
+        // Turning the module off is not the same as forgetting the choice: it
         // must reopen the way the user left it.
-        val hidden = ViewConfig.DEFAULT.setDefaultForecastMode(ForecastMode.DAILY).setShowForecast(false)
-        assertFalse(hidden.showForecast)
+        val hidden = ViewConfig.DEFAULT.setDefaultForecastMode(ForecastMode.DAILY).toggle(ModuleKey.Forecast)
+        assertFalse(hidden.shows(ModuleKey.Forecast))
         assertEquals(ForecastMode.DAILY, hidden.defaultForecastMode)
+    }
+
+    @Test
+    fun `the forecast is movable and resizable like any module, down to two by two`() {
+        // The ask: every tile carries the same interaction. So the forecast
+        // moves in the visible order and resizes, floored where a forecast
+        // stops being one (two hour tiles under a header).
+        val moved = ViewConfig.DEFAULT.moveVisible(ModuleKey.Forecast, 0)
+        assertEquals(ModuleKey.Forecast, moved.visible.first().module)
+        val squeezed = ViewConfig.DEFAULT.resize(ModuleKey.Forecast, ModuleSize.CELL)
+        assertEquals(ModuleSize(2, 2), squeezed.items.first { it.module == ModuleKey.Forecast }.size)
     }
 
     @Test

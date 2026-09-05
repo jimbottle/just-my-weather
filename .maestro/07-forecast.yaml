@@ -1,9 +1,10 @@
-# The forecast grid and the option that lives on it.
+# The forecast module and the option that lives on it.
 #
 # The framing used to be a screen-wide mode with three states, one of which
-# ("Now") meant no forecast at all. It is two things now — whether the grid
-# shows, on the customize screen, and which framing it shows, on the grid
-# itself — so this flow walks both and the boundary between them.
+# ("Now") meant no forecast at all. It is two things now — whether the module
+# shows, switched in the customize screen's field list like any other tile,
+# and which framing it shows, on the module itself — so this flow walks both
+# and the boundary between them.
 appId: io.raylytics.justmyweather
 ---
 - launchApp:
@@ -29,19 +30,20 @@ appId: io.raylytics.justmyweather
     visible: ".*(Today|Tonight|This Afternoon|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday).*"
     timeout: 30000
 
-# Back to hourly, and the glance above is untouched by either — the two grids
-# are independent, which is the whole point of the forecast owning its option.
+# Back to hourly, and the hero beside it is untouched by either — the framing
+# is the forecast's own option, not the screen's.
 - tapOn:
     id: "forecast_hourly"
 - assertVisible:
     id: "module_temperature"
 
-# Turning the forecast off takes the grid AND its toggle with it: the calm
+# Turning the forecast off takes the tile AND its toggle with it: the calm
 # minimum is the glance by itself, which is what the old "Now" mode meant.
+# The switch is the module's own row in the field list, like every tile's.
 - tapOn: "Customize"
 - assertVisible: "Customize view"
 - tapOn:
-    id: "show-forecast-toggle"
+    id: "toggle_forecast"
 - tapOn: "Done"
 - extendedWaitUntil:
     visible: "Refresh"
@@ -49,14 +51,14 @@ appId: io.raylytics.justmyweather
 - assertNotVisible: "Forecast"
 - assertNotVisible:
     id: "forecast_hourly"
-# The glance survives — hiding the second grid must not disturb the first.
+# The glance survives — hiding one module must not disturb the others.
 - assertVisible:
     id: "module_temperature"
 
 # And it comes back, still framed the way it was left.
 - tapOn: "Customize"
 - tapOn:
-    id: "show-forecast-toggle"
+    id: "toggle_forecast"
 - tapOn: "Done"
 - extendedWaitUntil:
     visible: "Forecast"

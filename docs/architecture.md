@@ -61,12 +61,15 @@ shapes never leak past `WeatherRepository`.
   a pure `ThemeConfig` to a Material color scheme + typography in one place.
 - **`ui/home/`**, **`ui/customize/`**, **`ui/alerts/`** — one view model + one
   screen each. `ui/home/DensitySpec` maps a `Density` to concrete sizes/spacing.
-  The home screen is **two grids over one engine**: `ui/home/TileGrid` is the
-  engine (row packing + the bordered tile shell), `ui/home/ModuleGrid` is the
-  arrangeable glance built on it — it owns all of arrange mode's
-  gesture/animation machinery — and `ui/home/ForecastGrid` is the data-driven
-  forecast, carrying its own Hourly/Daily toggle. The criteria all of this
-  answers to live in `docs/modular-v2-evaluation.md`.
+  The home screen is **one arrangeable grid**: `ui/home/CellGrid` is the
+  lattice engine (fixed cells; placements from `view/packGrid`),
+  `ui/home/ModuleGrid` is the glance built on it — it owns all of arrange
+  mode's gesture/animation machinery: drag to move, drag a corner to resize —
+  and every module draws inside its tile, including `ui/home/ForecastModule`,
+  the forecast with its own Hourly/Daily toggle in its header, whose inner
+  hour/day tiles pack on `ui/home/TileGrid` (the flow-grid engine + the
+  bordered tile shell) into exactly the module's columns. The criteria all of
+  this answers to live in `docs/modular-v2-evaluation.md`.
 
 ## Freshness
 

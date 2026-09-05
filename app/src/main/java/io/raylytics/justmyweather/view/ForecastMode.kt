@@ -9,7 +9,7 @@ package io.raylytics.justmyweather.view
  * really a third framing: it meant "no forecast at all", which is the absence
  * of this choice rather than one of its values, and modelling it as a sibling
  * put a control for *whether* the forecast shows in the same row as the control
- * for *what it shows*. Whether it shows is now [ViewConfig.showForecast]; this
+ * for *what it shows*. Whether it shows is the forecast module's own visibility; this
  * enum is only the option on the forecast itself.
  */
 enum class ForecastMode(

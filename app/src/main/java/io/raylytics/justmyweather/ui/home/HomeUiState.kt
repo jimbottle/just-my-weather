@@ -20,9 +20,9 @@ sealed interface HomeUiState {
 
     /** The normal case: a snapshot to glance at, projected through the user's
      * [config] so the screen draws exactly the fields they chose, in order.
-     * [forecastMode] picks the forecast grid's framing; that grid's data is
-     * null until its first fetch lands (it shows a quiet placeholder), and the
-     * grid is absent altogether when the config has it switched off. */
+     * [forecastMode] picks the forecast module's framing; that module's data
+     * is null until its first fetch lands (it shows a quiet placeholder), and
+     * the module is absent altogether when the config has it hidden. */
     data class Ready(
         val snapshot: WeatherSnapshot,
         val config: ViewConfig,

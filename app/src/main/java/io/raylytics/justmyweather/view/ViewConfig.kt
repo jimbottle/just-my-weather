@@ -30,14 +30,9 @@ data class ModuleSetting(
 data class ViewConfig(
     val items: List<ModuleSetting>,
     val density: Density = Density.DEFAULT,
-    /**
-     * Whether the forecast grid appears beneath the glance at all. On by
-     * default, which is what the app has always shown; turning it off is the
-     * calm minimum — just the glance — and is what the old NOW view mode meant.
-     */
-    val showForecast: Boolean = true,
-    /** Which framing the forecast grid opens on; its toggle can still switch
-     * away for the session. */
+    /** Which framing the forecast module opens on; its toggle can still
+     * switch away for the session. Whether the forecast shows at all is the
+     * module's own visibility, like every other tile's. */
     val defaultForecastMode: ForecastMode = ForecastMode.DEFAULT,
     /** How the Daily framing draws each period. */
     val dailyStyle: DailyStyle = DailyStyle.DEFAULT,
@@ -52,6 +47,9 @@ data class ViewConfig(
 
     fun toggle(module: ModuleKey): ViewConfig =
         copy(items = items.map { if (it.module == module) it.copy(visible = !it.visible) else it })
+
+    fun setVisible(module: ModuleKey, visible: Boolean): ViewConfig =
+        copy(items = items.map { if (it.module == module) it.copy(visible = visible) else it })
 
     fun relabel(module: ModuleKey, label: String?): ViewConfig =
         copy(items = items.map { if (it.module == module) it.copy(customLabel = label) else it })
@@ -97,8 +95,6 @@ data class ViewConfig(
 
     fun setDensity(density: Density): ViewConfig = copy(density = density)
 
-    fun setShowForecast(show: Boolean): ViewConfig = copy(showForecast = show)
-
     fun setDefaultForecastMode(mode: ForecastMode): ViewConfig = copy(defaultForecastMode = mode)
 
     fun setDailyStyle(style: DailyStyle): ViewConfig = copy(dailyStyle = style)
@@ -120,19 +116,20 @@ data class ViewConfig(
 
     companion object {
         /** The calm default: temperature is the hero, conditions sits beneath
-         * it, everything else is available but hidden. Mirrors the zero-setup
-         * glance the app ships with. */
+         * it, the forecast under that, everything else is available but
+         * hidden. Mirrors the zero-setup glance the app ships with. */
         val DEFAULT =
             ViewConfig(
                 ModuleKey.catalog.map { module ->
                     ModuleSetting(
                         module = module,
-                        // Temperature and conditions are the shipped glance;
-                        // everything else is available but something you go
-                        // and turn on.
+                        // Temperature, conditions and the forecast are the
+                        // shipped glance; everything else is available but
+                        // something you go and turn on.
                         visible =
                             module == ModuleKey.Reading(WeatherField.TEMPERATURE) ||
-                                module == ModuleKey.Reading(WeatherField.CONDITIONS),
+                                module == ModuleKey.Reading(WeatherField.CONDITIONS) ||
+                                module == ModuleKey.Forecast,
                     )
                 },
             )
@@ -147,7 +144,6 @@ data class ViewConfig(
         fun normalized(
             settings: List<ModuleSetting>,
             density: Density = Density.DEFAULT,
-            showForecast: Boolean = true,
             defaultForecastMode: ForecastMode = ForecastMode.DEFAULT,
             dailyStyle: DailyStyle = DailyStyle.DEFAULT,
             alertBannerPosition: AlertBannerPosition = AlertBannerPosition.DEFAULT,
@@ -160,7 +156,6 @@ data class ViewConfig(
             return ViewConfig(
                 seen.values.toList(),
                 density,
-                showForecast,
                 defaultForecastMode,
                 dailyStyle,
                 alertBannerPosition,

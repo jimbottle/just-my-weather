@@ -1,18 +1,15 @@
 package io.raylytics.justmyweather.ui.home
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -20,31 +17,41 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.raylytics.justmyweather.data.nws.DailyPeriod
 import io.raylytics.justmyweather.data.nws.ForecastPoint
 import io.raylytics.justmyweather.view.DailyStyle
 import io.raylytics.justmyweather.view.ForecastMode
+import io.raylytics.justmyweather.view.ModuleContent
 import java.time.ZoneId
 import java.util.Locale
 import kotlin.math.roundToInt
 
 /*
- * The screen's second grid: the forecast, drawn as tiles on the same engine as
- * the glance. It is the counterpart to ModuleGrid — same tile language, no
- * arranging, because its contents come from NWS rather than from the user.
+ * The forecast module's drawing: a grid of hour or day tiles inside a tile of
+ * the glance, with its own Hourly/Daily toggle in its header.
+ *
+ * It used to be the screen's second grid, a fixed section under the glance
+ * that could be switched off but not moved or sized. It is a module now so
+ * that every tile carries the same interaction — drag to move, drag the
+ * corner to resize — and the size does real work: the inner grid packs
+ * exactly as many columns as the module is wide, so an hour tile is one
+ * lattice cell wide wherever the module sits, and a taller module simply
+ * shows more rows before it scrolls.
  *
  * The Hourly/Daily choice lives HERE, on the forecast, rather than as a
- * screen-wide mode. That is the whole shape of this file: the forecast is one
- * thing on the page with its own option, instead of the page having three
- * states of which two happen to be forecasts.
+ * screen-wide mode: the forecast is one thing on the page with its own
+ * option, instead of the page having three states of which two happen to be
+ * forecasts.
  */
 
 /**
  * How many hours the Hourly framing offers. A day's worth: six rows of four,
- * of which the viewport shows a couple and the rest is a scroll away.
+ * of which the module shows a couple and the rest is a scroll away.
  *
  * This is bounded rather than NWS's full ~156 points because the grid is drawn
  * eagerly, not lazily — thirty-nine rows of tiles would be composed whether or
@@ -54,74 +61,77 @@ import kotlin.math.roundToInt
  */
 private const val HOURLY_TILES = 24
 
-/**
- * How tall the forecast is allowed to be before it scrolls inside itself.
- *
- * The forecast is a BOX on the page, not a run of content that pushes
- * everything below it off screen. Sized to show about two and a half rows, so
- * the cut-off row is visibly cut off — that is what says "there is more here"
- * without a scrollbar to point at it.
- */
-private val FORECAST_VIEWPORT = 260.dp
-
-/** Hours are terse enough for a quarter tile; a period's name ("Monday Night",
- * "This Afternoon") needs half a row to survive without ellipsis. */
+/** Hours are terse enough for one cell; a period's name ("Monday Night",
+ * "This Afternoon") needs two to survive without ellipsis. */
 private const val HOUR_COLUMNS = 1
 private const val DAY_COLUMNS = 2
 
+/** Below this many cells across, the header has no room for the word
+ * "Forecast" beside its toggle — the toggle alone says what the tile is. */
+private const val LABELLED_HEADER_MIN_COLUMNS = 3
+
 /**
- * The forecast grid and its own framing toggle.
+ * The forecast, filling the tile it was given.
  *
- * Renders nothing at all when the user has turned the forecast off — the calm
- * minimum is the glance by itself, and an empty heading would be worse than
- * absence.
+ * The header is the tile's own label row: "Forecast" and the framing toggle.
+ * Below it the framing's grid scrolls inside whatever height is left — the
+ * module is a BOX, not a run of content, so its footprint is its cells
+ * whatever NWS returned. That inner scroll is switched off while arranging:
+ * a child's scroll would otherwise take the very drag the grid needs to move
+ * or resize this tile.
  */
 @Composable
-internal fun ForecastGrid(
-    mode: ForecastMode,
+internal fun ForecastModuleContent(
+    content: ModuleContent.Forecast,
+    /** The module's width in cells, and so the inner grid's column count. */
+    columns: Int,
+    gap: Dp,
+    arranging: Boolean,
     onSetMode: (ForecastMode) -> Unit,
-    dailyStyle: DailyStyle,
-    hours: List<ForecastPoint>?,
-    periods: List<DailyPeriod>?,
-    error: String?,
-    /** The place's zone: an hour label is a clock face, and one for a place a
-     * few timezones away must not read in the phone's time. */
-    zone: ZoneId,
-    gap: androidx.compose.ui.unit.Dp,
-    modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = modifier.widthIn(max = GRID_MAX_WIDTH).fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        ForecastHeader(mode = mode, onSetMode = onSetMode)
-        when (mode) {
+        ForecastHeader(
+            mode = content.mode,
+            onSetMode = onSetMode,
+            showLabel = columns >= LABELLED_HEADER_MIN_COLUMNS,
+        )
+        val viewport =
+            Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState(), enabled = !arranging)
+        when (content.mode) {
             ForecastMode.HOURLY ->
-                ForecastFrame(items = hours, error = error) { list ->
-                    ForecastViewport {
+                ForecastFrame(items = content.hours, error = content.error) { list ->
+                    Box(viewport) {
                         TileGrid(
                             items = list.take(HOURLY_TILES),
                             columns = { HOUR_COLUMNS },
                             gap = gap,
+                            gridColumns = columns,
                             modifier = Modifier.fillMaxWidth(),
-                        ) { hour, _, tileModifier -> HourTile(hour, zone, tileModifier) }
+                        ) { hour, _, tileModifier -> HourTile(hour, content.zone, tileModifier) }
                     }
                 }
 
             ForecastMode.DAILY ->
-                ForecastFrame(items = periods, error = error) { list ->
+                ForecastFrame(items = content.periods, error = content.error) { list ->
                     // Pairing the half-day periods is pure; cache per list.
                     val days =
-                        remember(list, dailyStyle) {
-                            if (dailyStyle == DailyStyle.COMBINED) combineDays(list) else emptyList()
+                        remember(list, content.dailyStyle) {
+                            if (content.dailyStyle == DailyStyle.COMBINED) combineDays(list) else emptyList()
                         }
-                    ForecastViewport {
-                        when (dailyStyle) {
+                    Box(viewport) {
+                        when (content.dailyStyle) {
                             DailyStyle.COMBINED ->
                                 TileGrid(
                                     items = days,
                                     columns = { DAY_COLUMNS },
                                     gap = gap,
+                                    gridColumns = columns,
                                     modifier = Modifier.fillMaxWidth(),
                                 ) { day, _, tileModifier -> CombinedDayTile(day, tileModifier) }
 
@@ -130,6 +140,7 @@ internal fun ForecastGrid(
                                     items = list,
                                     columns = { DAY_COLUMNS },
                                     gap = gap,
+                                    gridColumns = columns,
                                     modifier = Modifier.fillMaxWidth(),
                                 ) { period, _, tileModifier -> HalfDayTile(period, tileModifier) }
                         }
@@ -140,66 +151,51 @@ internal fun ForecastGrid(
 }
 
 /**
- * The box the forecast lives in: a bounded height with its own scroll.
+ * The module's label row: "Forecast" on the left, the framing on the right.
  *
- * Without this the forecast is a run of content that grows with however many
- * periods NWS returned, pushing the glance up and the controls down — a day of
- * hourly tiles is six rows, and half-day periods are seven. Capping it keeps
- * the forecast's footprint on the page stable whatever the data does, and the
- * scroll is where the rest of it lives.
- *
- * Nesting a vertical scroll inside the glance's own is deliberate and already
- * the pattern here (the old stacked daily list did the same): the inner one
- * takes the gesture when the pointer is over it, so the box scrolls first and
- * the page scrolls once the box is at its end.
+ * The framing is two words rather than two chips. Chips need a row to
+ * themselves at two cells wide, and this header has one line — so the chosen
+ * framing is the bold, accented word and the other is quiet and tappable.
+ * The label stands for the provenance the glance's "Observed" line gives its
+ * side: everything in this tile is model output for a grid cell, not a
+ * station's measurement, and the two legitimately disagree.
  */
-@Composable
-private fun ForecastViewport(content: @Composable () -> Unit) {
-    Box(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .heightIn(max = FORECAST_VIEWPORT)
-                .verticalScroll(rememberScrollState()),
-    ) {
-        content()
-    }
-}
-
-/**
- * "Forecast" with its framing chips on the same line — the arrangement that
- * makes the toggle read as an option belonging to this grid rather than a
- * control for the whole screen, which is what it was when it sat alone at the
- * bottom offering "Now" as a third state.
- */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ForecastHeader(
     mode: ForecastMode,
     onSetMode: (ForecastMode) -> Unit,
+    showLabel: Boolean,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
+        horizontalArrangement = if (showLabel) Arrangement.SpaceBetween else Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // The counterpart to the glance's "Observed" line: everything below
-        // this is model output for a grid cell, not a station's measurement,
-        // and the two legitimately disagree.
-        Text(
-            text = "Forecast",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        // FlowRow so a large display scale wraps the chips under the label
-        // instead of squeezing them off the edge.
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (showLabel) {
+            Text(
+                text = "Forecast",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             ForecastMode.entries.forEach { entry ->
-                FilterChip(
-                    selected = entry == mode,
-                    onClick = { onSetMode(entry) },
-                    label = { Text(entry.label) },
-                    modifier = Modifier.testTag("forecast_${entry.key}"),
+                val selected = entry == mode
+                Text(
+                    text = entry.label,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                    color =
+                        if (selected) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                    modifier =
+                        Modifier
+                            .clickable { onSetMode(entry) }
+                            .padding(horizontal = 6.dp, vertical = 4.dp)
+                            .testTag("forecast_${entry.key}"),
                 )
             }
         }

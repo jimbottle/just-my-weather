@@ -568,13 +568,13 @@ class HomeViewModelTest {
     fun `a hidden forecast grid fetches nothing at all`() = runTest(dispatcher) {
         // The reason "off" is worth having: a view nobody is looking at should
         // not cost a round trip. The old NOW mode already skipped the fetch;
-        // that must survive the move from screen mode to config flag.
-        val h = harness(config = ViewConfig.DEFAULT.setShowForecast(false))
+        // that must survive the move from screen mode to module visibility.
+        val h = harness(config = ViewConfig.DEFAULT.setVisible(ModuleKey.Forecast, false))
         advanceUntilIdle()
         assertEquals(0, h.transport.hourlyFetches)
         assertEquals(0, h.transport.dailyFetches)
         // …and switching it back on fetches for the framing it opens in.
-        h.configRepository.update { it.setShowForecast(true) }
+        h.configRepository.update { it.setVisible(ModuleKey.Forecast, true) }
         advanceUntilIdle()
         assertEquals(1, h.transport.hourlyFetches)
     }
@@ -587,7 +587,7 @@ class HomeViewModelTest {
         h.transport.failDaily = true
         advanceUntilIdle()
         assertNotNull(h.vm.ready().forecastError)
-        h.configRepository.update { it.setShowForecast(false) }
+        h.configRepository.update { it.setVisible(ModuleKey.Forecast, false) }
         advanceUntilIdle()
         assertNull(h.vm.ready().forecastError)
     }
@@ -771,7 +771,7 @@ class HomeViewModelTest {
         h.vm.moveModule(reading(WeatherField.TEMPERATURE), 1)
         advanceUntilIdle()
         assertEquals(
-            listOf(reading(WeatherField.CONDITIONS), reading(WeatherField.TEMPERATURE)),
+            listOf(reading(WeatherField.CONDITIONS), reading(WeatherField.TEMPERATURE), ModuleKey.Forecast),
             h.configRepository.config.first().visible.map { it.module },
         )
     }
@@ -795,7 +795,7 @@ class HomeViewModelTest {
         advanceUntilIdle()
         val saved = h.configRepository.config.first()
         assertEquals(
-            listOf(reading(WeatherField.CONDITIONS), reading(WeatherField.TEMPERATURE)),
+            listOf(reading(WeatherField.CONDITIONS), reading(WeatherField.TEMPERATURE), ModuleKey.Forecast),
             saved.visible.map { it.module },
             "the move survived",
         )

@@ -121,7 +121,7 @@ class HomeViewModel(
      */
     private val forecast: StateFlow<ForecastChoice?> =
         combine(chosenMode, configRepository.config) { chosen, config ->
-            ForecastChoice(config.showForecast, chosen ?: config.defaultForecastMode)
+            ForecastChoice(config.shows(ModuleKey.Forecast), chosen ?: config.defaultForecastMode)
         }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     /** Paired so the five-flow limit of the typed [combine] still fits: these
@@ -134,7 +134,7 @@ class HomeViewModel(
             // Before the stored config lands, fall back to what it will say:
             // the config flow itself has already emitted by the time a Ready
             // state can exist, so this only covers the first frame.
-            val shown = forecastChoice?.shown ?: config.showForecast
+            val shown = forecastChoice?.shown ?: config.shows(ModuleKey.Forecast)
             val framing = forecastChoice?.mode ?: config.defaultForecastMode
             when (load) {
                 is WeatherLoad.Loading -> HomeUiState.Loading

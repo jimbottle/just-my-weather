@@ -49,9 +49,10 @@ data class ModuleSize(val columns: Int, val rows: Int) {
          * gesture is borrowed from. */
         const val COLUMNS = 4
 
-        /** Tallest a tile may be. Three cells is already most of a phone
-         * screen's glance; beyond that a tile stops being a tile. */
-        const val MAX_ROWS = 3
+        /** Tallest a tile may be. Four cells is what the forecast wants for
+         * two rows of hours under its header; beyond that a tile stops being
+         * a tile and starts being the screen. */
+        const val MAX_ROWS = 4
 
         /** A single cell — the floor for a short reading. */
         val CELL = ModuleSize(1, 1)

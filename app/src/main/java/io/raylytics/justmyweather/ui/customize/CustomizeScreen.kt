@@ -70,7 +70,6 @@ fun CustomizeScreen(
     onMoveUp: (Int) -> Unit,
     onMoveDown: (Int) -> Unit,
     onSetDensity: (Density) -> Unit,
-    onSetShowForecast: (Boolean) -> Unit,
     onSetDefaultForecastMode: (ForecastMode) -> Unit,
     onSetDailyStyle: (DailyStyle) -> Unit,
     onSetAlertBannerPosition: (AlertBannerPosition) -> Unit,
@@ -107,10 +106,9 @@ fun CustomizeScreen(
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                 DensityPicker(selected = config.density, onSelect = onSetDensity)
                 ForecastPicker(
-                    show = config.showForecast,
+                    show = config.shows(ModuleKey.Forecast),
                     mode = config.defaultForecastMode,
                     dailyStyle = config.dailyStyle,
-                    onSetShow = onSetShowForecast,
                     onSetMode = onSetDefaultForecastMode,
                     onSetDailyStyle = onSetDailyStyle,
                 )
@@ -353,60 +351,49 @@ private fun DensityPicker(
  */
 @Composable
 private fun ForecastPicker(
+    /** Whether the forecast module is on — switched in the field list below,
+     * like every other module. */
     show: Boolean,
     mode: ForecastMode,
     dailyStyle: DailyStyle,
-    onSetShow: (Boolean) -> Unit,
     onSetMode: (ForecastMode) -> Unit,
     onSetDailyStyle: (DailyStyle) -> Unit,
 ) {
+    // The framing options only mean something when there is a forecast to
+    // frame; offered for a hidden module they read as controls that do
+    // nothing. Nothing at all is drawn then — the module's own row in the
+    // list below is where it is switched back on.
+    if (!show) return
     Column(
         modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Text("Forecast", style = MaterialTheme.typography.labelMedium)
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text("Show the forecast", style = MaterialTheme.typography.bodyLarge)
-            Switch(
-                checked = show,
-                onCheckedChange = onSetShow,
-                modifier = Modifier.testTag("show-forecast-toggle"),
-            )
-        }
-        // The framing options only mean something when there is a forecast to
-        // frame; offered under an off switch they read as controls that do
-        // nothing.
-        if (show) {
-            Text(
-                text = "Opens on",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            ChipRow(
-                options = ForecastMode.entries,
-                selected = mode,
-                label = { it.label },
-                onSelect = onSetMode,
-                tag = { "forecast_default_${it.key}" },
-            )
-            Text(
-                text = "Each day shows",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 4.dp),
-            )
-            ChipRow(
-                options = DailyStyle.entries,
-                selected = dailyStyle,
-                label = { it.label },
-                onSelect = onSetDailyStyle,
-                tag = { "daily_style_${it.key}" },
-            )
-        }
+        Text(
+            text = "Opens on",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        ChipRow(
+            options = ForecastMode.entries,
+            selected = mode,
+            label = { it.label },
+            onSelect = onSetMode,
+            tag = { "forecast_default_${it.key}" },
+        )
+        Text(
+            text = "Each day shows",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+        ChipRow(
+            options = DailyStyle.entries,
+            selected = dailyStyle,
+            label = { it.label },
+            onSelect = onSetDailyStyle,
+            tag = { "daily_style_${it.key}" },
+        )
     }
 }
 

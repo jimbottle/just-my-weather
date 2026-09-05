@@ -37,6 +37,7 @@ import io.raylytics.justmyweather.data.SunDay
 import io.raylytics.justmyweather.data.WeatherSnapshot
 import io.raylytics.justmyweather.data.nws.ActiveAlert
 import io.raylytics.justmyweather.view.AlertBannerPosition
+import io.raylytics.justmyweather.view.ForecastData
 import io.raylytics.justmyweather.view.ForecastMode
 import io.raylytics.justmyweather.view.ModuleKey
 import io.raylytics.justmyweather.view.ModuleSize
@@ -204,18 +205,20 @@ private fun GlanceView(
                     .testTag("locationLabel"),
         )
 
-        // Grid one of two: the glance. It always leads, and the forecast grid
-        // below adds to it rather than replacing it, so the screen answers
-        // "right now" AND "ahead" without changing what it is.
+        // The glance: every module the user has on, the forecast among them,
+        // as tiles on one grid. The screen answers "right now" AND "ahead"
+        // with one set of tiles and one set of gestures.
         NowContent(
             snapshot = snapshot,
             config = config,
             sunDays = state.sunDays,
             zone = state.zone,
+            forecast = ForecastData(state.forecastMode, state.hourly, state.daily, state.forecastError),
             arranging = arranging,
             onStartArranging = onStartArranging,
             onResizeModule = onResizeModule,
             onMoveModule = onMoveModule,
+            onSetForecastMode = onSetMode,
         )
 
         // Only while arranging, right under the grid it edits. The wiggle
@@ -225,29 +228,6 @@ private fun GlanceView(
         // handle is a small dot, and a gesture nobody would guess is a
         // feature nobody has. Back and a tap on empty ground end it too.
         if (arranging) ArrangeBar(onDone = onDoneArranging)
-
-        // Grid two of two: the forecast, carrying its own Hourly/Daily toggle.
-        // Absent entirely when the user has turned it off — that is what the
-        // old NOW view mode meant, expressed as the forecast not being there
-        // rather than as a third state of the whole screen.
-        //
-        // The old "Updated HH:MM" line lived down here, below the forecast and
-        // density-gated. It is gone rather than duplicated: the same fact now
-        // sits with the glance as "Observed HH:MM", where it explains the
-        // number it belongs to instead of trailing the whole screen.
-        if (config.showForecast) {
-            ForecastGrid(
-                mode = state.forecastMode,
-                onSetMode = onSetMode,
-                dailyStyle = config.dailyStyle,
-                hours = state.hourly,
-                periods = state.daily,
-                zone = state.zone,
-                error = state.forecastError,
-                gap = spec.moduleGap,
-                modifier = Modifier.padding(top = 4.dp),
-            )
-        }
 
         if (config.alertBannerPosition == AlertBannerPosition.BOTTOM) {
             SafetyAlertBanner(alerts = state.safetyAlerts)
@@ -328,12 +308,16 @@ private fun NowContent(
     /** The place's zone, and the one the sun rows were computed in — the same
      * value, published together. */
     zone: ZoneId,
+    /** The forecast module's data: a separate fetch with its own failure and
+     * a session-chosen framing, so it rides beside the snapshot. */
+    forecast: ForecastData,
     arranging: Boolean,
     onStartArranging: () -> Unit,
     onResizeModule: (ModuleKey, ModuleSize) -> Unit,
     onMoveModule: (ModuleKey, Int) -> Unit,
+    onSetForecastMode: (ForecastMode) -> Unit,
 ) {
-    val rendered: RenderedView = config.render(snapshot, sunDays, zone)
+    val rendered: RenderedView = config.render(snapshot, sunDays, zone, forecast)
     val spec = config.density.spec()
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -356,6 +340,7 @@ private fun NowContent(
                 onStartArranging = onStartArranging,
                 onResize = onResizeModule,
                 onMove = onMoveModule,
+                onSetForecastMode = onSetForecastMode,
                 modifier = Modifier.fillMaxWidth(),
             )
         }

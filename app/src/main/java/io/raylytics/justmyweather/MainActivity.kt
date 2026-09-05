@@ -255,7 +255,6 @@ private fun App(
                 onMoveUp = customizeViewModel::moveUp,
                 onMoveDown = customizeViewModel::moveDown,
                 onSetDensity = customizeViewModel::setDensity,
-                onSetShowForecast = customizeViewModel::setShowForecast,
                 onSetDefaultForecastMode = customizeViewModel::setDefaultForecastMode,
                 onSetDailyStyle = customizeViewModel::setDailyStyle,
                 onSetAlertBannerPosition = customizeViewModel::setAlertBannerPosition,

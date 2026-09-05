@@ -44,10 +44,14 @@ forecast (data-driven), both drawn by one engine (`ui/home/TileGrid`). The
 screen-wide Now/Hourly/Daily toggle is gone. Its three states split into the two
 questions they actually were:
 
-- *Does the forecast show at all?* → `ViewConfig.showForecast`, on the customize
-  screen. This is what the old NOW meant.
-- *Which framing does it show?* → `ForecastMode`, as a toggle **on the forecast
-  grid itself**.
+- *Does the forecast show at all?* → the forecast **module's** visibility,
+  switched in the customize screen's field list like every other tile. This is
+  what the old NOW meant. (2026-09-05: the forecast became a module on the
+  lattice — movable and resizable with the same drag and corner as a reading —
+  because "every tile carries the same interaction" was the ask, and a fixed
+  section under the grid did not.)
+- *Which framing does it show?* → `ForecastMode`, as a toggle **in the forecast
+  module's own header**.
 
 Two settings died in the move: `ForecastLayout` (side-by-side vs stacked) is
 subsumed — the grid flows its tiles, so there is no direction left to choose.
@@ -119,9 +123,9 @@ Worth stating plainly, because the gaps are where the shipped bugs lived:
 - **Instrumented** (`ModuleGridTest`) covers what only a device measures —
   spans in real dp, gaps left empty — and the accessibility actions.
 - **Maestro** covers the real touch paths: `06-arrange.yaml` for long-press
-  entry, tap-to-cycle, exit and persistence across a restart; `07-forecast.yaml`
-  for the framing toggle and for hiding/showing the second grid without
-  disturbing the first.
+  entry, corner-drag resize, exit and persistence across a restart;
+  `07-forecast.yaml` for the framing toggle and for hiding/showing the forecast
+  module without disturbing the others.
 - **The drag reorder is now automatable** — once the tiles wiggle a plain
   swipe moves them, so `06-arrange.yaml` asserts it (added with
   just-my-weather-csa). It has not actually run yet: Maestro's on-device

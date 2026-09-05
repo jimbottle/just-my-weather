@@ -38,11 +38,14 @@ object ViewConfigCodec {
         // Same defaulting story: configs written before an option existed
         // decode to that option's shipped default.
         //
-        // `mode` is the LEGACY key, kept read-only for migration: it held a
-        // screen-wide NOW/HOURLY/DAILY, where "now" meant no forecast at all.
-        // It is split on read into showForecast + forecastMode below and never
-        // written again, so a config saved by this build carries the new pair
-        // and an older one still opens the way its owner left it.
+        // `mode` and `showForecast` are LEGACY keys, kept read-only for
+        // migration. `mode` held a screen-wide NOW/HOURLY/DAILY, where "now"
+        // meant no forecast at all; `showForecast` was the switch that
+        // replaced that third state. Whether the forecast shows is now the
+        // forecast MODULE's visibility, like every other tile's, so both are
+        // folded on read into that module's entry (see [withLegacyForecast])
+        // and never written again. `forecastMode` — which framing it opens
+        // on — is still a real option and is still written.
         val mode: String? = null,
         val showForecast: Boolean? = null,
         val forecastMode: String? = null,
@@ -66,7 +69,6 @@ object ViewConfigCodec {
         json.encodeToString(
             StoredConfig(
                 density = config.density.key,
-                showForecast = config.showForecast,
                 forecastMode = config.defaultForecastMode.key,
                 dailyStyle = config.dailyStyle.key,
                 alertBannerPosition = config.alertBannerPosition.key,
@@ -118,14 +120,13 @@ object ViewConfigCodec {
         val bannerPosition = AlertBannerPosition.byKey(stored.alertBannerPosition) ?: AlertBannerPosition.DEFAULT
         val (showForecast, forecastMode) = stored.forecastChoice()
         return ViewConfig.normalized(
-            // Fold the retired screen-wide sun switch into the module, unless
-            // this config already carries a "sun" entry of its own — a config
+            // Fold the retired screen-wide switches into their modules, unless
+            // this config already carries the module's own entry — a config
             // written by THIS build is the authority on its own layout, and a
-            // leftover `showSunTimes` must not re-show a tile the user has
-            // since hidden.
-            settings.withLegacySunTimes(stored.showSunTimes),
+            // leftover legacy key must not re-show a tile the user has since
+            // hidden.
+            settings.withLegacySunTimes(stored.showSunTimes).withLegacyForecast(showForecast),
             density,
-            showForecast,
             forecastMode,
             DailyStyle.byKey(stored.dailyStyle) ?: DailyStyle.DEFAULT,
             bannerPosition,
@@ -171,18 +172,32 @@ object ViewConfigCodec {
     }
 
     /**
-     * Resolve "does the forecast show, and in which framing" from either
-     * shape. The new pair wins when present; otherwise the legacy `mode` is
-     * split — "now" meant the forecast was hidden, and hourly/daily meant it
-     * was shown in that framing. Absent both (a config older than either), the
-     * shipped default: shown, hourly.
+     * A config with no "forecast" entry predates the forecast being a module.
+     * Its forecast was showing unless a legacy key said otherwise — the app
+     * has always shown one out of the box — so the module is appended
+     * visible, or hidden when [shown] says so. (normalize would append it
+     * hidden, which is right for every OTHER newly-added module but would
+     * silently switch off a forecast everyone had.)
      */
-    private fun StoredConfig.forecastChoice(): Pair<Boolean, ForecastMode> {
+    private fun List<ModuleSetting>.withLegacyForecast(shown: Boolean?): List<ModuleSetting> {
+        if (any { it.module == ModuleKey.Forecast }) return this
+        return this + ModuleSetting(ModuleKey.Forecast, visible = shown ?: true)
+    }
+
+    /**
+     * Resolve "was the forecast showing, and in which framing" from either
+     * legacy shape. `showForecast` wins when present; otherwise the older
+     * screen-wide `mode` is split — "now" meant the forecast was hidden, and
+     * hourly/daily meant it was shown in that framing. Absent both, the
+     * showing is unknown (null: the module entry, or the default, decides)
+     * and the framing is the shipped one.
+     */
+    private fun StoredConfig.forecastChoice(): Pair<Boolean?, ForecastMode> {
         showForecast?.let { shown ->
             return shown to (forecastMode?.let(ForecastMode::byKey) ?: ForecastMode.DEFAULT)
         }
         return when (mode) {
-            null -> true to ForecastMode.DEFAULT
+            null -> null to (forecastMode?.let(ForecastMode::byKey) ?: ForecastMode.DEFAULT)
             "now" -> false to ForecastMode.DEFAULT
             else -> true to (ForecastMode.byKey(mode) ?: ForecastMode.DEFAULT)
         }

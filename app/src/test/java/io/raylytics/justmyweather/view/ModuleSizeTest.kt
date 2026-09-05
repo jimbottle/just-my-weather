@@ -22,7 +22,7 @@ class ModuleSizeTest {
         assertTrue(ModuleSize(4, 3).fits(min))
         assertFalse(ModuleSize(1, 1).fits(min), "below the floor")
         assertFalse(ModuleSize(5, 1).fits(min), "wider than the grid")
-        assertFalse(ModuleSize(2, 4).fits(min), "taller than allowed")
+        assertFalse(ModuleSize(2, 5).fits(min), "taller than allowed")
         assertFalse(ModuleSize(2, 0).fits(min), "no rows at all")
     }
 
@@ -30,7 +30,7 @@ class ModuleSizeTest {
     fun `clamp lands on the nearest legal size`() {
         val min = ModuleSize(2, 1)
         assertEquals(ModuleSize(2, 1), ModuleSize(0, -3).clamp(min))
-        assertEquals(ModuleSize(4, 3), ModuleSize(9, 9).clamp(min))
+        assertEquals(ModuleSize(4, 4), ModuleSize(9, 9).clamp(min))
         assertEquals(ModuleSize(3, 2), ModuleSize(3, 2).clamp(min))
         // A nonsense floor (config is user data) is itself brought into the
         // lattice before it is applied.

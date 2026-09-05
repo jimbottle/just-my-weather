@@ -28,12 +28,15 @@ class GridPackingTest {
     }
 
     @Test
-    fun `the default config packs to hero row then conditions row`() {
-        val rows = packGridRows(ViewConfig.DEFAULT.visible) { it.size.columns }
+    fun `the default config packs to hero, conditions, then the forecast, each on its own rows`() {
+        val placed = packGrid(ViewConfig.DEFAULT.visible) { it.size }
         assertEquals(
-            listOf(listOf(reading(WeatherField.TEMPERATURE)), listOf(reading(WeatherField.CONDITIONS))),
-            rows.map { row -> row.map { it.module } },
+            listOf(reading(WeatherField.TEMPERATURE), reading(WeatherField.CONDITIONS), ModuleKey.Forecast),
+            placed.map { it.item.module },
         )
+        // 4×2 hero on rows 0–1, the half-width conditions on row 2, the
+        // full-width forecast under it from row 3.
+        assertEquals(listOf(0 to 0, 0 to 2, 0 to 3), placed.map { it.column to it.row })
     }
 
     // ---- the lattice ----

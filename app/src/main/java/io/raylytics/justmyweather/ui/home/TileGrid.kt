@@ -56,7 +56,7 @@ internal val TILE_MIN_HEIGHT = 64.dp
 internal val GRID_MAX_WIDTH = 480.dp
 
 /**
- * Pack [items] into rows of [ModuleSize.COLUMNS] and draw them.
+ * Pack [items] into rows of [gridColumns] and draw them.
  *
  * The packing itself is pure and lives in `view/packGridRows`; this only turns
  * its rows into Compose. A row's leftover columns become a [Spacer] rather than
@@ -70,13 +70,17 @@ internal val GRID_MAX_WIDTH = 480.dp
 @Composable
 internal fun <T> TileGrid(
     items: List<T>,
-    /** How many of the four columns an item spans. */
+    /** How many columns an item spans. */
     columns: (T) -> Int,
     gap: Dp,
     modifier: Modifier = Modifier,
+    /** How many columns the grid has. Four across the page; inside a
+     * forecast module, the module's own width in cells — so a one-column
+     * item here is exactly one lattice cell wide, wherever the grid sits. */
+    gridColumns: Int = ModuleSize.COLUMNS,
     tile: @Composable (item: T, index: Int, tileModifier: Modifier) -> Unit,
 ) {
-    val rows = packGridRows(items, span = columns)
+    val rows = packGridRows(items, gridColumns, columns)
     var index = 0
     Column(verticalArrangement = Arrangement.spacedBy(gap), modifier = modifier) {
         rows.forEach { row ->
@@ -95,7 +99,7 @@ internal fun <T> TileGrid(
                         Modifier.weight(columns(item).toFloat()).fillMaxHeight(),
                     )
                 }
-                val leftover = (ModuleSize.COLUMNS - row.sumOf { columns(it) }).coerceAtLeast(0)
+                val leftover = (gridColumns - row.sumOf { columns(it) }).coerceAtLeast(0)
                 if (leftover > 0) Spacer(Modifier.weight(leftover.toFloat()))
             }
         }

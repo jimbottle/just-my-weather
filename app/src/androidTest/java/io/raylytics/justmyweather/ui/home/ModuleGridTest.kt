@@ -17,7 +17,9 @@ import androidx.compose.ui.unit.DpRect
 import androidx.compose.ui.unit.dp
 import io.raylytics.justmyweather.data.SunDay
 import io.raylytics.justmyweather.ui.theme.JustMyWeatherTheme
+import io.raylytics.justmyweather.view.DailyStyle
 import io.raylytics.justmyweather.view.Density
+import io.raylytics.justmyweather.view.ForecastMode
 import io.raylytics.justmyweather.view.ModuleContent
 import io.raylytics.justmyweather.view.ModuleKey
 import io.raylytics.justmyweather.view.ModuleSize
@@ -74,6 +76,7 @@ class ModuleGridTest {
                         onStartArranging = {},
                         onResize = { field, size -> resizes += field to size },
                         onMove = { field, index -> moves += field to index },
+                        onSetForecastMode = {},
                     )
                 }
             }
@@ -96,6 +99,15 @@ class ModuleGridTest {
                 when (key) {
                     is ModuleKey.Reading -> ModuleContent.Reading("—")
                     ModuleKey.Sun -> ModuleContent.Sun(sunDays, ZoneId.systemDefault())
+                    ModuleKey.Forecast ->
+                        ModuleContent.Forecast(
+                            hours = null,
+                            periods = null,
+                            error = null,
+                            mode = ForecastMode.DEFAULT,
+                            dailyStyle = DailyStyle.DEFAULT,
+                            zone = ZoneId.systemDefault(),
+                        )
                 },
         )
 
@@ -323,6 +335,26 @@ class ModuleGridTest {
         // grid of one would be offering to reorder nothing.
         show(module(WeatherField.TEMPERATURE, 4, 2))
         assertEquals(listOf("Narrower", "Taller", "Shorter"), actionsOn(WeatherField.TEMPERATURE).map { it.label })
+    }
+
+    @Test
+    fun theForecastIsATileWithTheSameActionsAndItsOwnHeader() {
+        // The ask: every tile carries the same interaction. So the forecast
+        // module offers the same move and resize actions as a reading, and
+        // draws its framing toggle inside its own tile.
+        show(
+            module(WeatherField.TEMPERATURE, 4, 2),
+            module(ModuleKey.Forecast, 4, 4),
+        )
+        val actions = actionsOn(ModuleKey.Forecast).map { it.label }
+        assertTrue("$actions", "Move up" in actions && "Narrower" in actions && "Shorter" in actions)
+        assertTrue("$actions", "Wider" !in actions && "Taller" !in actions)
+        compose.onNodeWithTag("forecast_hourly", useUnmergedTree = true).assertIsDisplayed()
+        compose.onNodeWithTag("forecast_daily", useUnmergedTree = true).assertIsDisplayed()
+        // Four rows of cells: the tallest tile on the grid, about twice the hero.
+        val hero = compose.onNodeWithTag("module_temperature").getUnclippedBoundsInRoot()
+        val forecast = compose.onNodeWithTag("module_forecast").getUnclippedBoundsInRoot()
+        assertTrue("4×4 is about twice a 4×2", forecast.height() > hero.height() * 1.8f)
     }
 
     @Test

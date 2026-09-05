@@ -47,6 +47,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import io.raylytics.justmyweather.view.ForecastMode
 import io.raylytics.justmyweather.view.ModuleContent
 import io.raylytics.justmyweather.view.ModuleKey
 import io.raylytics.justmyweather.view.ModuleSize
@@ -182,6 +183,8 @@ internal fun ModuleGrid(
     onResize: (ModuleKey, ModuleSize) -> Unit,
     /** Move a module so it lands at this index among the visible ones. */
     onMove: (ModuleKey, Int) -> Unit,
+    /** The forecast module's own option: which framing it shows. */
+    onSetForecastMode: (ForecastMode) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val haptics = LocalHapticFeedback.current
@@ -501,6 +504,7 @@ internal fun ModuleGrid(
             lastIndex = modules.lastIndex,
             onMove = onMove,
             onResize = onResize,
+            onSetForecastMode = onSetForecastMode,
             module = module,
             arranging = arranging,
             spec = spec,
@@ -598,6 +602,7 @@ private fun ModuleTile(
     lastIndex: Int,
     onMove: (ModuleKey, Int) -> Unit,
     onResize: (ModuleKey, ModuleSize) -> Unit,
+    onSetForecastMode: (ForecastMode) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val borderColor =
@@ -610,8 +615,8 @@ private fun ModuleTile(
         }
     // A full-width tile drops its label — the content is big enough to speak
     // for itself, as the old hero did, and the sun table brings its own column
-    // headings.
-    val showLabel = module.size.columns != ModuleSize.COLUMNS
+    // headings. The forecast draws its own header, with its toggle in it.
+    val showLabel = module.size.columns != ModuleSize.COLUMNS && module.content !is ModuleContent.Forecast
     val size = module.size
     val min = module.module.minSize
     val handleColor = MaterialTheme.colorScheme.primary
@@ -698,6 +703,18 @@ private fun ModuleTile(
                         }
                 },
     ) {
+        // The forecast fills its tile edge to edge — it is a grid with a
+        // header, not a value to centre — so it skips the label column.
+        if (module.content is ModuleContent.Forecast) {
+            ForecastModuleContent(
+                content = module.content,
+                columns = module.size.columns,
+                gap = spec.moduleGap,
+                arranging = arranging,
+                onSetMode = onSetForecastMode,
+            )
+            return@TileShell
+        }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             if (showLabel) {
                 // Fitted like the value, on one line: "Temperature" does not
@@ -733,6 +750,8 @@ private fun ModuleTile(
                 // pair when smaller. See SunModule.kt for why that is
                 // adaptation rather than two designs.
                 is ModuleContent.Sun -> SunModuleContent(days = content.days, size = module.size, zone = content.zone)
+                // Handled above: the forecast takes the whole shell.
+                is ModuleContent.Forecast -> Unit
             }
         }
     }

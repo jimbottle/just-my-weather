@@ -37,12 +37,15 @@ class ViewConfigCodecTest {
         val restored = ViewConfigCodec.decode(ViewConfigCodec.encode(original))
         assertEquals(ForecastMode.DAILY, restored.defaultForecastMode)
         assertEquals(DailyStyle.HALF_DAY, restored.dailyStyle)
-        assertTrue(restored.showForecast)
+        assertTrue(restored.shows(ModuleKey.Forecast))
 
-        val hidden = ViewConfigCodec.decode(ViewConfigCodec.encode(original.setShowForecast(false)))
-        assertFalse(hidden.showForecast)
-        // Hiding the grid must not forget which framing to reopen on.
+        val hidden = ViewConfigCodec.decode(ViewConfigCodec.encode(original.toggle(ModuleKey.Forecast)))
+        assertFalse(hidden.shows(ModuleKey.Forecast))
+        // Hiding the module must not forget which framing to reopen on.
         assertEquals(ForecastMode.DAILY, hidden.defaultForecastMode)
+        // And the switch is the module's own visibility now: the retired key
+        // is not written.
+        assertTrue(!ViewConfigCodec.encode(original).contains("showForecast"))
     }
 
     @Test
@@ -53,13 +56,13 @@ class ViewConfigCodecTest {
         fun decode(mode: String) =
             ViewConfigCodec.decode("""{"mode":"$mode","items":[{"key":"temperature","visible":true}]}""")
 
-        assertFalse(decode("now").showForecast, "now meant no forecast")
-        assertTrue(decode("hourly").showForecast)
+        assertFalse(decode("now").shows(ModuleKey.Forecast), "now meant no forecast")
+        assertTrue(decode("hourly").shows(ModuleKey.Forecast))
         assertEquals(ForecastMode.HOURLY, decode("hourly").defaultForecastMode)
-        assertTrue(decode("daily").showForecast)
+        assertTrue(decode("daily").shows(ModuleKey.Forecast))
         assertEquals(ForecastMode.DAILY, decode("daily").defaultForecastMode)
         // An unknown legacy mode still means "a forecast was showing".
-        assertTrue(decode("biweekly").showForecast)
+        assertTrue(decode("biweekly").shows(ModuleKey.Forecast))
         assertEquals(ForecastMode.DEFAULT, decode("biweekly").defaultForecastMode)
     }
 
@@ -71,14 +74,32 @@ class ViewConfigCodecTest {
         val both =
             """{"mode":"now","showForecast":true,"forecastMode":"daily",
                "items":[{"key":"temperature","visible":true}]}"""
-        assertTrue(ViewConfigCodec.decode(both).showForecast)
+        assertTrue(ViewConfigCodec.decode(both).shows(ModuleKey.Forecast))
         assertEquals(ForecastMode.DAILY, ViewConfigCodec.decode(both).defaultForecastMode)
 
         // Older than either key: the shipped default, which shows an hourly
         // forecast — what the app has always done out of the box.
         val neither = """{"density":"comfortable","items":[{"key":"temperature","visible":true}]}"""
-        assertTrue(ViewConfigCodec.decode(neither).showForecast)
+        assertTrue(ViewConfigCodec.decode(neither).shows(ModuleKey.Forecast))
         assertEquals(ForecastMode.DEFAULT, ViewConfigCodec.decode(neither).defaultForecastMode)
+    }
+
+    @Test
+    fun `a config with its own forecast entry is the authority over the legacy switch`() {
+        // A config written by this build carries the module; a leftover
+        // `showForecast:true` from before must not re-show a forecast the user
+        // has since hidden — and the module's stored size comes through.
+        val stored =
+            """{"showForecast":true,"items":[
+                {"key":"temperature","visible":true},
+                {"key":"forecast","visible":false,"columns":2,"rows":3}
+            ]}"""
+        val config = ViewConfigCodec.decode(stored)
+        assertFalse(config.shows(ModuleKey.Forecast))
+        assertEquals(ModuleSize(2, 3), config.items.first { it.module == ModuleKey.Forecast }.size)
+        // With no entry, the legacy switch decides — off stays off.
+        val legacyOff = """{"showForecast":false,"items":[{"key":"temperature","visible":true}]}"""
+        assertFalse(ViewConfigCodec.decode(legacyOff).shows(ModuleKey.Forecast))
     }
 
     @Test
@@ -103,7 +124,7 @@ class ViewConfigCodecTest {
                "items":[{"key":"temperature","visible":true}]}"""
         val config = ViewConfigCodec.decode(legacy)
         assertEquals(ForecastMode.DAILY, config.defaultForecastMode)
-        assertTrue(config.showForecast)
+        assertTrue(config.shows(ModuleKey.Forecast))
     }
 
     @Test

@@ -53,8 +53,6 @@ class CustomizeViewModel(
 
     fun setDensity(density: Density) = edit { it.setDensity(density) }
 
-    fun setShowForecast(show: Boolean) = edit { it.setShowForecast(show) }
-
     fun setDefaultForecastMode(mode: ForecastMode) = edit { it.setDefaultForecastMode(mode) }
 
     fun setDailyStyle(style: DailyStyle) = edit { it.setDailyStyle(style) }

@@ -7,7 +7,8 @@ package io.raylytics.justmyweather.view
  * the [WeatherField] catalog — a number or a phrase measured at a station —
  * while [Sun] is worked out on the device from the date and where you are, has
  * no threshold you could sensibly alert on, and draws a table rather than a
- * value. Forcing it into `WeatherField` would have bent that enum's contract
+ * value, and [Forecast] is a whole grid of NWS's model output with a framing
+ * toggle of its own. Forcing it into `WeatherField` would have bent that enum's contract
  * ("how to render its value from a WeatherSnapshot") and put a nonsense entry
  * in the alert builder, which iterates `WeatherField` on purpose.
  *
@@ -60,10 +61,30 @@ sealed interface ModuleKey {
         override val minSize: ModuleSize get() = ModuleSize(2, 1)
     }
 
+    /**
+     * The forecast: hours or days ahead, from NWS's model rather than a
+     * station. A module like any other so it is moved and resized with the
+     * same drag and corner as a reading — the user asked for every tile to
+     * carry the same interaction, and a fixed section under the grid did not.
+     */
+    data object Forecast : ModuleKey {
+        override val key: String get() = "forecast"
+        override val defaultLabel: String get() = "Forecast"
+
+        /** The full width and four rows: a header plus two rows of hour tiles,
+         * which is what "a day at a glance" needs before scrolling. */
+        override val defaultSize: ModuleSize get() = ModuleSize(4, 4)
+
+        /** Two cells across is two hour tiles (or one day tile) per row; two
+         * down is the header and one row of them. Smaller has no forecast in
+         * it. */
+        override val minSize: ModuleSize get() = ModuleSize(2, 2)
+    }
+
     companion object {
         /** Every module, in the order a fresh config lists them: the station's
-         * readings first, then the computed extras. */
-        val catalog: List<ModuleKey> = WeatherField.entries.map(::Reading) + Sun
+         * readings first, then the computed extras, then the forecast. */
+        val catalog: List<ModuleKey> = WeatherField.entries.map(::Reading) + Sun + Forecast
 
         fun byKey(key: String): ModuleKey? = catalog.firstOrNull { it.key == key }
     }
