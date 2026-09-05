@@ -67,6 +67,7 @@ Requires JDK 17+ and the Android SDK (`local.properties` → `sdk.dir`). Uses th
 Gradle wrapper — no global Gradle needed.
 
 ```bash
+scripts/verify.sh                   # the whole JVM gate; --fix formats first
 ./gradlew :app:testDebugUnitTest    # fast: JVM unit tests (JUnit 5)
 ./gradlew :app:ktlintCheck          # style gate
 ./gradlew :app:ktlintFormat         # auto-fix style
