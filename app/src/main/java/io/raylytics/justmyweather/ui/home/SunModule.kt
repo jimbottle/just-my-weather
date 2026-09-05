@@ -11,6 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import io.raylytics.justmyweather.data.SunDay
@@ -122,20 +123,28 @@ private fun SunPair(day: SunDay, zone: ZoneId) {
     }
 }
 
-/** Today's pair, side by side, for a one-row tile: each time under its word,
- * the two sharing the width the way the table's columns would. */
+/**
+ * Today's pair, side by side, for a one-row tile: each time under its word,
+ * the two sharing the width the way the table's columns would.
+ *
+ * The times take a step down from the stacked form's size: two "12:00 AM"s at
+ * titleMedium are wider than the two-cell tile this form is the floor for,
+ * and on a phone they met in the middle ("7:16 AM8:06 PM"). Each half gets
+ * exactly half the width, so a long time cannot push the other aside.
+ */
 @Composable
 private fun SunPairRow(day: SunDay, zone: ZoneId) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceEvenly,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            SunPairLine("Sunrise", day.sunrise, zone, MaterialTheme.colorScheme.onBackground)
+        val timeStyle = MaterialTheme.typography.bodyLarge
+        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
+            SunPairLine("Sunrise", day.sunrise, zone, MaterialTheme.colorScheme.onBackground, timeStyle)
         }
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            SunPairLine("Sunset", day.sunset, zone, MaterialTheme.colorScheme.onSurfaceVariant)
+        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
+            SunPairLine("Sunset", day.sunset, zone, MaterialTheme.colorScheme.onSurfaceVariant, timeStyle)
         }
     }
 }
@@ -146,6 +155,7 @@ private fun SunPairLine(
     event: Instant?,
     zone: ZoneId,
     color: Color,
+    timeStyle: TextStyle = MaterialTheme.typography.titleMedium,
 ) {
     Text(
         text = label,
@@ -154,7 +164,7 @@ private fun SunPairLine(
     )
     Text(
         text = event?.atZone(zone)?.format(timeFormat) ?: "—",
-        style = MaterialTheme.typography.titleMedium,
+        style = timeStyle,
         color = color,
         maxLines = 1,
     )
