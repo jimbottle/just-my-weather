@@ -19,9 +19,15 @@ object ViewConfigCodec {
         val key: String,
         val visible: Boolean,
         val label: String? = null,
-        // Defaulted null so a config written before modules had widths decodes;
-        // null (or an unknown key) resolves to the field's own default span.
+        // LEGACY, read-only: the width token from when a module had one of
+        // three widths and no height. Folded into columns/rows on read (see
+        // [legacySize]) and never written again.
         val span: String? = null,
+        // Defaulted null so a config written before modules had sizes decodes;
+        // either missing resolves to the module's own default. An out-of-range
+        // value is clamped, not rejected: config is user data.
+        val columns: Int? = null,
+        val rows: Int? = null,
     )
 
     @Serializable
@@ -64,7 +70,16 @@ object ViewConfigCodec {
                 forecastMode = config.defaultForecastMode.key,
                 dailyStyle = config.dailyStyle.key,
                 alertBannerPosition = config.alertBannerPosition.key,
-                items = config.items.map { StoredSetting(it.module.key, it.visible, it.customLabel, it.span.key) },
+                items =
+                    config.items.map {
+                        StoredSetting(
+                            key = it.module.key,
+                            visible = it.visible,
+                            label = it.customLabel,
+                            columns = it.size.columns,
+                            rows = it.size.rows,
+                        )
+                    },
             ),
         )
 
@@ -90,8 +105,7 @@ object ViewConfigCodec {
         val settings =
             stored.items.mapNotNull { s ->
                 ModuleKey.byKey(s.key)?.let { module ->
-                    val span = s.span?.let(ModuleSpan::byKey) ?: module.defaultSpan
-                    ModuleSetting(module, s.visible, s.label, span)
+                    ModuleSetting(module, s.visible, s.label, s.size(module))
                 }
             }
         // No recognised settings means this wasn't really a config — an empty or
@@ -117,6 +131,39 @@ object ViewConfigCodec {
             bannerPosition,
         )
     }
+
+    /**
+     * The stored footprint, in order of authority: explicit columns/rows from
+     * this build; else the legacy width token; else the module's default.
+     * Whatever the source, the result is clamped to the module's minimum and
+     * the lattice, so a size this build cannot draw never reaches the grid.
+     */
+    private fun StoredSetting.size(module: ModuleKey): ModuleSize {
+        val default = module.defaultSize
+        val stored =
+            when {
+                columns != null || rows != null -> ModuleSize(columns ?: default.columns, rows ?: default.rows)
+                span != null -> legacySize(span, module)
+                else -> default
+            }
+        return stored.clamp(module.minSize)
+    }
+
+    /**
+     * A width-only config's footprint. Widths carry over as columns. Rows did
+     * not exist — a row was as tall as its content — so a module at (or above)
+     * its default width keeps the default's height, which is the height that
+     * content needed (the hero temperature and the sun table are the two-row
+     * cases), and anything narrower was a one-liner and stays one row. An
+     * unknown token (a size some other build knew) falls back to the default.
+     */
+    private fun legacySize(span: String, module: ModuleKey): ModuleSize {
+        val default = module.defaultSize
+        val columns = LEGACY_SPAN_COLUMNS[span] ?: return default
+        return ModuleSize(columns, rows = if (columns >= default.columns) default.rows else 1)
+    }
+
+    private val LEGACY_SPAN_COLUMNS = mapOf("quarter" to 1, "half" to 2, "full" to 4)
 
     private fun List<ModuleSetting>.withLegacySunTimes(showSunTimes: Boolean): List<ModuleSetting> {
         if (!showSunTimes || any { it.module == ModuleKey.Sun }) return this

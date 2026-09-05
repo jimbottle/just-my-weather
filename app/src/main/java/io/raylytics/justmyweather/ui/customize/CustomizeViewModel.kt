@@ -9,7 +9,7 @@ import io.raylytics.justmyweather.view.DailyStyle
 import io.raylytics.justmyweather.view.Density
 import io.raylytics.justmyweather.view.ForecastMode
 import io.raylytics.justmyweather.view.ModuleKey
-import io.raylytics.justmyweather.view.ModuleSpan
+import io.raylytics.justmyweather.view.ModuleSize
 import io.raylytics.justmyweather.view.ViewConfig
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -45,7 +45,7 @@ class CustomizeViewModel(
 
     fun relabel(module: ModuleKey, label: String?) = edit { it.relabel(module, label) }
 
-    fun setSpan(module: ModuleKey, span: ModuleSpan) = edit { it.setSpan(module, span) }
+    fun resize(module: ModuleKey, size: ModuleSize) = edit { it.resize(module, size) }
 
     fun moveUp(index: Int) = edit { it.moveUp(index) }
 

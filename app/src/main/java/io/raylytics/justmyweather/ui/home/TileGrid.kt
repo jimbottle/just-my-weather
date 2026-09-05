@@ -20,17 +20,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import io.raylytics.justmyweather.view.ModuleSpan
+import io.raylytics.justmyweather.view.ModuleSize
 import io.raylytics.justmyweather.view.packGridRows
 
 /*
- * The grid engine, shared by the two grids this screen has: the glance
- * (ModuleGrid — arrangeable) and the forecast (ForecastGrid — data-driven).
- * One engine is the point: a tile is a tile wherever it appears, so the screen
- * reads as one system rather than two things that happen to use rectangles,
- * and "how wide is a half tile" has exactly one answer.
+ * The flow-grid engine and the tile shell. The forecast grid (ForecastGrid —
+ * data-driven) packs its tiles here in rows as tall as their content; the
+ * glance (ModuleGrid — arrangeable) packs onto the fixed lattice in
+ * CellGrid.kt, because its tiles have a height in cells as well as a width.
+ * Both divide the same width into the same four columns and draw the same
+ * TileShell, so a tile is a tile wherever it appears: the screen reads as one
+ * system rather than two things that happen to use rectangles, and "how wide
+ * is a two-column tile" has exactly one answer.
  *
- * The engine deliberately owns layout only. Gestures, semantics and animation
+ * The engines deliberately own layout only. Gestures, semantics and animation
  * belong to whoever is drawing — the glance grid is arrangeable and the
  * forecast grid is not, and pushing that difference down here would make this
  * file the union of both instead of the part they share.
@@ -43,16 +46,17 @@ internal val TILE_CORNER = 10.dp
 /** Air between a tile's border and its content. */
 internal val TILE_PADDING = 10.dp
 
-/** Floor for a tile's height, so a quarter tile with a short value is still a
- * comfortable touch target for the glance grid's long-press. */
+/** Floor for a flow-grid tile's height, so a one-column tile with a short
+ * value is still a comfortable touch target. (A lattice tile's height is fixed
+ * by its cells and this floor yields to it.) */
 internal val TILE_MIN_HEIGHT = 64.dp
 
-/** Both grids stop growing here — on a tablet a quarter tile the width of a
- * phone screen stops being a tile. */
+/** Both grids stop growing here — on a tablet a one-column tile the width of
+ * a phone screen stops being a tile. */
 internal val GRID_MAX_WIDTH = 480.dp
 
 /**
- * Pack [items] into rows of [ModuleSpan.COLUMNS] and draw them.
+ * Pack [items] into rows of [ModuleSize.COLUMNS] and draw them.
  *
  * The packing itself is pure and lives in `view/packGridRows`; this only turns
  * its rows into Compose. A row's leftover columns become a [Spacer] rather than
@@ -66,15 +70,13 @@ internal val GRID_MAX_WIDTH = 480.dp
 @Composable
 internal fun <T> TileGrid(
     items: List<T>,
-    span: (T) -> ModuleSpan,
+    /** How many of the four columns an item spans. */
+    columns: (T) -> Int,
     gap: Dp,
     modifier: Modifier = Modifier,
-    /** Applied to the Row holding [row]'s tiles — the glance grid raises the
-     * row it is dragging above its neighbours this way. */
-    rowModifier: (row: List<T>) -> Modifier = { Modifier },
     tile: @Composable (item: T, index: Int, tileModifier: Modifier) -> Unit,
 ) {
-    val rows = packGridRows(items) { span(it).columns }
+    val rows = packGridRows(items, span = columns)
     var index = 0
     Column(verticalArrangement = Arrangement.spacedBy(gap), modifier = modifier) {
         rows.forEach { row ->
@@ -84,17 +86,16 @@ internal fun <T> TileGrid(
                     Modifier
                         .fillMaxWidth()
                         // Equal-height tiles per row, sized by the tallest.
-                        .height(IntrinsicSize.Min)
-                        .then(rowModifier(row)),
+                        .height(IntrinsicSize.Min),
             ) {
                 row.forEach { item ->
                     tile(
                         item,
                         index++,
-                        Modifier.weight(span(item).columns.toFloat()).fillMaxHeight(),
+                        Modifier.weight(columns(item).toFloat()).fillMaxHeight(),
                     )
                 }
-                val leftover = (ModuleSpan.COLUMNS - row.sumOf { span(it).columns }).coerceAtLeast(0)
+                val leftover = (ModuleSize.COLUMNS - row.sumOf { columns(it) }).coerceAtLeast(0)
                 if (leftover > 0) Spacer(Modifier.weight(leftover.toFloat()))
             }
         }

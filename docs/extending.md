@@ -22,10 +22,12 @@ reading needs nothing in the module catalog — `ModuleKey.Reading` wraps every
    ```
    Add branches to `numericValue`, `formatValue` (e.g. `"${value.roundToInt()}%"`),
    `format` if it needs special wording, `forecastValue` (return `null` unless
-   the forecast carries it — also flip `isForecastable` if it does), and
-   `defaultSpan` (how wide the module ships on the glance grid — quarter for a
-   short number, half for longer text). `isNumeric` is true for everything
-   except `CONDITIONS`, so it's alertable automatically.
+   the forecast carries it — also flip `isForecastable` if it does),
+   `defaultSize` (the footprint the module ships at on the glance lattice — a
+   single cell for a short number, 2×1 for longer text) and `minSize` (the
+   smallest the user may drag it to — one cell for anything that is a number
+   and a unit, wider for prose). `isNumeric` is true for everything except
+   `CONDITIONS`, so it's alertable automatically.
 2. **`data/WeatherSnapshot.kt`** — add `val humidityPct: Double?`.
 3. **`data/nws/`** — add the field to `NwsWire.ObservationProps`, project it in
    `NwsModels.CurrentObservation`, and read it in `NwsClient.getObservation`.
@@ -42,7 +44,8 @@ Sun times are the worked example: computed on the device, no threshold to alert
 on, and a table rather than a value.
 
 1. **`view/ModuleKey.kt`** — add a subtype. Give it a stable `key` (never rename
-   it), a `defaultLabel`, and a `defaultSpan`.
+   it), a `defaultLabel`, a `defaultSize` and a `minSize` (the floor the corner
+   drag stops at — size it to what the module has to say).
 2. **`view/ViewRender.kt`** — add a `ModuleContent` variant carrying whatever
    the tile needs to draw, and a branch in `render`. If the data is not in
    `WeatherSnapshot` (sun times are not), pass it into `render` as its own

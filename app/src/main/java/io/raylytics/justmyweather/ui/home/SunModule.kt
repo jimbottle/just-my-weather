@@ -14,21 +14,23 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import io.raylytics.justmyweather.data.SunDay
-import io.raylytics.justmyweather.view.ModuleSpan
+import io.raylytics.justmyweather.view.ModuleSize
 import java.time.Instant
 import java.time.ZoneId
 import java.util.Locale
 
 /*
- * The sun module's drawing, at each width it can be given.
+ * The sun module's drawing, at each size it can be given.
  *
  * Sun times are the one module whose content is a table rather than a value,
  * and the table is not decoration: between sunrise and sunset, "the next
  * sunrise" and "the next sunset" fall on different dates, so a row that
  * carries its own date says which is which without hanging a "tomorrow" off a
  * time. Rather than lose that by flattening it to fit a tile, the module
- * adapts — full width keeps the table, and narrower widths condense to today's
- * pair, where "today" is unambiguous because the label says so.
+ * adapts — the full-width, two-row tile keeps the table, and smaller tiles
+ * condense to today's pair, where "today" is unambiguous because the label
+ * says so. The pair itself takes the shape of its tile: side by side in a
+ * one-row tile, stacked in a taller one.
  */
 
 /** Width of each sun-time column, sized for "12:00 AM" at titleMedium so the
@@ -39,7 +41,7 @@ private val SUN_COLUMN_WIDTH = 92.dp
 @Composable
 internal fun SunModuleContent(
     days: List<SunDay>,
-    span: ModuleSpan,
+    size: ModuleSize,
     /** The PLACE's zone, not the device's — see ModuleContent.Sun. */
     zone: ZoneId,
 ) {
@@ -53,9 +55,14 @@ internal fun SunModuleContent(
         )
         return
     }
-    when (span) {
-        ModuleSpan.FULL -> SunTimesTable(days, zone)
-        ModuleSpan.HALF, ModuleSpan.QUARTER -> SunPair(days.first(), zone)
+    when {
+        // The table needs the whole width for its three columns and two rows
+        // of cells for its heading plus two days.
+        size.columns == ModuleSize.COLUMNS && size.rows >= 2 -> SunTimesTable(days, zone)
+        // One row of cells is too short to stack two labelled times; two
+        // cells wide (the module's minimum) is room for them side by side.
+        size.rows == 1 -> SunPairRow(days.first(), zone)
+        else -> SunPair(days.first(), zone)
     }
 }
 
@@ -71,7 +78,7 @@ internal fun SunModuleContent(
 internal fun SunTimesTable(days: List<SunDay>, zone: ZoneId = ZoneId.systemDefault()) {
     Column(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         // Column headings once at the top, not repeated per row: with two
         // values a row this is a small table, and repeating the words would
@@ -97,7 +104,8 @@ internal fun SunTimesTable(days: List<SunDay>, zone: ZoneId = ZoneId.systemDefau
 }
 
 /**
- * Today's pair, for a tile too narrow for the table.
+ * Today's pair, stacked, for a tile too small for the table but taller than
+ * one row.
  *
  * Each time keeps its own word rather than an arrow or an icon: "Sunrise" and
  * "Sunset" survive being read aloud, and at this size there is no column
@@ -111,6 +119,24 @@ private fun SunPair(day: SunDay, zone: ZoneId) {
     ) {
         SunPairLine("Sunrise", day.sunrise, zone, MaterialTheme.colorScheme.onBackground)
         SunPairLine("Sunset", day.sunset, zone, MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+/** Today's pair, side by side, for a one-row tile: each time under its word,
+ * the two sharing the width the way the table's columns would. */
+@Composable
+private fun SunPairRow(day: SunDay, zone: ZoneId) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceEvenly,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            SunPairLine("Sunrise", day.sunrise, zone, MaterialTheme.colorScheme.onBackground)
+        }
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            SunPairLine("Sunset", day.sunset, zone, MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 }
 
@@ -130,6 +156,7 @@ private fun SunPairLine(
         text = event?.atZone(zone)?.format(timeFormat) ?: "—",
         style = MaterialTheme.typography.titleMedium,
         color = color,
+        maxLines = 1,
     )
 }
 

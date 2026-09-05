@@ -17,7 +17,6 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.State
@@ -30,6 +29,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.graphicsLayer
@@ -38,28 +38,30 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import io.raylytics.justmyweather.view.ModuleContent
 import io.raylytics.justmyweather.view.ModuleKey
-import io.raylytics.justmyweather.view.ModuleSpan
+import io.raylytics.justmyweather.view.ModuleSize
 import io.raylytics.justmyweather.view.ModuleValue
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 /*
  * The modular glance: every visible field as a bordered tile on a 4-column
- * flow grid, plus the launcher-style gestures that rearrange it. All the
- * gesture and animation machinery is deliberately confined to this file — the
- * geometry it acts on (spans, row packing, reorder transforms) is pure Kotlin
- * in view/, and the rest of the app only ever sees a ViewConfig change.
+ * lattice, plus the launcher-style gestures that rearrange and resize it. All
+ * the gesture and animation machinery is deliberately confined to this file —
+ * the geometry it acts on (sizes, cell packing, reorder transforms) is pure
+ * Kotlin in view/, and the rest of the app only ever sees a ViewConfig change.
  * docs/modular-v2-evaluation.md holds the criteria this design is judged by.
  */
 
@@ -80,8 +82,41 @@ private const val WIGGLE_PERIOD_MS = 160
  */
 private enum class DragOwner { LONG_PRESS, IMMEDIATE }
 
+/**
+ * What a drag is doing to its tile. Decided where the finger landed: on the
+ * corner handle it resizes, anywhere else on the tile it moves. One drag is
+ * one or the other for its whole life.
+ */
+private enum class DragKind { MOVE, RESIZE }
+
 /** The dragged tile lifts slightly, the way a launcher icon does. */
 private const val DRAG_SCALE = 1.04f
+
+/** The resize handle: a dot on the tile's bottom-right corner. */
+private val HANDLE_RADIUS = 6.dp
+
+/** How far the handle's dot sits inside the corner, so it rides the border's
+ * curve rather than floating off the tile. */
+private val HANDLE_INSET = 3.dp
+
+/**
+ * The region around a tile's bottom-right corner that starts a resize instead
+ * of a move: this far INSIDE the corner along each edge, and [HANDLE_REACH]
+ * outside it. Far bigger than the dot it surrounds: the dot is what to aim
+ * at, this is what a thumb actually lands on.
+ */
+private val HANDLE_HIT = 40.dp
+
+/**
+ * How far past the corner the handle still catches. A drag's start is not the
+ * finger's landing point but where it crossed the touch slop, which for a
+ * growing drag is down-and-right of the dot — outside the tile — by the slop
+ * plus whatever a fast finger covered in the frame that crossed it. Verified
+ * on-device: with only half a gap of reach, a grow from the dot missed and
+ * was taken for a move. The cost is a thin strip of the neighbour's corner
+ * that resizes this tile instead of moving that one.
+ */
+private val HANDLE_REACH = 24.dp
 
 /**
  * How a tile lifts, settles and slides: a firm spring with no bounce. Quick
@@ -112,11 +147,13 @@ private class TileMotion {
  * grid exists.
  *
  * Arrange mode is the launcher's grammar: long-press any tile to enter (tiles
- * wiggle, borders take the accent), and the same hold flows straight into a
- * drag. While arranging, tap a tile to cycle its width and long-press-drag to
- * reorder. Every edit lands as a
+ * wiggle, borders take the accent, a handle appears on every corner), and the
+ * same hold flows straight into a drag. While arranging, drag a tile to move
+ * it and drag its bottom-right corner to resize it — the corner snaps to
+ * cells as the finger draws the rectangle, and stops at the module's own
+ * minimum. Every edit lands as a
  * [ViewConfig][io.raylytics.justmyweather.view.ViewConfig] transform through
- * [onMove]/[onCycleSpan], so a drag persists like any other customization —
+ * [onMove]/[onResize], so a drag persists like any other customization —
  * there is no separate "editing copy" to commit or lose.
  *
  * All pointer detection lives on the GRID, not the tiles, with tiles found by
@@ -140,13 +177,19 @@ internal fun ModuleGrid(
     arranging: Boolean,
     spec: DensitySpec,
     onStartArranging: () -> Unit,
-    onCycleSpan: (ModuleKey) -> Unit,
+    /** Give a module this footprint. The config clamps it to the module's
+     * minimum, so the grid asks for whatever the finger drew. */
+    onResize: (ModuleKey, ModuleSize) -> Unit,
     /** Move a module so it lands at this index among the visible ones. */
     onMove: (ModuleKey, Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val haptics = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
+    val density = LocalDensity.current
+    val gapPx = with(density) { spec.moduleGap.toPx() }
+    val handleHitPx = with(density) { HANDLE_HIT.toPx() }
+    val handleReachPx = with(density) { HANDLE_REACH.toPx() }
 
     // The gesture coroutines below live in pointerInput(Unit) — never
     // restarted, so they cannot lose a gesture — which means everything they
@@ -154,7 +197,7 @@ internal fun ModuleGrid(
     val currentModules by rememberUpdatedState(modules)
     val isArranging by rememberUpdatedState(arranging)
     val startArranging by rememberUpdatedState(onStartArranging)
-    val cycleSpan by rememberUpdatedState(onCycleSpan)
+    val resize by rememberUpdatedState(onResize)
     val move by rememberUpdatedState(onMove)
 
     // Drag state. Positions are all in window-root coordinates — one shared
@@ -163,7 +206,13 @@ internal fun ModuleGrid(
     // reorder, which is what keeps the dragged tile anchored under the finger
     // when its slot (and therefore its layout position) changes mid-drag.
     var dragged by remember { mutableStateOf<ModuleKey?>(null) }
+    var dragKind by remember { mutableStateOf<DragKind?>(null) }
     var grabOffset by remember { mutableStateOf(Offset.Zero) }
+    // A resize measures the rectangle the finger has drawn from the tile's
+    // top-left AS IT WAS when the drag began. Growing a tile can move it (it
+    // no longer fits where it sat and re-packs onto the next row); measuring
+    // from where it is now would then change the answer under a still finger.
+    var resizeOrigin by remember { mutableStateOf(Offset.Zero) }
     var dragPosition by remember { mutableStateOf(Offset.Zero) }
     val bounds = remember { mutableStateMapOf<ModuleKey, Rect>() }
     var gridCoords by remember { mutableStateOf<LayoutCoordinates?>(null) }
@@ -181,13 +230,6 @@ internal fun ModuleGrid(
         val visible = modules.mapTo(HashSet()) { it.module }
         slots.keys.retainAll(visible)
     }
-    // The hold that triggers the drag detector's long-press ALSO looks like a
-    // tap to the tap detector once the finger lifts (a hold-then-release IS a
-    // tap to detectTapGestures unless it consumes-until-up — and consuming is
-    // not an option, because that eats the drag's move events; both failure
-    // modes were hit on-device). The drag detector flags its long-press here;
-    // the tap handler, which runs first on the shared release, skips one tap.
-    var suppressTap by remember { mutableStateOf(false) }
     // Which detector is driving the current drag. While arranging BOTH are
     // live — the launcher gesture and the plain one — and a slow press that
     // then moves can look like the start of either. Without an owner they
@@ -199,6 +241,8 @@ internal fun ModuleGrid(
     // the save round-trips through DataStore, and re-requesting the same move
     // on every drag event in that window would thrash.
     var pendingTarget by remember { mutableStateOf<Int?>(null) }
+    // The resize's twin of pendingTarget.
+    var pendingSize by remember { mutableStateOf<ModuleSize?>(null) }
     // Counts drags, so a drop's deferred clean-up can tell whether the drag it
     // belongs to is still the current one.
     var dragSerial by remember { mutableStateOf(0) }
@@ -209,21 +253,48 @@ internal fun ModuleGrid(
     fun tileAt(rootPos: Offset): ModuleKey? =
         currentModules.firstOrNull { bounds[it.module]?.contains(rootPos) == true }?.module
 
+    /** The tile whose corner handle is under [rootPos], if any: inside the
+     * corner by [HANDLE_HIT], past it by [HANDLE_REACH]. */
+    fun handleAt(rootPos: Offset): ModuleKey? =
+        currentModules
+            .firstOrNull {
+                val rect = bounds[it.module] ?: return@firstOrNull false
+                rootPos.x in (rect.right - handleHitPx)..(rect.right + handleReachPx) &&
+                    rootPos.y in (rect.bottom - handleHitPx)..(rect.bottom + handleReachPx)
+            }?.module
+
+    /** What a drag starting at [rootPos] would do, and to which tile — or null
+     * off every tile. The handle is only live while arranging: outside the
+     * mode there is no handle to see, so a hold on a corner is a hold on the
+     * tile. */
+    fun dragAt(rootPos: Offset): Pair<ModuleKey, DragKind>? {
+        if (isArranging) handleAt(rootPos)?.let { return it to DragKind.RESIZE }
+        return tileAt(rootPos)?.let { it to DragKind.MOVE }
+    }
+
     /** Claim the drag for [owner], or return false if someone else has it. */
-    fun beginDrag(owner: DragOwner, field: ModuleKey, rootPos: Offset): Boolean {
+    fun beginDrag(owner: DragOwner, field: ModuleKey, kind: DragKind, rootPos: Offset): Boolean {
         if (dragOwner != null) return false
         dragSerial++
         dragOwner = owner
         dragged = field
+        dragKind = kind
         dragPosition = rootPos
-        grabOffset = rootPos - (bounds[field]?.topLeft ?: rootPos)
         pendingTarget = null
-        // The lift. Any slide still in flight is abandoned: the drag positions
-        // the tile absolutely from here on.
-        val motion = motionOf(field)
-        scope.launch {
-            motion.offset.snapTo(Offset.Zero)
-            motion.scale.animateTo(DRAG_SCALE, settleSpring())
+        pendingSize = null
+        val rest = bounds[field]?.topLeft ?: rootPos
+        when (kind) {
+            DragKind.RESIZE -> resizeOrigin = rest
+            DragKind.MOVE -> {
+                grabOffset = rootPos - rest
+                // The lift. Any slide still in flight is abandoned: the drag
+                // positions the tile absolutely from here on.
+                val motion = motionOf(field)
+                scope.launch {
+                    motion.offset.snapTo(Offset.Zero)
+                    motion.scale.animateTo(DRAG_SCALE, settleSpring())
+                }
+            }
         }
         return true
     }
@@ -231,10 +302,18 @@ internal fun ModuleGrid(
     fun endDrag(owner: DragOwner) {
         if (dragOwner != owner) return
         val field = dragged
+        val kind = dragKind
         dragOwner = null
         pendingTarget = null
-        suppressTap = false
+        pendingSize = null
         if (field == null) return
+        if (kind == DragKind.RESIZE) {
+            // Nothing to land: a resize never lifted the tile, and each cell
+            // it crossed was committed as it crossed it.
+            dragged = null
+            dragKind = null
+            return
+        }
         // The drop. The tile is wherever the finger left it and layout has its
         // slot; spring the difference to zero and the scale back to rest,
         // together, so it lands rather than appears. `dragged` is cleared
@@ -249,6 +328,7 @@ internal fun ModuleGrid(
             val motion = motionOf(field)
             bounds[field]?.topLeft?.let { rest -> motion.offset.snapTo(dragPosition - grabOffset - rest) }
             dragged = null
+            dragKind = null
             coroutineScope {
                 launch { motion.scale.animateTo(1f, settleSpring()) }
                 launch { motion.offset.animateTo(Offset.Zero, settleSpring()) }
@@ -258,9 +338,9 @@ internal fun ModuleGrid(
 
     // Nearest-center wins, not rect containment: once a tile moves under the
     // pointer, ITS center is the nearest, so the arrangement is stable by
-    // construction — rect hit-testing oscillates when tiles of different spans
+    // construction — rect hit-testing oscillates when tiles of different sizes
     // land where the pointer already is.
-    fun settleDrag() {
+    fun settleMove() {
         val field = dragged ?: return
         val current = currentModules.indexOfFirst { it.module == field }
         if (current == -1) return
@@ -278,10 +358,47 @@ internal fun ModuleGrid(
         }
     }
 
-    TileGrid(
+    // The finger is drawing the tile's far corner; the size is however many
+    // cells that rectangle rounds to, so the tile grows half a cell before it
+    // snaps and shrinks the same way. The cell pitch is read off the tile
+    // itself — its width is `columns` cells and `columns - 1` gaps — rather
+    // than passed in, so this needs to know nothing about the lattice's
+    // arithmetic. The config clamps to the module's minimum; the tick fires
+    // only when a size is actually requested, so dragging past the floor is
+    // silent, which is how the floor is felt.
+    fun settleResize() {
+        val field = dragged ?: return
+        val module = currentModules.firstOrNull { it.module == field } ?: return
+        val rect = bounds[field] ?: return
+        val current = module.size
+        val pitchX = (rect.width + gapPx) / current.columns
+        val pitchY = (rect.height + gapPx) / current.rows
+        val drawn = dragPosition - resizeOrigin
+        val target =
+            ModuleSize(
+                columns = (drawn.x / pitchX).roundToInt(),
+                rows = (drawn.y / pitchY).roundToInt(),
+            ).clamp(field.minSize)
+        if (target != current && target != pendingSize) {
+            pendingSize = target
+            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            resize(field, target)
+        }
+    }
+
+    fun settleDrag() {
+        when (dragKind) {
+            DragKind.MOVE -> settleMove()
+            DragKind.RESIZE -> settleResize()
+            null -> Unit
+        }
+    }
+
+    CellGrid(
         items = modules,
-        span = { it.span },
+        size = { it.size },
         gap = spec.moduleGap,
+        cellAspect = spec.cellAspect,
         modifier =
             modifier
                 .widthIn(max = GRID_MAX_WIDTH)
@@ -292,14 +409,16 @@ internal fun ModuleGrid(
                     // drag without lifting — the launcher gesture in full.
                     detectDragGesturesAfterLongPress(
                         onDragStart = { local ->
-                            suppressTap = true
                             val rootPos = toRoot(local)
-                            val field = tileAt(rootPos) ?: return@detectDragGesturesAfterLongPress
+                            // Decided BEFORE the mode flips: a hold that opens
+                            // the mode is a hold on a tile, not on a handle
+                            // that was not there to be held.
+                            val (field, kind) = dragAt(rootPos) ?: return@detectDragGesturesAfterLongPress
                             if (!isArranging) {
                                 haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                                 startArranging()
                             }
-                            beginDrag(DragOwner.LONG_PRESS, field, rootPos)
+                            beginDrag(DragOwner.LONG_PRESS, field, kind, rootPos)
                         },
                         onDrag = { change, amount ->
                             if (dragOwner != DragOwner.LONG_PRESS) return@detectDragGesturesAfterLongPress
@@ -311,10 +430,11 @@ internal fun ModuleGrid(
                         onDragCancel = { endDrag(DragOwner.LONG_PRESS) },
                     )
                 }
-                // Once the tiles are wiggling, a plain drag moves one — no
-                // second long-press. That is what a launcher does, and holding
-                // again for every tile you want to nudge is the kind of
-                // friction people read as the gesture not having worked.
+                // Once the tiles are wiggling, a plain drag moves one — or,
+                // from its corner, resizes it — with no second long-press.
+                // That is what a launcher does, and holding again for every
+                // tile you want to nudge is the kind of friction people read
+                // as the gesture not having worked.
                 //
                 // Keyed on `arranging` so the detector does not EXIST outside
                 // arrange mode: an always-on drag detector over the grid would
@@ -345,8 +465,8 @@ internal fun ModuleGrid(
                         detectDragGestures(
                             onDragStart = { local ->
                                 val rootPos = toRoot(local)
-                                val field = tileAt(rootPos) ?: return@detectDragGestures
-                                if (beginDrag(DragOwner.IMMEDIATE, field, rootPos)) suppressTap = true
+                                val (field, kind) = dragAt(rootPos) ?: return@detectDragGestures
+                                beginDrag(DragOwner.IMMEDIATE, field, kind, rootPos)
                             },
                             onDrag = { change, amount ->
                                 if (dragOwner != DragOwner.IMMEDIATE) return@detectDragGestures
@@ -362,51 +482,46 @@ internal fun ModuleGrid(
                         endDrag(DragOwner.IMMEDIATE)
                     }
                 }
-                .pointerInput(Unit) {
-                    detectTapGestures(
-                        onTap = { local ->
-                            if (suppressTap) return@detectTapGestures
-                            if (!isArranging) return@detectTapGestures
-                            tileAt(toRoot(local))?.let {
-                                // The same tick a slot change gives: the tile
-                                // visibly changes size, but the finger is
-                                // covering the part that changed.
-                                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                cycleSpan(it)
-                            }
-                        },
-                    )
-                },
-        // The dragged tile's row draws over its neighbours, or the tile slides
-        // UNDER the next row on a long drag.
-        rowModifier = { row -> if (row.any { it.module == dragged }) Modifier.zIndex(1f) else Modifier },
+                // Taps do nothing to the grid, and are consumed so that they do
+                // nothing to anything else either: the tap-on-empty-ground
+                // detector above this grid leaves arrange mode, and a tap on
+                // a wiggling tile must not — the launcher contract is that
+                // the way out is Done, Back, or the ground, never the thing
+                // you were editing.
+                .pointerInput(Unit) { detectTapGestures {} },
     ) { module, index, tileModifier ->
         val field = module.module
-        val isDragged = dragged == field
-        val wiggle = wiggleAngle(active = arranging && !isDragged, phase = index)
+        // Only a MOVE lifts the tile and pins it under the finger; a resize
+        // leaves it in the lattice and changes its cells.
+        val isLifted = dragged == field && dragKind == DragKind.MOVE
+        val wiggle = wiggleAngle(active = arranging && !isLifted, phase = index)
         val motion = motionOf(field)
         ModuleTile(
             index = index,
             lastIndex = modules.lastIndex,
             onMove = onMove,
-            onCycleSpan = onCycleSpan,
+            onResize = onResize,
             module = module,
             arranging = arranging,
             spec = spec,
             modifier =
                 tileModifier
-                    .zIndex(if (isDragged) 1f else 0f)
+                    // The dragged tile draws over its neighbours, or it slides
+                    // UNDER the next row on a long drag.
+                    .zIndex(if (dragged == field) 1f else 0f)
                     .onGloballyPositioned { coords ->
                         bounds[field] = coords.boundsInRoot()
-                        // A changed slot while not being dragged means the
-                        // order (or a neighbour's height) changed under this
+                        // A changed slot while not being moved means the
+                        // order (or a neighbour's size) changed under this
                         // tile: slide from the old slot to the new one. The
-                        // dragged tile is exempt — the finger, not layout,
-                        // says where it is.
+                        // lifted tile is exempt — the finger, not layout, says
+                        // where it is. A tile being RESIZED is not: growing
+                        // can re-pack it onto the next row, and it should be
+                        // seen going there.
                         val grid = gridCoords ?: return@onGloballyPositioned
                         val slot = grid.localPositionOf(coords, Offset.Zero)
                         val previous = slots.put(field, slot)
-                        if (previous != null && previous != slot && dragged != field) {
+                        if (previous != null && previous != slot && !isLifted) {
                             scope.slide(motion, from = previous - slot)
                         }
                     }
@@ -416,7 +531,7 @@ internal fun ModuleGrid(
                         // invocations, so a branch that "doesn't touch"
                         // translation would freeze the drag's offset onto the
                         // tile.
-                        if (isDragged) {
+                        if (isLifted) {
                             // Anchor the grab point under the finger, wherever
                             // layout put the tile this frame.
                             val base = bounds[field]?.topLeft ?: (dragPosition - grabOffset)
@@ -453,18 +568,18 @@ private fun CoroutineScope.slide(motion: TileMotion, from: Offset) =
 
 /**
  * One tile: the always-on border (the user asked for the grid footprint to be
- * legible outside the editor — this thin line is that), a quiet label, and the
- * value at the size its width allows. Width IS prominence: a full tile shows
- * its value at hero size and drops the label (a full-width value speaks for
- * itself, as the old hero did), narrower tiles caption themselves and their
- * value steps down with them. The value is FITTED rather than styled per span
- * (see FittedText): the span sets the ceiling, and a value too long for it —
- * a conditions phrase, a pressure with its unit — shrinks to fit its tile
- * instead of breaking words or spilling past the border.
+ * legible outside the editor — this thin line is that), a quiet label, the
+ * value at the size its cells allow, and — while arranging — the handle on
+ * its corner. Size IS prominence: the value is FITTED to the tile (see
+ * FittedText) up to the hero size, so a 4×2 temperature is the hero, the same
+ * reading at 1×1 is a small number, and a conditions phrase or a pressure
+ * with its unit shrinks to fit rather than breaking words or spilling past the
+ * border. A full-width tile drops its label — a value that wide speaks for
+ * itself, as the old hero did.
  *
  * The tile is also where arranging becomes reachable without gestures. Its
- * accessibility actions — Move up, Move down, Resize — are the SAME
- * [onMove]/[onCycleSpan] calls the drag and tap make, and they are offered at
+ * accessibility actions — Move up/down, Wider/Narrower, Taller/Shorter — are
+ * the SAME [onMove]/[onResize] calls the drags make, and they are offered at
  * all times rather than only while arranging: long-press-and-drag is not a
  * gesture a TalkBack or switch-access user can perform at all, so gating them
  * behind a mode they cannot enter would be gating them behind nothing.
@@ -482,7 +597,7 @@ private fun ModuleTile(
     index: Int,
     lastIndex: Int,
     onMove: (ModuleKey, Int) -> Unit,
-    onCycleSpan: (ModuleKey) -> Unit,
+    onResize: (ModuleKey, ModuleSize) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val borderColor =
@@ -496,16 +611,35 @@ private fun ModuleTile(
     // A full-width tile drops its label — the content is big enough to speak
     // for itself, as the old hero did, and the sun table brings its own column
     // headings.
-    val showLabel = module.span != ModuleSpan.FULL
+    val showLabel = module.size.columns != ModuleSize.COLUMNS
+    val size = module.size
+    val min = module.module.minSize
+    val handleColor = MaterialTheme.colorScheme.primary
+    val handleRing = MaterialTheme.colorScheme.background
     TileShell(
         borderColor = borderColor,
         modifier =
             modifier
+                .drawWithContent {
+                    drawContent()
+                    // The handle: a dot on the corner, ringed in the ground
+                    // colour so it reads as sitting ON the border rather than
+                    // as a thickening of it. Drawn, not composed, so it adds
+                    // no node to the tile's semantics and no layout to its
+                    // cells.
+                    if (arranging) {
+                        val inset = HANDLE_INSET.toPx()
+                        val center = Offset(this.size.width - inset, this.size.height - inset)
+                        drawCircle(handleRing, radius = HANDLE_RADIUS.toPx() + 2.dp.toPx(), center = center)
+                        drawCircle(handleColor, radius = HANDLE_RADIUS.toPx(), center = center)
+                    }
+                }
                 .semantics(mergeDescendants = true) {
-                    // The width is state, not a label: it changes under the
-                    // user and is what Resize acts on, so it belongs where a
-                    // screen reader re-reads it rather than in the name.
-                    stateDescription = "${module.span.label} width"
+                    // The size is state, not a label: it changes under the
+                    // user and is what the resize actions act on, so it
+                    // belongs where a screen reader re-reads it rather than
+                    // in the name.
+                    stateDescription = size.label
                     customActions =
                         buildList {
                             if (index > 0) {
@@ -524,44 +658,81 @@ private fun ModuleTile(
                                     },
                                 )
                             }
-                            // Named for where it lands, not for what it does:
-                            // "Resize" alone leaves the user to guess which of
-                            // three widths a tap will pick.
-                            add(
-                                CustomAccessibilityAction("Resize to ${module.span.next().label.lowercase()}") {
-                                    onCycleSpan(module.module)
-                                    true
-                                },
-                            )
+                            // One cell at a time in each direction, and only
+                            // the steps that exist: a tile at the grid's edge
+                            // is not offered "Wider", one at its module's
+                            // minimum is not offered "Narrower". An action
+                            // that would do nothing is absent, not ignored.
+                            if (size.columns < ModuleSize.COLUMNS) {
+                                add(
+                                    CustomAccessibilityAction("Wider") {
+                                        onResize(module.module, size.wider())
+                                        true
+                                    },
+                                )
+                            }
+                            if (size.columns > min.columns) {
+                                add(
+                                    CustomAccessibilityAction("Narrower") {
+                                        onResize(module.module, size.narrower())
+                                        true
+                                    },
+                                )
+                            }
+                            if (size.rows < ModuleSize.MAX_ROWS) {
+                                add(
+                                    CustomAccessibilityAction("Taller") {
+                                        onResize(module.module, size.taller())
+                                        true
+                                    },
+                                )
+                            }
+                            if (size.rows > min.rows) {
+                                add(
+                                    CustomAccessibilityAction("Shorter") {
+                                        onResize(module.module, size.shorter())
+                                        true
+                                    },
+                                )
+                            }
                         }
                 },
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             if (showLabel) {
-                Text(
+                // Fitted like the value, on one line: "Temperature" does not
+                // fit a single cell at the label size, and "Temperat…" is
+                // worse than the same word a shade smaller.
+                val labelStyle = MaterialTheme.typography.labelSmall
+                FittedText(
                     text = module.label,
-                    style = MaterialTheme.typography.labelSmall,
+                    style = labelStyle,
+                    ceiling = labelStyle.fontSize,
+                    floor = LABEL_FLOOR,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
                 )
             }
             when (val content = module.content) {
                 is ModuleContent.Reading ->
-                    // The hero's face and weight at every width, so a reading
-                    // is one thing scaled rather than three styles that happen
-                    // to share a tile.
+                    // The hero's face and weight at every size, so a reading
+                    // is one thing scaled rather than several styles that
+                    // happen to share a tile. The ceiling is the hero itself;
+                    // the tile's cells decide how close the value gets.
                     FittedText(
                         text = content.text,
                         style = spec.heroStyle,
-                        ceiling = spec.valueCeiling(module.span),
+                        ceiling = spec.heroStyle.fontSize,
                         floor = VALUE_FLOOR,
                         color = MaterialTheme.colorScheme.onBackground,
+                        // Two lines per row of cells: a phrase in a taller
+                        // tile may use the height rather than shrink.
+                        maxLines = 2 * size.rows,
                     )
-                // Sun times draw themselves: they are a table at full width and
-                // today's pair when narrower. See SunModule.kt for why that is
+                // Sun times draw themselves: a table at full size, today's
+                // pair when smaller. See SunModule.kt for why that is
                 // adaptation rather than two designs.
-                is ModuleContent.Sun -> SunModuleContent(days = content.days, span = module.span, zone = content.zone)
+                is ModuleContent.Sun -> SunModuleContent(days = content.days, size = module.size, zone = content.zone)
             }
         }
     }

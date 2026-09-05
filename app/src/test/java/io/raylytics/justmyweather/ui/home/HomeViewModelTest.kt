@@ -19,7 +19,7 @@ import io.raylytics.justmyweather.location.LocationResolver
 import io.raylytics.justmyweather.view.Density
 import io.raylytics.justmyweather.view.ForecastMode
 import io.raylytics.justmyweather.view.ModuleKey
-import io.raylytics.justmyweather.view.ModuleSpan
+import io.raylytics.justmyweather.view.ModuleSize
 import io.raylytics.justmyweather.view.ViewConfig
 import io.raylytics.justmyweather.view.WeatherField
 import kotlinx.coroutines.CompletableDeferred
@@ -752,16 +752,16 @@ class HomeViewModelTest {
     }
 
     @Test
-    fun `cycleModuleSpan persists the next width for that field only`() = runTest(dispatcher) {
+    fun `resizeModule persists the new footprint for that field only`() = runTest(dispatcher) {
         val h = harness()
         advanceUntilIdle()
-        h.vm.cycleModuleSpan(reading(WeatherField.CONDITIONS)) // half -> full
+        h.vm.resizeModule(reading(WeatherField.CONDITIONS), ModuleSize(4, 1))
         advanceUntilIdle()
         val saved = h.configRepository.config.first()
-        assertEquals(ModuleSpan.FULL, saved.items.first { it.module == reading(WeatherField.CONDITIONS) }.span)
-        // The neighbour keeps its width — the transform touches one field.
-        assertEquals(ModuleSpan.FULL, saved.items.first { it.module == reading(WeatherField.TEMPERATURE) }.span)
-        assertEquals(ModuleSpan.QUARTER, saved.items.first { it.module == reading(WeatherField.WIND) }.span)
+        assertEquals(ModuleSize(4, 1), saved.items.first { it.module == reading(WeatherField.CONDITIONS) }.size)
+        // The neighbours keep their sizes — the transform touches one field.
+        assertEquals(ModuleSize(4, 2), saved.items.first { it.module == reading(WeatherField.TEMPERATURE) }.size)
+        assertEquals(ModuleSize.CELL, saved.items.first { it.module == reading(WeatherField.WIND) }.size)
     }
 
     @Test
@@ -788,7 +788,7 @@ class HomeViewModelTest {
         val gate = CompletableDeferred<Unit>()
         h.configStore.gate = gate
         h.vm.moveModule(reading(WeatherField.TEMPERATURE), 1)
-        h.vm.cycleModuleSpan(reading(WeatherField.CONDITIONS))
+        h.vm.resizeModule(reading(WeatherField.CONDITIONS), ModuleSize(4, 1))
         runCurrent()
         h.configStore.gate = null
         gate.complete(Unit)
@@ -800,8 +800,8 @@ class HomeViewModelTest {
             "the move survived",
         )
         assertEquals(
-            ModuleSpan.FULL,
-            saved.items.first { it.module == reading(WeatherField.CONDITIONS) }.span,
+            ModuleSize(4, 1),
+            saved.items.first { it.module == reading(WeatherField.CONDITIONS) }.size,
             "the resize survived",
         )
     }

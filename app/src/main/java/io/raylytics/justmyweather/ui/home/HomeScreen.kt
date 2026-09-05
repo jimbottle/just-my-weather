@@ -39,6 +39,7 @@ import io.raylytics.justmyweather.data.nws.ActiveAlert
 import io.raylytics.justmyweather.view.AlertBannerPosition
 import io.raylytics.justmyweather.view.ForecastMode
 import io.raylytics.justmyweather.view.ModuleKey
+import io.raylytics.justmyweather.view.ModuleSize
 import io.raylytics.justmyweather.view.RenderedView
 import io.raylytics.justmyweather.view.ViewConfig
 import io.raylytics.justmyweather.view.render
@@ -65,13 +66,13 @@ internal val SUN_TICK = 1.minutes
 /**
  * The home view. Out of the box it's a calm single glance; once the user edits
  * their config it's whatever they made it — same screen, driven by data. The
- * visible fields sit as bordered modules on a flow grid, each as prominent as
- * the user made it wide. Centred in whitespace so the glance is readable in
+ * visible fields sit as bordered modules on a grid, each as prominent as the
+ * user made it big. Centred in whitespace so the glance is readable in
  * well under a second.
  *
  * Arrange mode is session UI, not app state: long-pressing a module starts it,
  * Done or system back ends it, and everything it changes lands in the persisted
- * ViewConfig through [onCycleSpan]/[onMoveModule] — so there is nothing to save
+ * ViewConfig through [onResizeModule]/[onMoveModule] — so there is nothing to save
  * on exit and nothing lost if the process dies mid-arrange.
  */
 @Composable
@@ -81,7 +82,7 @@ fun HomeScreen(
     onSetMode: (ForecastMode) -> Unit,
     onCustomize: () -> Unit,
     onAlerts: () -> Unit,
-    onCycleSpan: (ModuleKey) -> Unit,
+    onResizeModule: (ModuleKey, ModuleSize) -> Unit,
     onMoveModule: (ModuleKey, Int) -> Unit,
     onPlaces: () -> Unit,
     modifier: Modifier = Modifier,
@@ -137,7 +138,7 @@ fun HomeScreen(
                             arranging = arranging,
                             onStartArranging = { arranging = true },
                             onDoneArranging = { arranging = false },
-                            onCycleSpan = onCycleSpan,
+                            onResizeModule = onResizeModule,
                             onMoveModule = onMoveModule,
                             onPlaces = onPlaces,
                         )
@@ -165,7 +166,7 @@ private fun GlanceView(
     arranging: Boolean,
     onStartArranging: () -> Unit,
     onDoneArranging: () -> Unit,
-    onCycleSpan: (ModuleKey) -> Unit,
+    onResizeModule: (ModuleKey, ModuleSize) -> Unit,
     onMoveModule: (ModuleKey, Int) -> Unit,
     onPlaces: () -> Unit,
 ) {
@@ -213,15 +214,15 @@ private fun GlanceView(
             zone = state.zone,
             arranging = arranging,
             onStartArranging = onStartArranging,
-            onCycleSpan = onCycleSpan,
+            onResizeModule = onResizeModule,
             onMoveModule = onMoveModule,
         )
 
         // Only while arranging, right under the grid it edits. The wiggle
         // says "editing"; this says what editing IS and how it stops. The
-        // hint earns its line because half of the grammar is not borrowed:
-        // drag-to-move is the launcher's and needs no telling, but no
-        // launcher resizes on a tap, and a gesture nobody would guess is a
+        // hint earns its line because half of the grammar is not obvious:
+        // drag-to-move is the launcher's and needs no telling, but the corner
+        // handle is a small dot, and a gesture nobody would guess is a
         // feature nobody has. Back and a tap on empty ground end it too.
         if (arranging) ArrangeBar(onDone = onDoneArranging)
 
@@ -259,7 +260,7 @@ private fun GlanceView(
 private fun ArrangeBar(onDone: () -> Unit) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
-            text = "Drag to move · Tap to resize",
+            text = "Drag to move · Drag a corner to resize",
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
@@ -329,7 +330,7 @@ private fun NowContent(
     zone: ZoneId,
     arranging: Boolean,
     onStartArranging: () -> Unit,
-    onCycleSpan: (ModuleKey) -> Unit,
+    onResizeModule: (ModuleKey, ModuleSize) -> Unit,
     onMoveModule: (ModuleKey, Int) -> Unit,
 ) {
     val rendered: RenderedView = config.render(snapshot, sunDays, zone)
@@ -353,7 +354,7 @@ private fun NowContent(
                 arranging = arranging,
                 spec = spec,
                 onStartArranging = onStartArranging,
-                onCycleSpan = onCycleSpan,
+                onResize = onResizeModule,
                 onMove = onMoveModule,
                 modifier = Modifier.fillMaxWidth(),
             )

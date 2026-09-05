@@ -27,7 +27,6 @@ import io.raylytics.justmyweather.data.nws.DailyPeriod
 import io.raylytics.justmyweather.data.nws.ForecastPoint
 import io.raylytics.justmyweather.view.DailyStyle
 import io.raylytics.justmyweather.view.ForecastMode
-import io.raylytics.justmyweather.view.ModuleSpan
 import java.time.ZoneId
 import java.util.Locale
 import kotlin.math.roundToInt
@@ -67,8 +66,8 @@ private val FORECAST_VIEWPORT = 260.dp
 
 /** Hours are terse enough for a quarter tile; a period's name ("Monday Night",
  * "This Afternoon") needs half a row to survive without ellipsis. */
-private val HOUR_SPAN = ModuleSpan.QUARTER
-private val DAY_SPAN = ModuleSpan.HALF
+private const val HOUR_COLUMNS = 1
+private const val DAY_COLUMNS = 2
 
 /**
  * The forecast grid and its own framing toggle.
@@ -102,7 +101,7 @@ internal fun ForecastGrid(
                     ForecastViewport {
                         TileGrid(
                             items = list.take(HOURLY_TILES),
-                            span = { HOUR_SPAN },
+                            columns = { HOUR_COLUMNS },
                             gap = gap,
                             modifier = Modifier.fillMaxWidth(),
                         ) { hour, _, tileModifier -> HourTile(hour, zone, tileModifier) }
@@ -121,7 +120,7 @@ internal fun ForecastGrid(
                             DailyStyle.COMBINED ->
                                 TileGrid(
                                     items = days,
-                                    span = { DAY_SPAN },
+                                    columns = { DAY_COLUMNS },
                                     gap = gap,
                                     modifier = Modifier.fillMaxWidth(),
                                 ) { day, _, tileModifier -> CombinedDayTile(day, tileModifier) }
@@ -129,7 +128,7 @@ internal fun ForecastGrid(
                             DailyStyle.HALF_DAY ->
                                 TileGrid(
                                     items = list,
-                                    span = { DAY_SPAN },
+                                    columns = { DAY_COLUMNS },
                                     gap = gap,
                                     modifier = Modifier.fillMaxWidth(),
                                 ) { period, _, tileModifier -> HalfDayTile(period, tileModifier) }

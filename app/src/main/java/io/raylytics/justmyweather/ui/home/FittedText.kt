@@ -31,26 +31,33 @@ import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
 
 /*
- * A value that grows to the size its tile allows. This is what makes "width is
- * prominence" literally true on the glance: the same reading is hero-sized at
- * full width and steps down as its tile narrows, and a long phrase — "Chance
+ * A value that grows to the size its tile allows. This is what makes "size is
+ * prominence" literally true on the glance: the same reading is hero-sized in
+ * a 4×2 tile and a small number in a single cell, and a long phrase — "Chance
  * Showers And Thunderstorms" — shrinks to fit instead of becoming a tower of
  * 120sp words or breaking "Thunderstorms" across two lines.
  *
+ * Both dimensions bound the fit. The lattice fixes a tile's height as firmly
+ * as its width, so a value must land inside the box in both directions — and
+ * height is the lever that matters for a short reading, which never wraps:
+ * "72°" in a one-row tile is height-bound, and only a taller tile lets it
+ * grow.
+ *
  * Why this is a Layout of its own and not a Text with a size picked from the
- * constraints: the grid sizes each row to its tallest tile with
+ * constraints: the forecast grid sizes rows to their tallest tile with
  * `IntrinsicSize.Min`, and Compose's constraint-reading composable
  * (BoxWithConstraints) throws when asked for intrinsics. Measuring the text
  * ourselves inside a MeasurePolicy answers both questions — "how tall am I at
- * this width?" during the intrinsic pass and "what do I draw?" during measure
+ * this width?" during an intrinsic pass and "what do I draw?" during measure
  * — from the same fit, in the same frame, with no first-frame flash at the
  * wrong size.
  */
 
 /**
  * Draw [text] at the largest size in `[floor, ceiling]` at which it fits the
- * width it is given in at most [maxLines] lines with no word broken across
- * lines. At the floor it is ellipsised rather than shrunk further.
+ * width AND height it is given, in at most [maxLines] lines with no word
+ * broken across lines. At the floor it is ellipsised rather than shrunk
+ * further.
  *
  * Only the size (and line height, in proportion) is chosen here; face, weight
  * and alignment come from [style]. The text is exposed to accessibility as
@@ -96,15 +103,16 @@ private class TextFitter(
     private val maxLines: Int,
     private val measurer: TextMeasurer,
 ) : MeasurePolicy {
-    /** The fit for [lastWidth], read by the draw pass. */
+    /** The fit for the last box, read by the draw pass. */
     var last: TextLayoutResult? = null
         private set
     private var lastWidth = -1
+    private var lastHeight = -1
 
     private val words = text.split(' ').filter { it.isNotEmpty() }
 
-    private fun Density.fit(maxWidth: Int): TextLayoutResult {
-        last?.takeIf { lastWidth == maxWidth }?.let { return it }
+    private fun Density.fit(maxWidth: Int, maxHeight: Int): TextLayoutResult {
+        last?.takeIf { lastWidth == maxWidth && lastHeight == maxHeight }?.let { return it }
         // Whole sp steps: a binary search over integers finds the largest size
         // that fits in a handful of measurements, and sub-sp precision is
         // invisible next to the tile's own rounding.
@@ -112,23 +120,18 @@ private class TextFitter(
         var hi = ceiling.value.roundToInt().coerceAtLeast(lo)
         while (lo < hi) {
             val mid = (lo + hi + 1) / 2
-            if (fits(mid.sp, maxWidth)) lo = mid else hi = mid - 1
+            if (fits(mid.sp, maxWidth, maxHeight)) lo = mid else hi = mid - 1
         }
-        // Line height is settled after the size, by line count: wrapped text
-        // needs air between its lines, but a single line keeps the style's
-        // own ratio — the hero's is 1.0, and a fitted hero must not stand
-        // taller than the unfitted one it replaces.
-        val wrapped = measure(lo.sp, maxWidth, TextOverflow.Ellipsis, MULTILINE_RATIO)
-        val result = if (wrapped.lineCount > 1) wrapped else measure(lo.sp, maxWidth, TextOverflow.Ellipsis, ownRatio)
+        val result = layoutAt(lo.sp, maxWidth, TextOverflow.Ellipsis)
         last = result
         lastWidth = maxWidth
+        lastHeight = maxHeight
         return result
     }
 
-    /** Fits means: no word needs breaking, and the whole thing lands in
-     * [maxLines] with nothing clipped. Line height plays no part in either,
-     * so the search measures at one ratio and lets [fit] choose the final. */
-    private fun Density.fits(size: TextUnit, maxWidth: Int): Boolean {
+    /** Fits means: no word needs breaking, the whole thing lands in
+     * [maxLines] with nothing clipped, and it is no taller than the box. */
+    private fun Density.fits(size: TextUnit, maxWidth: Int, maxHeight: Int): Boolean {
         val longestWord =
             words.maxOfOrNull { word ->
                 measurer
@@ -137,7 +140,20 @@ private class TextFitter(
                     .width
             } ?: 0
         if (longestWord > maxWidth) return false
-        return !measure(size, maxWidth, TextOverflow.Clip, MULTILINE_RATIO).hasVisualOverflow
+        val laid = layoutAt(size, maxWidth, TextOverflow.Clip)
+        return !laid.hasVisualOverflow && laid.size.height <= maxHeight
+    }
+
+    /**
+     * The text at [size], with its line height settled by line count: wrapped
+     * text needs air between its lines, but a single line keeps the style's
+     * own ratio — the hero's is 1.0, and a fitted hero must not stand taller
+     * than the unfitted one it replaces. Decided per measurement rather than
+     * after the search, because height is part of what "fits" means.
+     */
+    private fun Density.layoutAt(size: TextUnit, maxWidth: Int, overflow: TextOverflow): TextLayoutResult {
+        val single = measure(size, maxWidth, overflow, ownRatio)
+        return if (single.lineCount > 1) measure(size, maxWidth, overflow, MULTILINE_RATIO) else single
     }
 
     private fun Density.measure(size: TextUnit, maxWidth: Int, overflow: TextOverflow, ratio: Float): TextLayoutResult =
@@ -158,17 +174,19 @@ private class TextFitter(
         style.copy(fontSize = size, lineHeight = size * ratio)
 
     override fun MeasureScope.measure(measurables: List<Measurable>, constraints: Constraints): MeasureResult {
-        val result = fit(constraints.maxWidth)
+        val result = fit(constraints.maxWidth, constraints.maxHeight)
         val width = constraints.constrainWidth(result.size.width)
         val height = constraints.constrainHeight(result.size.height)
         return layout(width, height) {}
     }
 
+    // Height intrinsics are asked with no height to fit into — that is the
+    // question being answered — so the fit is by width alone.
     override fun IntrinsicMeasureScope.minIntrinsicHeight(measurables: List<IntrinsicMeasurable>, width: Int): Int =
-        fit(width).size.height
+        fit(width, Constraints.Infinity).size.height
 
     override fun IntrinsicMeasureScope.maxIntrinsicHeight(measurables: List<IntrinsicMeasurable>, width: Int): Int =
-        fit(width).size.height
+        fit(width, Constraints.Infinity).size.height
 
     // Width intrinsics are asked of tiles only when a row has no width to
     // give, which the grid never does — but they must still be sane, and

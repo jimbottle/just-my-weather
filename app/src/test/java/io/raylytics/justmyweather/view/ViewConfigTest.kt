@@ -89,7 +89,7 @@ class ViewConfigTest {
     }
 
     @Test
-    fun `render projects the visible modules, in order, with their spans`() {
+    fun `render projects the visible modules, in order, with their sizes`() {
         val config = ViewConfig.DEFAULT.toggle(reading(WeatherField.WIND)) // temp, conditions, wind visible
         val rendered = config.render(snapshot)
         assertEquals(
@@ -97,8 +97,8 @@ class ViewConfigTest {
             rendered.modules.map { (it.content as ModuleContent.Reading).text },
         )
         assertEquals(
-            listOf(ModuleSpan.FULL, ModuleSpan.HALF, ModuleSpan.QUARTER),
-            rendered.modules.map { it.span },
+            listOf(ModuleSize(4, 2), ModuleSize(2, 1), ModuleSize(1, 1)),
+            rendered.modules.map { it.size },
         )
     }
 
@@ -120,37 +120,56 @@ class ViewConfigTest {
         // The zone travels WITH the days: they are instants, and the same
         // sunrise formats as a different clock time depending where you ask.
         assertEquals(ModuleContent.Sun(days, zone), sun.content)
-        // Full width by default: that is the size the table needs.
-        assertEquals(ModuleSpan.FULL, sun.span)
+        // Full width and two rows by default: that is the size the table needs.
+        assertEquals(ModuleSize(4, 2), sun.size)
     }
 
     @Test
-    fun `fields ship at their default spans and setSpan changes one field only`() {
+    fun `fields ship at their default sizes and resize changes one field only`() {
         assertEquals(
-            ModuleSpan.FULL,
+            ModuleSize(4, 2),
             ViewConfig.DEFAULT.items.first {
                 it.module == reading(WeatherField.TEMPERATURE)
-            }.span,
+            }.size,
         )
-        val resized = ViewConfig.DEFAULT.setSpan(reading(WeatherField.TEMPERATURE), ModuleSpan.QUARTER)
+        // The hero down to a single cell: the ask that started the lattice.
+        val resized = ViewConfig.DEFAULT.resize(reading(WeatherField.TEMPERATURE), ModuleSize.CELL)
         assertEquals(
-            ModuleSpan.QUARTER,
-            resized.items.first { it.module == reading(WeatherField.TEMPERATURE) }.span,
+            ModuleSize.CELL,
+            resized.items.first { it.module == reading(WeatherField.TEMPERATURE) }.size,
         )
         assertEquals(
-            ModuleSpan.HALF,
-            resized.items.first { it.module == reading(WeatherField.CONDITIONS) }.span,
+            ModuleSize(2, 1),
+            resized.items.first { it.module == reading(WeatherField.CONDITIONS) }.size,
         )
     }
 
     @Test
-    fun `cycleSpan steps around the size ring`() {
-        val once = ViewConfig.DEFAULT.cycleSpan(reading(WeatherField.WIND)) // quarter -> half
-        assertEquals(ModuleSpan.HALF, once.items.first { it.module == reading(WeatherField.WIND) }.span)
-        val around =
-            once.cycleSpan(reading(WeatherField.WIND)) // -> full
-                .cycleSpan(reading(WeatherField.WIND)) // -> back to quarter
-        assertEquals(ModuleSpan.QUARTER, around.items.first { it.module == reading(WeatherField.WIND) }.span)
+    fun `resize stops at the module's own minimum and at the lattice`() {
+        // Conditions is prose and will not go below two cells wide, however
+        // small a rectangle the finger draws.
+        val squeezed = ViewConfig.DEFAULT.resize(reading(WeatherField.CONDITIONS), ModuleSize(1, 1))
+        assertEquals(ModuleSize(2, 1), squeezed.items.first { it.module == reading(WeatherField.CONDITIONS) }.size)
+        // Sun needs its pair side by side.
+        val sun = ViewConfig.DEFAULT.resize(ModuleKey.Sun, ModuleSize(1, 3))
+        assertEquals(ModuleSize(2, 3), sun.items.first { it.module == ModuleKey.Sun }.size)
+        // And nothing outgrows the grid.
+        val huge = ViewConfig.DEFAULT.resize(reading(WeatherField.WIND), ModuleSize(9, 9))
+        assertEquals(
+            ModuleSize(ModuleSize.COLUMNS, ModuleSize.MAX_ROWS),
+            huge.items.first { it.module == reading(WeatherField.WIND) }.size,
+        )
+    }
+
+    @Test
+    fun `every module ships at or above its own minimum`() {
+        // A default below the floor would be a tile the codec clamps the
+        // moment it is written back — a config that cannot round-trip.
+        ModuleKey.catalog.forEach { module ->
+            assertTrue(module.defaultSize.fits(module.minSize)) {
+                "${module.key} default ${module.defaultSize} vs min ${module.minSize}"
+            }
+        }
     }
 
     @Test

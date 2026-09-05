@@ -15,6 +15,10 @@ if [ "${1:-}" = "--fix" ]; then
     ./gradlew --quiet :app:ktlintFormat || exit 1
 fi
 
+# Stale results from an earlier run must not be tallied as this run's: a
+# compile failure would otherwise report yesterday's test count as today's.
+rm -rf app/build/test-results/testDebugUnitTest
+
 ./gradlew --quiet :app:testDebugUnitTest :app:ktlintCheck :app:assembleDebug :app:assembleDebugAndroidTest
 status=$?
 

@@ -21,7 +21,18 @@ package io.raylytics.justmyweather.view
 sealed interface ModuleKey {
     val key: String
     val defaultLabel: String
-    val defaultSpan: ModuleSpan
+
+    /** The footprint a fresh config gives this module. */
+    val defaultSize: ModuleSize
+
+    /**
+     * The smallest footprint this module can be shrunk to. Sized to what it
+     * has to say: a number and its unit read in one cell, a phrase or a table
+     * does not. This is the floor the corner drag, the accessibility actions
+     * and the customize screen all stop at, and the codec clamps a stored size
+     * up to it, so a module is never drawn in a tile it cannot fill honestly.
+     */
+    val minSize: ModuleSize
 
     /** A reading from the weather station: temperature, wind, conditions… */
     data class Reading(val field: WeatherField) : ModuleKey {
@@ -30,7 +41,8 @@ sealed interface ModuleKey {
         // same trap docs/extending.md warns about for FieldSetting.label.
         override val key: String get() = this.field.key
         override val defaultLabel: String get() = this.field.defaultLabel
-        override val defaultSpan: ModuleSpan get() = this.field.defaultSpan
+        override val defaultSize: ModuleSize get() = this.field.defaultSize
+        override val minSize: ModuleSize get() = this.field.minSize
     }
 
     /** Sunrise and sunset. Computed, not fetched, so it works with no signal. */
@@ -38,10 +50,14 @@ sealed interface ModuleKey {
         override val key: String get() = "sun"
         override val defaultLabel: String get() = "Sun"
 
-        /** Full width by default: at that size the module draws the two-day
-         * table, which is the form that answers "which sunrise?" without
-         * hanging a "tomorrow" off a time. Shrink it and it condenses. */
-        override val defaultSpan: ModuleSpan get() = ModuleSpan.FULL
+        /** Full width and two rows by default: at that size the module draws
+         * the two-day table, which is the form that answers "which sunrise?"
+         * without hanging a "tomorrow" off a time. Shrink it and it condenses. */
+        override val defaultSize: ModuleSize get() = ModuleSize(4, 2)
+
+        /** Two times with their words need two cells side by side; one cell
+         * cannot hold "Sunrise 6:57 AM" over "Sunset 8:36 PM" legibly. */
+        override val minSize: ModuleSize get() = ModuleSize(2, 1)
     }
 
     companion object {

@@ -2,14 +2,14 @@ package io.raylytics.justmyweather.view
 
 /**
  * One module's place in the user's view: whether it shows, an optional label
- * override, and how wide it sits on the grid. The effective [label] falls back
- * to the module's default.
+ * override, and how much of the grid it occupies. The effective [label] falls
+ * back to the module's default.
  */
 data class ModuleSetting(
     val module: ModuleKey,
     val visible: Boolean,
     val customLabel: String? = null,
-    val span: ModuleSpan = module.defaultSpan,
+    val size: ModuleSize = module.defaultSize,
 ) {
     val label: String
         get() = customLabel?.takeIf { it.isNotBlank() } ?: module.defaultLabel
@@ -17,9 +17,9 @@ data class ModuleSetting(
 
 /**
  * The user's view as data: an ordered list of every module's setting. The
- * visible modules flow onto the glance's grid in this order, each as wide as
- * its [ModuleSetting.span] — size is what makes a module prominent, so promote
- * one by widening it or moving it up; remove it by hiding it. All edits are
+ * visible modules pack onto the glance's grid in this order, each at its
+ * [ModuleSetting.size] — size is what makes a module prominent, so promote
+ * one by enlarging it or moving it up; remove it by hiding it. All edits are
  * pure transforms returning a new config, so the customize screen and the
  * arrange gesture have no mutable state to get wrong and the logic is testable.
  *
@@ -56,13 +56,15 @@ data class ViewConfig(
     fun relabel(module: ModuleKey, label: String?): ViewConfig =
         copy(items = items.map { if (it.module == module) it.copy(customLabel = label) else it })
 
-    fun setSpan(module: ModuleKey, span: ModuleSpan): ViewConfig =
-        copy(items = items.map { if (it.module == module) it.copy(span = span) else it })
-
-    /** Step the module to the next size — what tapping a wiggling tile does in
-     * arrange mode. */
-    fun cycleSpan(module: ModuleKey): ViewConfig =
-        copy(items = items.map { if (it.module == module) it.copy(span = it.span.next()) else it })
+    /**
+     * Give a module a new footprint — what the corner drag, the Wider/Taller
+     * accessibility actions and the customize screen's chips all do. Clamped
+     * to the module's own minimum and the lattice, so no caller can request a
+     * size the module cannot fill; the drag in particular asks for whatever
+     * rectangle the finger draws and relies on this to say no.
+     */
+    fun resize(module: ModuleKey, size: ModuleSize): ViewConfig =
+        copy(items = items.map { if (it.module == module) it.copy(size = size.clamp(module.minSize)) else it })
 
     /**
      * Move a visible module so it lands at [toVisibleIndex] among the *visible*

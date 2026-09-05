@@ -55,10 +55,10 @@ subsumed — the grid flows its tiles, so there is no direction left to choose.
 What to keep judging:
 
 - **Arrange mode carries one line of chrome, and only then.** Under the
-  wiggling grid: "Drag to move · Tap to resize", then Done. Drag-to-move is
-  the launcher's and needs no telling, but no launcher resizes on a tap, and a
-  gesture nobody would guess is a feature nobody has. Three ways out, all
-  launcher-native: Done, Back, or a tap on empty ground.
+  wiggling grid: "Drag to move · Drag a corner to resize", then Done.
+  Drag-to-move is the launcher's and needs no telling, but the corner handle
+  is a small dot, and a gesture nobody would guess is a feature nobody has.
+  Three ways out, all launcher-native: Done, Back, or a tap on empty ground.
 - **Motion is legible and layer-only.** A dropped tile springs into its slot
   (scale and offset together); a tile whose slot changed — under a drag, or
   from an accessibility Move — slides from where it was to where it is. No
@@ -159,8 +159,8 @@ Measured on the API 35+ emulator (edge-to-edge enforced), per the device rules:
 
 | Cut | v2 choice | The fuller version, and when to revisit |
 | --- | --- | --- |
-| Placement | Flow grid: order + span, rows pack greedily, no gaps | Free 2D placement with persistent empty cells needs a custom layout plus collision/reflow. Revisit only if users ask for deliberate whitespace. |
-| Spans | Quarter, half, full (1/2/4 of 4 columns) | Three-quarter width exists on launchers; it earns its place only when a module's content wants it. |
-| Resize | Tap a wiggling tile to cycle its span, with the hint line saying so | Launcher-style drag handles. Revisit if cycling feels like a slot machine once spans grow beyond three. |
-| Value size | Fitted per tile: span sets the ceiling, content sets the size | A fixed size per span reads more uniformly across tiles of the same width but cannot hold a long phrase. Revisit only if fitted neighbours look ragged in practice. |
-| Row heights | Intrinsic — a row is as tall as its tallest tile | Fixed square cells (true "4 square wide"). Revisit when forecast modules arrive and want 2-row heights. |
+| Placement | Lattice: order + size, first-fit with a forward-only cursor, holes stay honest | Free 2D placement with persistent empty cells needs collision/reflow on top of the lattice. Revisit only if users ask for deliberate whitespace. |
+| Sizes | Any 1–4 columns × 1–3 rows, floored per module (`minSize`: a number 1×1, prose 2×1, the sun table's pair 2×1) | **Revisited 2026-09-05.** The three-width catalog went when resizing became a corner drag: a handle that snaps to cells has no reason to skip three-quarters. |
+| Resize | Drag a tile's bottom-right handle while arranging; snaps to cells, ticks per cell, stops at the module's floor. Wider/Narrower/Taller/Shorter as accessibility actions | **Revisited 2026-09-05** — the "slot machine" prediction came true the moment a fourth width was wanted. Tap-to-cycle is gone. |
+| Value size | Fitted per tile, in both dimensions: the hero size is the ceiling, the cells set the size | A fixed size per footprint reads more uniformly across tiles of the same size but cannot hold a long phrase. Revisit only if fitted neighbours look ragged in practice. |
+| Row heights | Fixed cells: height = column width × a per-density aspect (0.9 / 0.8 / 0.75), tuned so the hero fits in two rows | **Revisited 2026-09-05.** Intrinsic rows could not give a tile a height to drag. The forecast grid keeps intrinsic rows — nothing there is resized. |

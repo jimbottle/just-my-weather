@@ -34,12 +34,12 @@ sealed interface ModuleContent {
     data class Sun(val days: List<SunDay>, val zone: ZoneId) : ModuleContent
 }
 
-/** A module resolved to what the screen shows: its label, its content, and how
- * wide it sits. */
+/** A module resolved to what the screen shows: its label, its content, and
+ * its footprint on the grid. */
 data class ModuleValue(
     val module: ModuleKey,
     val label: String,
-    val span: ModuleSpan,
+    val size: ModuleSize,
     val content: ModuleContent,
 )
 
@@ -47,7 +47,7 @@ data class ModuleValue(
  * The glance reduced to render-ready data: the visible modules, in the user's
  * order. Pure, so the mapping from "user's config + latest weather" to "what's
  * on screen" is testable without Compose. There is no special hero slot — a
- * module's prominence is its width, which is the whole idea of the grid.
+ * module's prominence is its size, which is the whole idea of the grid.
  */
 data class RenderedView(
     val modules: List<ModuleValue>,
@@ -74,7 +74,7 @@ fun ViewConfig.render(
             ModuleValue(
                 module = setting.module,
                 label = setting.label,
-                span = setting.span,
+                size = setting.size,
                 content =
                     when (val module = setting.module) {
                         is ModuleKey.Reading ->

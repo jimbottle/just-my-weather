@@ -43,7 +43,7 @@ import io.raylytics.justmyweather.view.Density
 import io.raylytics.justmyweather.view.ForecastMode
 import io.raylytics.justmyweather.view.ModuleKey
 import io.raylytics.justmyweather.view.ModuleSetting
-import io.raylytics.justmyweather.view.ModuleSpan
+import io.raylytics.justmyweather.view.ModuleSize
 import io.raylytics.justmyweather.view.ThemeConfig
 import io.raylytics.justmyweather.view.ThemeMood
 import io.raylytics.justmyweather.view.TypeChoice
@@ -66,7 +66,7 @@ fun CustomizeScreen(
     config: ViewConfig,
     onToggle: (ModuleKey) -> Unit,
     onRelabel: (ModuleKey, String?) -> Unit,
-    onSetSpan: (ModuleKey, ModuleSpan) -> Unit,
+    onResize: (ModuleKey, ModuleSize) -> Unit,
     onMoveUp: (Int) -> Unit,
     onMoveDown: (Int) -> Unit,
     onSetDensity: (Density) -> Unit,
@@ -126,7 +126,7 @@ fun CustomizeScreen(
                         canMoveDown = index < config.items.lastIndex,
                         onToggle = { onToggle(setting.module) },
                         onRelabel = { onRelabel(setting.module, it) },
-                        onSetSpan = { onSetSpan(setting.module, it) },
+                        onResize = { onResize(setting.module, it) },
                         onMoveUp = { onMoveUp(index) },
                         onMoveDown = { onMoveDown(index) },
                     )
@@ -273,6 +273,34 @@ private fun AccentChipRow(
     }
 }
 
+/** One labelled row of cell counts: "Width  1 2 3 4". */
+@Composable
+private fun SizeChips(
+    title: String,
+    options: List<Int>,
+    selected: Int,
+    onSelect: (Int) -> Unit,
+    tag: (Int) -> String,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        ChipRow(
+            options = options,
+            selected = selected,
+            label = { it.toString() },
+            onSelect = onSelect,
+            tag = tag,
+        )
+    }
+}
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun <T> ChipRow(
@@ -389,7 +417,7 @@ private fun FieldRow(
     canMoveDown: Boolean,
     onToggle: () -> Unit,
     onRelabel: (String?) -> Unit,
-    onSetSpan: (ModuleSpan) -> Unit,
+    onResize: (ModuleSize) -> Unit,
     onMoveUp: () -> Unit,
     onMoveDown: () -> Unit,
 ) {
@@ -454,27 +482,26 @@ private fun FieldRow(
                 modifier = Modifier.testTag("toggle_$key"),
             )
         }
-        // Width on the glance grid — the non-gesture twin of tapping the tile
-        // in arrange mode. Only for shown fields: a hidden field has no tile
-        // for the width to describe.
+        // Footprint on the glance grid — the non-gesture twin of dragging the
+        // tile's corner in arrange mode. Only for shown fields: a hidden field
+        // has no tile for the size to describe. Each row offers only the
+        // counts the module can fill: a phrase's width chips start at 2.
         if (setting.visible) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Text(
-                    text = "Width",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                ChipRow(
-                    options = ModuleSpan.entries,
-                    selected = setting.span,
-                    label = { it.label },
-                    onSelect = onSetSpan,
-                    tag = { "span_${key}_${it.key}" },
-                )
-            }
+            val min = setting.module.minSize
+            SizeChips(
+                title = "Width",
+                options = (min.columns..ModuleSize.COLUMNS).toList(),
+                selected = setting.size.columns,
+                onSelect = { onResize(setting.size.copy(columns = it)) },
+                tag = { "width_${key}_$it" },
+            )
+            SizeChips(
+                title = "Height",
+                options = (min.rows..ModuleSize.MAX_ROWS).toList(),
+                selected = setting.size.rows,
+                onSelect = { onResize(setting.size.copy(rows = it)) },
+                tag = { "height_${key}_$it" },
+            )
         }
     }
 }

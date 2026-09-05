@@ -15,6 +15,7 @@ import io.raylytics.justmyweather.data.nws.ForecastPoint
 import io.raylytics.justmyweather.location.LocationResolver
 import io.raylytics.justmyweather.view.ForecastMode
 import io.raylytics.justmyweather.view.ModuleKey
+import io.raylytics.justmyweather.view.ModuleSize
 import io.raylytics.justmyweather.view.ViewConfig
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -380,8 +381,9 @@ class HomeViewModel(
     /** An id this JVM does not recognise costs a fallback, never a crash. */
     private fun parseZone(id: String): ZoneId? = runCatching { ZoneId.of(id) }.getOrNull()
 
-    /** A tap on a wiggling module: step it to the next grid width. */
-    fun cycleModuleSpan(module: ModuleKey) = editConfig { it.cycleSpan(module) }
+    /** A corner drag (or a Wider/Taller action) on a module: give it this
+     * footprint. The config clamps it to what the module can fill. */
+    fun resizeModule(module: ModuleKey, size: ModuleSize) = editConfig { it.resize(module, size) }
 
     /** A drop from the arrange drag: land [module] at this visible slot. */
     fun moveModule(module: ModuleKey, toVisibleIndex: Int) = editConfig { it.moveVisible(module, toVisibleIndex) }

@@ -20,7 +20,7 @@ import io.raylytics.justmyweather.ui.theme.JustMyWeatherTheme
 import io.raylytics.justmyweather.view.Density
 import io.raylytics.justmyweather.view.ModuleContent
 import io.raylytics.justmyweather.view.ModuleKey
-import io.raylytics.justmyweather.view.ModuleSpan
+import io.raylytics.justmyweather.view.ModuleSize
 import io.raylytics.justmyweather.view.ModuleValue
 import io.raylytics.justmyweather.view.WeatherField
 import org.junit.Assert.assertEquals
@@ -34,16 +34,16 @@ import java.time.ZoneId
 
 /**
  * The two things about the module grid that only a device can answer: what the
- * flow packing actually MEASURES to, and whether the arrange operations are
+ * lattice packing actually MEASURES to, and whether the arrange operations are
  * reachable without a gesture.
  *
  * Layout is asserted in real dp rather than by counting composables — the
- * whole point of a span is the width it occupies, and a grid that composed the
+ * whole point of a size is the cells it occupies, and a grid that composed the
  * right tiles at the wrong sizes would pass any structural check. (This is the
  * gap FieldRowsTest used to cover for the old row layout, which the grid
  * replaced.)
  *
- * The gesture path itself — long-press, wiggle, drag, tap-to-cycle — is
+ * The gesture path itself — long-press, wiggle, drag, corner-drag — is
  * verified by .maestro/06-arrange.yaml, which drives real touch events;
  * Compose's test gestures do not reproduce the pointer-stream subtleties this
  * grid was debugged against.
@@ -61,7 +61,7 @@ class ModuleGridTest {
     private val gridWidth = 400.dp
 
     private val moves = mutableListOf<Pair<ModuleKey, Int>>()
-    private val resizes = mutableListOf<ModuleKey>()
+    private val resizes = mutableListOf<Pair<ModuleKey, ModuleSize>>()
 
     private fun show(vararg modules: ModuleValue) {
         compose.setContent {
@@ -72,7 +72,7 @@ class ModuleGridTest {
                         arranging = false,
                         spec = Density.COMFORTABLE.spec(),
                         onStartArranging = {},
-                        onCycleSpan = { resizes += it },
+                        onResize = { field, size -> resizes += field to size },
                         onMove = { field, index -> moves += field to index },
                     )
                 }
@@ -84,13 +84,14 @@ class ModuleGridTest {
      * alias would read worse than the subtraction it hides. */
     private fun DpRect.span(): androidx.compose.ui.unit.Dp = right - left
 
-    private fun module(field: WeatherField, span: ModuleSpan) = module(ModuleKey.Reading(field), span)
+    private fun module(field: WeatherField, columns: Int, rows: Int = 1) =
+        module(ModuleKey.Reading(field), columns, rows)
 
-    private fun module(key: ModuleKey, span: ModuleSpan) =
+    private fun module(key: ModuleKey, columns: Int, rows: Int = 1) =
         ModuleValue(
             module = key,
             label = key.defaultLabel,
-            span = span,
+            size = ModuleSize(columns, rows),
             content =
                 when (key) {
                     is ModuleKey.Reading -> ModuleContent.Reading("—")
@@ -131,11 +132,11 @@ class ModuleGridTest {
     }
 
     @Test
-    fun spansMeasureToTheirShareOfTheFourColumnGrid() {
+    fun sizesMeasureToTheirShareOfTheFourColumnGrid() {
         show(
-            module(WeatherField.TEMPERATURE, ModuleSpan.FULL),
-            module(WeatherField.WIND, ModuleSpan.QUARTER),
-            module(WeatherField.PRESSURE, ModuleSpan.QUARTER),
+            module(WeatherField.TEMPERATURE, 4, 2),
+            module(WeatherField.WIND, 1),
+            module(WeatherField.PRESSURE, 1),
         )
         val full = compose.onNodeWithTag("module_temperature").getUnclippedBoundsInRoot()
         val wind = compose.onNodeWithTag("module_wind").getUnclippedBoundsInRoot()
@@ -152,6 +153,29 @@ class ModuleGridTest {
         assertTrue("wind sits left of pressure", wind.left < pressure.left)
         // …and that row is BELOW the full tile, which took its own.
         assertTrue("the full tile got its own row", wind.top > full.bottom - 1.dp)
+        // Two rows of cells is about twice one — the lattice is a lattice.
+        assertTrue("the 4×2 hero is about twice a cell tall", full.height() > wind.height() * 1.8f)
+    }
+
+    /** Same shadowing story as [span]: `DpRect.height` vs the height import. */
+    private fun DpRect.height(): androidx.compose.ui.unit.Dp = bottom - top
+
+    @Test
+    fun aTallTileKeepsItsNeighboursBesideItInTheCellsItLeaves() {
+        // 2×2 at the origin, then two 2×1: they stack beside the tall one, on
+        // its two rows, rather than dropping below it.
+        show(
+            module(WeatherField.CONDITIONS, 2, 2),
+            module(WeatherField.WIND, 2),
+            module(WeatherField.PRESSURE, 2),
+        )
+        val tall = compose.onNodeWithTag("module_conditions").getUnclippedBoundsInRoot()
+        val wind = compose.onNodeWithTag("module_wind").getUnclippedBoundsInRoot()
+        val pressure = compose.onNodeWithTag("module_pressure").getUnclippedBoundsInRoot()
+        assertEquals("wind shares the tall tile's top", tall.top.value, wind.top.value, 0.5f)
+        assertTrue("wind sits right of the tall tile", wind.left > tall.right - 1.dp)
+        assertTrue("pressure sits under wind", pressure.top > wind.bottom - 1.dp)
+        assertTrue("and still beside the tall tile", pressure.bottom <= tall.bottom + 1.dp)
     }
 
     @Test
@@ -160,8 +184,8 @@ class ModuleGridTest {
         // tiles keep their widths instead of growing to fill the row, which is
         // what makes the grid legible as a grid.
         show(
-            module(WeatherField.CONDITIONS, ModuleSpan.HALF),
-            module(WeatherField.WIND, ModuleSpan.QUARTER),
+            module(WeatherField.CONDITIONS, 2),
+            module(WeatherField.WIND, 1),
         )
         val half = compose.onNodeWithTag("module_conditions").getUnclippedBoundsInRoot()
         val quarter = compose.onNodeWithTag("module_wind").getUnclippedBoundsInRoot()
@@ -173,24 +197,46 @@ class ModuleGridTest {
     @Test
     fun everyTileOffersResizeWithoutAnyGesture() {
         show(
-            module(WeatherField.TEMPERATURE, ModuleSpan.FULL),
-            module(WeatherField.CONDITIONS, ModuleSpan.HALF),
+            module(WeatherField.TEMPERATURE, 4, 2),
+            module(WeatherField.CONDITIONS, 2),
         )
-        // Named for where it lands, so the action itself says what it will do.
-        invoke(WeatherField.TEMPERATURE, "Resize to quarter") // full wraps to quarter
-        invoke(WeatherField.CONDITIONS, "Resize to full")
+        // One cell in one direction per action, and each says which.
+        invoke(WeatherField.TEMPERATURE, "Narrower")
+        invoke(WeatherField.TEMPERATURE, "Shorter")
+        invoke(WeatherField.CONDITIONS, "Wider")
+        invoke(WeatherField.CONDITIONS, "Taller")
         assertEquals(
-            listOf(reading(WeatherField.TEMPERATURE), reading(WeatherField.CONDITIONS)),
+            listOf(
+                reading(WeatherField.TEMPERATURE) to ModuleSize(3, 2),
+                reading(WeatherField.TEMPERATURE) to ModuleSize(4, 1),
+                reading(WeatherField.CONDITIONS) to ModuleSize(3, 1),
+                reading(WeatherField.CONDITIONS) to ModuleSize(2, 2),
+            ),
             resizes,
         )
     }
 
     @Test
+    fun resizeActionsStopAtTheGridAndAtTheModulesMinimum() {
+        // The hero at full width cannot go wider; conditions at its 2-wide
+        // floor cannot go narrower, and at one row cannot go shorter. An
+        // action that would do nothing is absent, not merely ignored.
+        show(
+            module(WeatherField.TEMPERATURE, 4, 2),
+            module(WeatherField.CONDITIONS, 2),
+        )
+        val hero = actionsOn(WeatherField.TEMPERATURE).map { it.label }
+        assertTrue("$hero", "Wider" !in hero && "Narrower" in hero && "Taller" in hero && "Shorter" in hero)
+        val prose = actionsOn(WeatherField.CONDITIONS).map { it.label }
+        assertTrue("$prose", "Wider" in prose && "Narrower" !in prose && "Taller" in prose && "Shorter" !in prose)
+    }
+
+    @Test
     fun moveActionsReorderAndStopAtTheEnds() {
         show(
-            module(WeatherField.TEMPERATURE, ModuleSpan.FULL),
-            module(WeatherField.CONDITIONS, ModuleSpan.HALF),
-            module(WeatherField.WIND, ModuleSpan.QUARTER),
+            module(WeatherField.TEMPERATURE, 4, 2),
+            module(WeatherField.CONDITIONS, 2),
+            module(WeatherField.WIND, 1),
         )
         invoke(WeatherField.CONDITIONS, "Move up")
         invoke(WeatherField.CONDITIONS, "Move down")
@@ -211,15 +257,15 @@ class ModuleGridTest {
     }
 
     @Test
-    fun aTileAnnouncesItsWidthAsState() {
-        show(module(WeatherField.WIND, ModuleSpan.QUARTER))
+    fun aTileAnnouncesItsSizeAsState() {
+        show(module(WeatherField.WIND, 1))
         val state =
             compose
                 .onNodeWithTag("module_wind")
                 .fetchSemanticsNode()
                 .config
                 .getOrNull(SemanticsProperties.StateDescription)
-        assertEquals("Quarter width", state)
+        assertEquals("1 wide, 1 tall", state)
         compose.onNodeWithTag("module_wind").assertIsDisplayed()
     }
 
@@ -230,7 +276,7 @@ class ModuleGridTest {
         // which date its times belong to. Between sunrise and sunset "the next
         // sunrise" and "the next sunset" fall on different dates, which is
         // exactly what flattening would lose.
-        show(module(ModuleKey.Sun, ModuleSpan.FULL))
+        show(module(ModuleKey.Sun, 4, 2))
         compose.onNodeWithText("Sunrise").assertIsDisplayed()
         compose.onNodeWithText("Sunset").assertIsDisplayed()
         compose.onNodeWithText("Aug 15").assertIsDisplayed()
@@ -239,11 +285,11 @@ class ModuleGridTest {
 
     @Test
     fun sunModuleCondensesToTodaysPairWhenNarrower() {
-        // Narrower: today's pair only — and still labelled in words rather
+        // Smaller: today's pair only — and still labelled in words rather
         // than reduced to arrows, because at this size there is no column
         // position left to carry the distinction. The second day's row is
         // dropped rather than squeezed.
-        show(module(ModuleKey.Sun, ModuleSpan.QUARTER))
+        show(module(ModuleKey.Sun, 2))
         compose.onNodeWithText("Sunrise").assertIsDisplayed()
         compose.onNodeWithText("Sunset").assertIsDisplayed()
         compose.onNodeWithText("Aug 16").assertDoesNotExist()
@@ -251,16 +297,16 @@ class ModuleGridTest {
 
     @Test
     fun aLongValueShrinksToStayInsideItsTile() {
-        // The value is fitted, not styled per span: a conditions phrase in a
-        // quarter tile would otherwise break "Thunderstorms" across lines or
-        // run past the border. Width is prominence, and a value that escapes
-        // its tile has no width to be prominent within.
+        // The value is fitted, not styled per size: a conditions phrase in a
+        // one-row tile would otherwise break "Thunderstorms" across lines, run
+        // past the border, or stand taller than its cells. Size is prominence,
+        // and a value that escapes its tile has no size to be prominent within.
         val phrase = "Chance Showers And Thunderstorms"
         show(
             ModuleValue(
                 module = reading(WeatherField.CONDITIONS),
                 label = "Conditions",
-                span = ModuleSpan.QUARTER,
+                size = ModuleSize(2, 1),
                 content = ModuleContent.Reading(phrase),
             ),
         )
@@ -275,7 +321,27 @@ class ModuleGridTest {
     fun theSoleTileHasNoMoveActionsAtAll() {
         // One module is a legal config; offering "Move up"/"Move down" on a
         // grid of one would be offering to reorder nothing.
-        show(module(WeatherField.TEMPERATURE, ModuleSpan.FULL))
-        assertEquals(listOf("Resize to quarter"), actionsOn(WeatherField.TEMPERATURE).map { it.label })
+        show(module(WeatherField.TEMPERATURE, 4, 2))
+        assertEquals(listOf("Narrower", "Taller", "Shorter"), actionsOn(WeatherField.TEMPERATURE).map { it.label })
+    }
+
+    @Test
+    fun aSingleCellTemperatureFitsInsideItsCell() {
+        // The ask that started the lattice: the hero shrunk to one cell. The
+        // value must land inside the cell in both directions — height is
+        // what bounds a short reading, and a 1×1 has little of it.
+        show(
+            ModuleValue(
+                module = reading(WeatherField.TEMPERATURE),
+                label = "Temperature",
+                size = ModuleSize.CELL,
+                content = ModuleContent.Reading("72°"),
+            ),
+        )
+        val tile = compose.onNodeWithTag("module_temperature").getUnclippedBoundsInRoot()
+        val value = compose.onNodeWithText("72°", useUnmergedTree = true).getUnclippedBoundsInRoot()
+        assertTrue("a cell is about a quarter of the grid, was ${tile.span()}", tile.span() < gridWidth * 0.3f)
+        assertTrue("value ends inside its cell", value.right <= tile.right && value.bottom <= tile.bottom)
+        assertTrue("value starts inside its cell", value.left >= tile.left && value.top >= tile.top)
     }
 }

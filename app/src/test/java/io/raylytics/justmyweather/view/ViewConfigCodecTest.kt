@@ -170,30 +170,57 @@ class ViewConfigCodecTest {
     }
 
     @Test
-    fun `module spans round-trip, and older or unknown spans fall back per-field`() {
-        val resized = ViewConfig.DEFAULT.setSpan(reading(WeatherField.TEMPERATURE), ModuleSpan.HALF)
+    fun `module sizes round-trip, and a config without them falls back per-module`() {
+        val resized = ViewConfig.DEFAULT.resize(reading(WeatherField.TEMPERATURE), ModuleSize(3, 1))
         val restored = ViewConfigCodec.decode(ViewConfigCodec.encode(resized))
         assertEquals(
-            ModuleSpan.HALF,
-            restored.items.first { it.module == reading(WeatherField.TEMPERATURE) }.span,
+            ModuleSize(3, 1),
+            restored.items.first { it.module == reading(WeatherField.TEMPERATURE) }.size,
         )
 
-        // A config written before modules had widths carries no span key. Each
-        // field falls back to ITS default — temperature full, wind quarter —
-        // so an update reproduces the old hero-and-rows proportions.
+        // A config written before modules had sizes carries neither span nor
+        // columns. Each module falls back to ITS default — temperature 4×2,
+        // wind a cell — so an update reproduces the old hero-and-rows look.
         val legacy = """[{"key":"temperature","visible":true},{"key":"wind","visible":true}]"""
         val decoded = ViewConfigCodec.decode(legacy)
-        assertEquals(
-            ModuleSpan.FULL,
-            decoded.items.first { it.module == reading(WeatherField.TEMPERATURE) }.span,
-        )
-        assertEquals(ModuleSpan.QUARTER, decoded.items.first { it.module == reading(WeatherField.WIND) }.span)
+        assertEquals(ModuleSize(4, 2), decoded.items.first { it.module == reading(WeatherField.TEMPERATURE) }.size)
+        assertEquals(ModuleSize.CELL, decoded.items.first { it.module == reading(WeatherField.WIND) }.size)
+    }
 
-        // An unknown span token (a future size this build doesn't know) falls
-        // back the same way rather than failing the whole config.
-        val unknown = """{"items":[{"key":"wind","visible":true,"span":"three-quarters"}]}"""
-        val wind = ViewConfigCodec.decode(unknown).items.first { it.module == reading(WeatherField.WIND) }
-        assertEquals(ModuleSpan.QUARTER, wind.span)
+    @Test
+    fun `the legacy width token becomes columns, with the rows its content needed`() {
+        // Widths carry over. Rows did not exist — a row was as tall as its
+        // content — so a module at its default width keeps the default's
+        // height (the hero needed two rows; so does the sun table), and one
+        // the user had narrowed was a one-liner and stays one row.
+        val legacy =
+            """{"items":[
+                {"key":"temperature","visible":true,"span":"full"},
+                {"key":"conditions","visible":true,"span":"quarter"},
+                {"key":"sun","visible":true,"span":"half"},
+                {"key":"wind","visible":true,"span":"three-quarters"}
+            ]}"""
+        val decoded = ViewConfigCodec.decode(legacy)
+
+        fun sizeOf(module: ModuleKey) = decoded.items.first { it.module == module }.size
+        assertEquals(ModuleSize(4, 2), sizeOf(reading(WeatherField.TEMPERATURE)))
+        // Narrowed below its minimum in the old model's terms: clamped up.
+        assertEquals(ModuleSize(2, 1), sizeOf(reading(WeatherField.CONDITIONS)))
+        assertEquals(ModuleSize(2, 1), sizeOf(ModuleKey.Sun))
+        // An unknown token (a size some other build knew) falls back to the
+        // module's default rather than failing the whole config.
+        assertEquals(ModuleSize.CELL, sizeOf(reading(WeatherField.WIND)))
+    }
+
+    @Test
+    fun `a stored size outside what the module can fill is clamped, not rejected`() {
+        val stored = """{"items":[{"key":"conditions","visible":true,"columns":1,"rows":9}]}"""
+        val conditions = ViewConfigCodec.decode(stored).items.first { it.module == reading(WeatherField.CONDITIONS) }
+        assertEquals(ModuleSize(2, ModuleSize.MAX_ROWS), conditions.size)
+        // The new pair is what this build writes; the legacy token is not.
+        val written = ViewConfigCodec.encode(ViewConfig.DEFAULT)
+        assertTrue(written.contains("\"columns\":4"), written)
+        assertTrue(!written.contains("\"span\""), written)
     }
 
     @Test

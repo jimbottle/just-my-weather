@@ -30,18 +30,32 @@ enum class WeatherField(
     val isNumeric: Boolean get() = this != CONDITIONS
 
     /**
-     * The grid width this field's module ships at (the user resizes from
-     * there). Sized to the content: temperature is the hero the app opens on,
-     * conditions is free text that wants room to say "Chance Showers And
-     * Thunderstorms", pressure's value string is the longest of the numerics,
-     * and wind/precip are short enough for a quarter tile.
+     * The footprint this field's module ships at (the user resizes from
+     * there). Sized to the content: temperature is the hero the app opens on
+     * and needs two rows to draw at hero size, conditions is free text that
+     * wants room to say "Chance Showers And Thunderstorms", pressure's value
+     * string is the longest of the numerics, and wind/precip are short enough
+     * for a single cell.
      */
-    val defaultSpan: ModuleSpan
+    val defaultSize: ModuleSize
         get() =
             when (this) {
-                TEMPERATURE -> ModuleSpan.FULL
-                CONDITIONS, PRESSURE -> ModuleSpan.HALF
-                WIND, PRECIPITATION -> ModuleSpan.QUARTER
+                TEMPERATURE -> ModuleSize(4, 2)
+                CONDITIONS, PRESSURE -> ModuleSize(2, 1)
+                WIND, PRECIPITATION -> ModuleSize.CELL
+            }
+
+    /**
+     * The smallest footprint this field can be shrunk to. A number with its
+     * unit fits one cell — the value is fitted to its tile, so "30.12 inHg"
+     * wraps onto two small lines rather than spilling — but a conditions
+     * phrase is prose, and prose in one cell is a column of broken words.
+     */
+    val minSize: ModuleSize
+        get() =
+            when (this) {
+                CONDITIONS -> ModuleSize(2, 1)
+                TEMPERATURE, WIND, PRECIPITATION, PRESSURE -> ModuleSize.CELL
             }
 
     /** Whether the hourly forecast carries this field, so a forecast-window
