@@ -465,11 +465,13 @@ private fun ForecastPicker(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 4.dp),
         )
+        // Snapped in code rather than with the slider's own `steps`: forty
+        // stops draw forty tick marks along the track, which on the phone
+        // read as a dotted line rather than a control.
         Slider(
             value = hourlyHours.toFloat(),
             onValueChange = { onSetHourlyHours(snapToStep(it)) },
             valueRange = HourlyHours.MIN.toFloat()..HourlyHours.MAX.toFloat(),
-            steps = (HourlyHours.MAX - HourlyHours.MIN) / HourlyHours.STEP - 1,
             modifier = Modifier.testTag("hourly-hours-slider"),
         )
         // What a tile carries beside its temperature. Multi-select: these

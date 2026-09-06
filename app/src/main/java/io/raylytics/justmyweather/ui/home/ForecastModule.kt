@@ -256,19 +256,21 @@ private fun HourTile(
         top = "${at.format(hourFormat).lowercase(Locale.getDefault())} ${at.format(shortDateFormat)}",
         bottom = hour.shortForecast?.takeIf { ForecastElement.CONDITIONS in elements },
         modifier = modifier,
+        below = {
+            ElementLines(
+                elements = elements,
+                precipChance = hour.precipProbabilityPercent,
+                windMph = hour.windMph,
+                windDirection = hour.windDirection,
+                humidity = hour.relativeHumidityPercent,
+                dewpointF = hour.dewpointF,
+            )
+        },
     ) {
         Text(
             text = hour.temperatureF.degrees(),
             style = MaterialTheme.typography.titleLarge,
             color = MaterialTheme.colorScheme.onBackground,
-        )
-        ElementLines(
-            elements = elements,
-            precipChance = hour.precipProbabilityPercent,
-            windMph = hour.windMph,
-            windDirection = hour.windDirection,
-            humidity = hour.relativeHumidityPercent,
-            dewpointF = hour.dewpointF,
         )
     }
 }
@@ -284,6 +286,16 @@ private fun CombinedDayTile(
         top = day.name,
         bottom = day.shortForecast?.takeIf { ForecastElement.CONDITIONS in elements },
         modifier = modifier,
+        below = {
+            ElementLines(
+                elements = elements,
+                // Either half's chance: the day's rain is the day's rain.
+                precipChance =
+                    listOfNotNull(day.day?.precipProbabilityPercent, day.night?.precipProbabilityPercent).maxOrNull(),
+                windMph = day.day?.windMph,
+                windDirection = day.day?.windDirection,
+            )
+        },
     ) {
         Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(
@@ -297,14 +309,6 @@ private fun CombinedDayTile(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        ElementLines(
-            elements = elements,
-            // Either half's chance: the day's rain is the day's rain.
-            precipChance =
-                listOfNotNull(day.day?.precipProbabilityPercent, day.night?.precipProbabilityPercent).maxOrNull(),
-            windMph = day.day?.windMph,
-            windDirection = day.day?.windDirection,
-        )
     }
 }
 
@@ -320,6 +324,14 @@ private fun HalfDayTile(
         top = period.name,
         bottom = period.shortForecast?.takeIf { ForecastElement.CONDITIONS in elements },
         modifier = modifier,
+        below = {
+            ElementLines(
+                elements = elements,
+                precipChance = period.precipProbabilityPercent,
+                windMph = period.windMph,
+                windDirection = period.windDirection,
+            )
+        },
     ) {
         Text(
             text = period.temperatureF.degrees(),
@@ -334,27 +346,31 @@ private fun HalfDayTile(
                     MaterialTheme.colorScheme.onSurfaceVariant
                 },
         )
-        ElementLines(
-            elements = elements,
-            precipChance = period.precipProbabilityPercent,
-            windMph = period.windMph,
-            windDirection = period.windDirection,
-        )
     }
 }
 
 /**
  * The three zones. [top] is pinned to the top edge, [bottom] (when there is
- * one) to the bottom, and the [middle] floats between them — weighted
- * spacers, not a Box with alignments, because a Column's intrinsic height is
- * the SUM of its children and a Box's is the tallest, and the row is sized
- * by that intrinsic: a Box would let the zones overlap in a short row.
+ * one) to the bottom, and the [middle] — the temperature — sits exactly
+ * halfway between them. What the user has switched on ([below]) hangs under
+ * the temperature in the lower half, and does not move it: the two halves
+ * are weighted equally, and the lower one is measured with its content, so
+ * a tile with a chance of rain grows both halves by the same amount and its
+ * temperature stays level with a neighbour's that has none. (Seen on the
+ * Pixel 9 before this: "1%" under one tile's number lifted it a line above
+ * the next tile's.)
+ *
+ * Weighted slots, not a Box with alignments, because a Column's intrinsic
+ * height is the SUM of its children and a Box's is the tallest, and the row
+ * is sized by that intrinsic: a Box would let the zones overlap in a short
+ * row.
  */
 @Composable
 private fun ZonedTile(
     top: String,
     bottom: String?,
     modifier: Modifier = Modifier,
+    below: @Composable ColumnScope.() -> Unit = {},
     middle: @Composable ColumnScope.() -> Unit,
 ) {
     TileShell(borderColor = MaterialTheme.colorScheme.surfaceVariant, modifier = modifier) {
@@ -371,12 +387,23 @@ private fun ZonedTile(
             )
             Spacer(Modifier.weight(1f))
             middle()
-            Spacer(Modifier.weight(1f))
+            Column(
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                content = below,
+            )
             bottom?.let {
                 Text(
                     text = it,
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    // Always two lines tall, even for "Clear": the bottom
+                    // zone's height is what fixes the middle's, and a row
+                    // where "Mostly Clear" wraps beside a "Clear" that does
+                    // not put the two temperatures at different heights
+                    // (seen on the Pixel 9). An empty second line is the
+                    // price of the temperatures reading straight across.
+                    minLines = 2,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     textAlign = TextAlign.Center,
