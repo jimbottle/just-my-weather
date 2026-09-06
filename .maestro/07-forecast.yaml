@@ -41,7 +41,7 @@ appId: io.raylytics.justmyweather
 # and Back puts the glance back as it was. On by default; the switch is on
 # the customize screen ("Tap a tile for details").
 - tapOn:
-    text: ".* (am|pm)"
+    text: ".* (am|pm) [0-9]+/[0-9]+"
     index: 0
 - assertVisible:
     id: "detailSheet"

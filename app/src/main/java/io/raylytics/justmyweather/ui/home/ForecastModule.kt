@@ -58,8 +58,9 @@ import kotlin.math.roundToInt
  * This is bounded rather than NWS's full ~156 points because the grid is drawn
  * eagerly, not lazily — thirty-nine rows of tiles would be composed whether or
  * not anyone scrolled to them. Twenty-four is the span people actually plan
- * against, and one midnight crossing needs no date labels to read: "11 pm"
- * then "12 am" is plainly tonight.
+ * against. Every tile still names its day ("7 pm 9/6"): the strip crosses
+ * midnight, and a tile scrolled into view on its own has no neighbour to
+ * tell it from tomorrow's.
  */
 private const val HOURLY_TILES = 24
 
@@ -235,12 +236,10 @@ private fun HourTile(hour: ForecastPoint, zone: ZoneId, modifier: Modifier = Mod
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
+            // "7 pm 9/6": the hour, then the day it belongs to, on one line.
+            val at = hour.startTime.atZone(zone)
             Text(
-                text =
-                    hour.startTime
-                        .atZone(zone)
-                        .format(hourFormat)
-                        .lowercase(Locale.getDefault()),
+                text = "${at.format(hourFormat).lowercase(Locale.getDefault())} ${at.format(shortDateFormat)}",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
