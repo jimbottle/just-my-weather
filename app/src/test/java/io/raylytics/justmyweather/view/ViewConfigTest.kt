@@ -235,6 +235,12 @@ class ViewConfigTest {
     }
 
     @Test
+    fun `tap-for-details ships on and is a plain switch`() {
+        assertTrue(ViewConfig.DEFAULT.tapForDetails)
+        assertFalse(ViewConfig.DEFAULT.setTapForDetails(false).tapForDetails)
+    }
+
+    @Test
     fun `the default config ships at the comfortable density`() {
         assertEquals(Density.COMFORTABLE, ViewConfig.DEFAULT.density)
     }

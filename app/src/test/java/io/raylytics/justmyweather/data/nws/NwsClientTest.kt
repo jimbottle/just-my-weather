@@ -201,6 +201,58 @@ class NwsClientTest {
     }
 
     @Test
+    fun `getHourlyForecast carries direction, humidity and dew point for the detail sheet`() = runTest {
+        val (client, _) =
+            client(
+                HttpResult(
+                    200,
+                    """
+                    {"properties":{"periods":[
+                      {"startTime":"2026-06-24T18:00:00+00:00","temperature":72,"temperatureUnit":"F",
+                       "windSpeed":"5 mph","windDirection":"SW",
+                       "relativeHumidity":{"unitCode":"wmoUnit:percent","value":60},
+                       "dewpoint":{"unitCode":"wmoUnit:degC","value":20}},
+                      {"startTime":"2026-06-24T19:00:00+00:00","temperature":70,"temperatureUnit":"F",
+                       "windSpeed":"5 mph","windDirection":""}
+                    ]}}
+                    """.trimIndent(),
+                    null,
+                ),
+            )
+        val forecast = client.getHourlyForecast("OKX", 33, 35)
+        assertEquals("SW", forecast[0].windDirection)
+        assertEquals(60.0, forecast[0].relativeHumidityPercent!!, 1e-6)
+        // Dew point is Celsius on the wire even when the temperature is not.
+        assertEquals(68.0, forecast[0].dewpointF!!, 1e-6)
+        // Absent or blank stays null, never "" or zero.
+        assertEquals(null, forecast[1].windDirection)
+        assertEquals(null, forecast[1].relativeHumidityPercent)
+        assertEquals(null, forecast[1].dewpointF)
+    }
+
+    @Test
+    fun `getDailyForecast carries wind and the detailed prose`() = runTest {
+        val (client, _) =
+            client(
+                HttpResult(
+                    200,
+                    """
+                    {"properties":{"periods":[
+                      {"name":"Friday","isDaytime":true,"temperature":85,"temperatureUnit":"F",
+                       "windSpeed":"5 to 10 mph","windDirection":"S",
+                       "shortForecast":"Sunny","detailedForecast":"Sunny, with a high near 85."}
+                    ]}}
+                    """.trimIndent(),
+                    null,
+                ),
+            )
+        val daily = client.getDailyForecast("OKX", 33, 35)
+        assertEquals(10.0, daily[0].windMph!!, 1e-6)
+        assertEquals("S", daily[0].windDirection)
+        assertEquals("Sunny, with a high near 85.", daily[0].detailedForecast)
+    }
+
+    @Test
     fun `getDailyForecast parses named half-day periods and drops nameless ones`() = runTest {
         val (client, transport) =
             client(

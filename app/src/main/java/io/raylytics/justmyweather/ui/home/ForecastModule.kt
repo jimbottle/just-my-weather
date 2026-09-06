@@ -25,6 +25,8 @@ import androidx.compose.ui.unit.dp
 import io.raylytics.justmyweather.data.nws.DailyPeriod
 import io.raylytics.justmyweather.data.nws.ForecastPoint
 import io.raylytics.justmyweather.view.DailyStyle
+import io.raylytics.justmyweather.view.Detail
+import io.raylytics.justmyweather.view.Details
 import io.raylytics.justmyweather.view.ForecastMode
 import io.raylytics.justmyweather.view.ModuleContent
 import java.time.ZoneId
@@ -88,7 +90,12 @@ internal fun ForecastModuleContent(
     gap: Dp,
     arranging: Boolean,
     onSetMode: (ForecastMode) -> Unit,
+    /** A tap on an hour or day opens everything it carries; null when
+     * tap-for-details is off. Inert while arranging, when a tap on a tile
+     * is part of a gesture that belongs to the grid. */
+    onOpenDetail: ((Detail) -> Unit)?,
 ) {
+    val open = onOpenDetail?.takeIf { !arranging }
     Column(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -113,7 +120,13 @@ internal fun ForecastModuleContent(
                             gap = gap,
                             gridColumns = columns,
                             modifier = Modifier.fillMaxWidth(),
-                        ) { hour, _, tileModifier -> HourTile(hour, content.zone, tileModifier) }
+                        ) { hour, _, tileModifier ->
+                            HourTile(
+                                hour = hour,
+                                zone = content.zone,
+                                modifier = tileModifier.opens(open) { Details.ofHour(hour, content.zone) },
+                            )
+                        }
                     }
                 }
 
@@ -133,7 +146,9 @@ internal fun ForecastModuleContent(
                                     gap = gap,
                                     gridColumns = columns,
                                     modifier = Modifier.fillMaxWidth(),
-                                ) { day, _, tileModifier -> CombinedDayTile(day, tileModifier) }
+                                ) { day, _, tileModifier ->
+                                    CombinedDayTile(day, tileModifier.opens(open) { day.detail() })
+                                }
 
                             DailyStyle.HALF_DAY ->
                                 TileGrid(
@@ -142,13 +157,23 @@ internal fun ForecastModuleContent(
                                     gap = gap,
                                     gridColumns = columns,
                                     modifier = Modifier.fillMaxWidth(),
-                                ) { period, _, tileModifier -> HalfDayTile(period, tileModifier) }
+                                ) { period, _, tileModifier ->
+                                    HalfDayTile(period, tileModifier.opens(open) { Details.ofPeriod(period) })
+                                }
                         }
                     }
                 }
         }
     }
 }
+
+/**
+ * A tile that opens a detail on tap, or an inert one when there is nothing
+ * to open. No clickable at all in the inert case, so a screen reader is not
+ * offered a tap that does nothing and no ripple answers one.
+ */
+private fun Modifier.opens(open: ((Detail) -> Unit)?, detail: () -> Detail): Modifier =
+    if (open == null) this else clickable { open(detail()) }
 
 /**
  * The module's label row: "Forecast" on the left, the framing on the right.

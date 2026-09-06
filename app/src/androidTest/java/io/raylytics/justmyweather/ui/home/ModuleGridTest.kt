@@ -13,6 +13,7 @@ import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.DpRect
 import androidx.compose.ui.unit.dp
 import io.raylytics.justmyweather.data.SunDay
@@ -64,6 +65,7 @@ class ModuleGridTest {
 
     private val moves = mutableListOf<Pair<ModuleKey, Int>>()
     private val resizes = mutableListOf<Pair<ModuleKey, ModuleSize>>()
+    private val opened = mutableListOf<ModuleKey>()
 
     private fun show(vararg modules: ModuleValue) {
         compose.setContent {
@@ -77,6 +79,7 @@ class ModuleGridTest {
                         onResize = { field, size -> resizes += field to size },
                         onMove = { field, index -> moves += field to index },
                         onSetForecastMode = {},
+                        onOpenModule = { opened += it.module },
                     )
                 }
             }
@@ -334,7 +337,24 @@ class ModuleGridTest {
         // One module is a legal config; offering "Move up"/"Move down" on a
         // grid of one would be offering to reorder nothing.
         show(module(WeatherField.TEMPERATURE, 4, 2))
-        assertEquals(listOf("Narrower", "Taller", "Shorter"), actionsOn(WeatherField.TEMPERATURE).map { it.label })
+        assertEquals(
+            listOf("Details", "Narrower", "Taller", "Shorter"),
+            actionsOn(WeatherField.TEMPERATURE).map { it.label },
+        )
+    }
+
+    @Test
+    fun aTapOutsideArrangeModeOpensTheTile() {
+        show(
+            module(WeatherField.TEMPERATURE, 4, 2),
+            module(WeatherField.WIND, 1),
+        )
+        compose.onNodeWithTag("module_wind").performClick()
+        compose.waitForIdle()
+        assertEquals(listOf(reading(WeatherField.WIND)), opened)
+        // The accessibility action is the same tap for a user who cannot tap.
+        invoke(WeatherField.TEMPERATURE, "Details")
+        assertEquals(listOf(reading(WeatherField.WIND), reading(WeatherField.TEMPERATURE)), opened)
     }
 
     @Test

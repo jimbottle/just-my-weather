@@ -49,6 +49,15 @@ class ViewConfigCodecTest {
     }
 
     @Test
+    fun `tap-for-details round-trips, and a config from before it reads as on`() {
+        val off = ViewConfigCodec.decode(ViewConfigCodec.encode(ViewConfig.DEFAULT.setTapForDetails(false)))
+        assertFalse(off.tapForDetails)
+        // Absent key: the shipped behaviour, not the opt-out.
+        val older = """{"density":"comfortable","items":[{"key":"temperature","visible":true}]}"""
+        assertTrue(ViewConfigCodec.decode(older).tapForDetails)
+    }
+
+    @Test
     fun `a legacy view mode splits into show-the-forecast plus a framing`() {
         // The old shape was one screen-wide mode, where "now" meant no forecast
         // at all. Each value has to land on the arrangement that looks the same

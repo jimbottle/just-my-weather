@@ -37,6 +37,8 @@ import io.raylytics.justmyweather.data.SunDay
 import io.raylytics.justmyweather.data.WeatherSnapshot
 import io.raylytics.justmyweather.data.nws.ActiveAlert
 import io.raylytics.justmyweather.view.AlertBannerPosition
+import io.raylytics.justmyweather.view.Detail
+import io.raylytics.justmyweather.view.Details
 import io.raylytics.justmyweather.view.ForecastData
 import io.raylytics.justmyweather.view.ForecastMode
 import io.raylytics.justmyweather.view.ModuleKey
@@ -92,6 +94,12 @@ fun HomeScreen(
     // Back leaves arrange mode before it leaves the screen — the launcher's
     // contract, and the gesture a wiggling grid teaches you to expect.
     BackHandler(enabled = arranging) { arranging = false }
+    // The detail a tap opened, if any. Session UI like `arranging`, not
+    // saved: a sheet is a look at more, and a process death should bring the
+    // glance back, not a sheet over it. Its content is a value built at tap
+    // time (view/Details), so the sheet does not chase the data underneath.
+    var detail by remember { mutableStateOf<Detail?>(null) }
+    detail?.let { DetailSheet(detail = it, onDismiss = { detail = null }) }
     Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         // The controls are pinned, not scrolled. A tall day — an alert banner,
         // the sun table and an hourly strip all at once — used to push them
@@ -142,6 +150,10 @@ fun HomeScreen(
                             onResizeModule = onResizeModule,
                             onMoveModule = onMoveModule,
                             onPlaces = onPlaces,
+                            // The option: off means no handler at all, so
+                            // nothing below draws a tap affordance for a
+                            // tap that does nothing.
+                            onOpenDetail = if (state.config.tapForDetails) ({ detail = it }) else null,
                         )
                 }
             }
@@ -170,6 +182,7 @@ private fun GlanceView(
     onResizeModule: (ModuleKey, ModuleSize) -> Unit,
     onMoveModule: (ModuleKey, Int) -> Unit,
     onPlaces: () -> Unit,
+    onOpenDetail: ((Detail) -> Unit)?,
 ) {
     val snapshot = state.snapshot
     val config = state.config
@@ -219,6 +232,7 @@ private fun GlanceView(
             onResizeModule = onResizeModule,
             onMoveModule = onMoveModule,
             onSetForecastMode = onSetMode,
+            onOpenDetail = onOpenDetail,
         )
 
         // Only while arranging, right under the grid it edits. The wiggle
@@ -316,6 +330,8 @@ private fun NowContent(
     onResizeModule: (ModuleKey, ModuleSize) -> Unit,
     onMoveModule: (ModuleKey, Int) -> Unit,
     onSetForecastMode: (ForecastMode) -> Unit,
+    /** Null when the user has switched tap-for-details off. */
+    onOpenDetail: ((Detail) -> Unit)?,
 ) {
     val rendered: RenderedView = config.render(snapshot, sunDays, zone, forecast)
     val spec = config.density.spec()
@@ -341,6 +357,13 @@ private fun NowContent(
                 onResize = onResizeModule,
                 onMove = onMoveModule,
                 onSetForecastMode = onSetForecastMode,
+                // A module's detail needs the observation its value came
+                // from, which lives here and not on the tile.
+                onOpenModule = onOpenDetail?.let {
+                        open ->
+                    { module -> Details.ofModule(module, snapshot, zone)?.let(open) }
+                },
+                onOpenDetail = onOpenDetail,
                 modifier = Modifier.fillMaxWidth(),
             )
         }

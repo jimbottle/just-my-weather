@@ -27,7 +27,9 @@ reading needs nothing in the module catalog — `ModuleKey.Reading` wraps every
    single cell for a short number, 2×1 for longer text) and `minSize` (the
    smallest the user may drag it to — one cell for anything that is a number
    and a unit, wider for prose). `isNumeric` is true for everything except
-   `CONDITIONS`, so it's alertable automatically.
+   `CONDITIONS`, so it's alertable automatically. The detail sheet a tap opens
+   lists every `WeatherField` from the snapshot (`view/Details.ofObservation`),
+   so the new point appears there with no further wiring.
 2. **`data/WeatherSnapshot.kt`** — add `val humidityPct: Double?`.
 3. **`data/nws/`** — add the field to `NwsWire.ObservationProps`, project it in
    `NwsModels.CurrentObservation`, and read it in `NwsClient.getObservation`.

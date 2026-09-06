@@ -48,7 +48,12 @@ data class CurrentObservation(
     val windDirectionDegrees: Double? = null,
 )
 
-/** One hour of the gridpoint hourly forecast. */
+/**
+ * One hour of the gridpoint hourly forecast. Everything NWS sends per hour is
+ * carried, not just what the hourly tile draws: the detail sheet a tap opens
+ * shows the lot, and a field the tile has no room for is still a field the
+ * user is tracking.
+ */
 data class ForecastPoint(
     val startTime: Instant,
     val temperatureF: Double?,
@@ -57,6 +62,11 @@ data class ForecastPoint(
     val precipProbabilityPercent: Double? = null,
     /** Plain-language summary for the hour ("Partly Sunny"), if present. */
     val shortForecast: String? = null,
+    /** Compass point the wind blows FROM ("SW"), as NWS words it. */
+    val windDirection: String? = null,
+    /** Relative humidity 0–100, or null when omitted. */
+    val relativeHumidityPercent: Double? = null,
+    val dewpointF: Double? = null,
 )
 
 /** One half-day of the gridpoint daily forecast: NWS splits days into a
@@ -69,6 +79,12 @@ data class DailyPeriod(
     val shortForecast: String?,
     /** Chance of precipitation for the period, 0–100, or null when omitted. */
     val precipProbabilityPercent: Double? = null,
+    val windMph: Double? = null,
+    /** Compass point the wind blows FROM ("SW"), as NWS words it. */
+    val windDirection: String? = null,
+    /** NWS's paragraph for the period — the forecast in prose, which is the
+     * "more" a tap on a day tile opens. */
+    val detailedForecast: String? = null,
 )
 
 /** An active NWS hazard alert for a zone (used to coexist with, not duplicate,

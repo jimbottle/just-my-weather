@@ -38,6 +38,14 @@ data class ViewConfig(
     val dailyStyle: DailyStyle = DailyStyle.DEFAULT,
     /** Where a safety-alert banner sits on the days there is one. */
     val alertBannerPosition: AlertBannerPosition = AlertBannerPosition.DEFAULT,
+    /**
+     * Whether a tap on a tile opens its detail sheet — the whole observation
+     * behind a reading, every field of a forecast hour. On by default: the
+     * detail is where the fields a tile has no room for live, and a glance
+     * that cannot be opened is a glance that hides them. Off is for the user
+     * who wants the screen inert.
+     */
+    val tapForDetails: Boolean = true,
 ) {
     val visible: List<ModuleSetting> get() = items.filter { it.visible }
 
@@ -102,6 +110,8 @@ data class ViewConfig(
     fun setAlertBannerPosition(position: AlertBannerPosition): ViewConfig =
         copy(alertBannerPosition = position)
 
+    fun setTapForDetails(enabled: Boolean): ViewConfig = copy(tapForDetails = enabled)
+
     fun moveUp(index: Int): ViewConfig = swap(index, index - 1)
 
     fun moveDown(index: Int): ViewConfig = swap(index, index + 1)
@@ -147,6 +157,7 @@ data class ViewConfig(
             defaultForecastMode: ForecastMode = ForecastMode.DEFAULT,
             dailyStyle: DailyStyle = DailyStyle.DEFAULT,
             alertBannerPosition: AlertBannerPosition = AlertBannerPosition.DEFAULT,
+            tapForDetails: Boolean = true,
         ): ViewConfig {
             val seen = LinkedHashMap<ModuleKey, ModuleSetting>()
             settings.forEach { setting -> seen.putIfAbsent(setting.module, setting) }
@@ -159,6 +170,7 @@ data class ViewConfig(
                 defaultForecastMode,
                 dailyStyle,
                 alertBannerPosition,
+                tapForDetails,
             )
         }
     }

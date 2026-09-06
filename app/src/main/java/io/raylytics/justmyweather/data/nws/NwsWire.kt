@@ -115,15 +115,24 @@ data class NwsForecastResponse(
     @Serializable
     data class ForecastPeriod(
         val startTime: String? = null,
+        val endTime: String? = null,
         val temperature: Double? = null,
         val temperatureUnit: String? = null,
         val windSpeed: String? = null,
-        // NWS gives this as { unitCode: "wmoUnit:percent", value: 40 }.
+        /** A compass point ("SW"), already a string on the wire. */
+        val windDirection: String? = null,
+        // NWS gives these as { unitCode: "wmoUnit:percent", value: 40 }.
         val probabilityOfPrecipitation: NwsValue? = null,
+        val relativeHumidity: NwsValue? = null,
+        /** { unitCode: "wmoUnit:degC", value: 21.1 } — Celsius even when the
+         * period's own temperature is in Fahrenheit. */
+        val dewpoint: NwsValue? = null,
         @SerialName("shortForecast") val shortForecast: String? = null,
         // Only the daily (non-hourly) forecast fills these: half-day periods
-        // named "Tonight"/"Friday", flagged day or night.
+        // named "Tonight"/"Friday", flagged day or night, each with a
+        // paragraph of prose.
         val name: String? = null,
         val isDaytime: Boolean? = null,
+        val detailedForecast: String? = null,
     )
 }

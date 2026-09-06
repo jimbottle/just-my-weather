@@ -70,6 +70,7 @@ fun CustomizeScreen(
     onMoveUp: (Int) -> Unit,
     onMoveDown: (Int) -> Unit,
     onSetDensity: (Density) -> Unit,
+    onSetTapForDetails: (Boolean) -> Unit,
     onSetDefaultForecastMode: (ForecastMode) -> Unit,
     onSetDailyStyle: (DailyStyle) -> Unit,
     onSetAlertBannerPosition: (AlertBannerPosition) -> Unit,
@@ -105,6 +106,7 @@ fun CustomizeScreen(
             // sections have outgrown a fixed header on small screens.
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                 DensityPicker(selected = config.density, onSelect = onSetDensity)
+                TapForDetailsPicker(enabled = config.tapForDetails, onSet = onSetTapForDetails)
                 ForecastPicker(
                     show = config.shows(ModuleKey.Forecast),
                     mode = config.defaultForecastMode,
@@ -339,8 +341,37 @@ private fun DensityPicker(
     }
 }
 
+/** One switch: whether a tap on a tile opens the sheet with everything behind
+ * it. On by default, because the sheet is where the fields a tile has no
+ * room for live; off for a screen that should stay inert. */
+@Composable
+private fun TapForDetailsPicker(
+    enabled: Boolean,
+    onSet: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text("Tap a tile for details", style = MaterialTheme.typography.bodyLarge)
+            Text(
+                text = "The whole observation behind a reading, every field of a forecast hour",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Switch(
+            checked = enabled,
+            onCheckedChange = onSet,
+            modifier = Modifier.testTag("tap-for-details-toggle"),
+        )
+    }
+}
+
 /**
- * Everything about the second grid, in one block: whether it appears, which
+ * Everything about the forecast module, in one block: whether it appears, which
  * framing it opens on, and how a day is drawn.
  *
  * These used to be three separate sections — "Opens on", "Hourly view", "Daily
@@ -349,6 +380,7 @@ private fun DensityPicker(
  * "which direction does the list run" pickers are gone entirely: the grid flows
  * its tiles, so there is no longer a direction to choose.
  */
+
 @Composable
 private fun ForecastPicker(
     /** Whether the forecast module is on — switched in the field list below,

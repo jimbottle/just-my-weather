@@ -47,6 +47,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import io.raylytics.justmyweather.view.Detail
 import io.raylytics.justmyweather.view.ForecastMode
 import io.raylytics.justmyweather.view.ModuleContent
 import io.raylytics.justmyweather.view.ModuleKey
@@ -185,6 +186,12 @@ internal fun ModuleGrid(
     onMove: (ModuleKey, Int) -> Unit,
     /** The forecast module's own option: which framing it shows. */
     onSetForecastMode: (ForecastMode) -> Unit,
+    /** A tap on a tile outside arrange mode, or null when tap-for-details is
+     * off. The module's detail is built by the caller, which holds the
+     * observation the tile's value came from. */
+    onOpenModule: ((ModuleValue) -> Unit)? = null,
+    /** For the tiles INSIDE the forecast module, which build their own. */
+    onOpenDetail: ((Detail) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val haptics = LocalHapticFeedback.current
@@ -202,6 +209,7 @@ internal fun ModuleGrid(
     val startArranging by rememberUpdatedState(onStartArranging)
     val resize by rememberUpdatedState(onResize)
     val move by rememberUpdatedState(onMove)
+    val openModule by rememberUpdatedState(onOpenModule)
 
     // Drag state. Positions are all in window-root coordinates — one shared
     // frame for the pointer and every tile's bounds, so nothing needs to know
@@ -485,13 +493,23 @@ internal fun ModuleGrid(
                         endDrag(DragOwner.IMMEDIATE)
                     }
                 }
-                // Taps do nothing to the grid, and are consumed so that they do
-                // nothing to anything else either: the tap-on-empty-ground
-                // detector above this grid leaves arrange mode, and a tap on
-                // a wiggling tile must not — the launcher contract is that
-                // the way out is Done, Back, or the ground, never the thing
-                // you were editing.
-                .pointerInput(Unit) { detectTapGestures {} },
+                // Outside arrange mode a tap on a tile opens its detail. In
+                // arrange mode taps do nothing — and are still consumed, so
+                // they do nothing to anything else either: the
+                // tap-on-empty-ground detector above this grid leaves arrange
+                // mode, and a tap on a wiggling tile must not; the launcher
+                // contract is that the way out is Done, Back, or the ground,
+                // never the thing you were editing. Tiles inside the forecast
+                // carry their own clickable and take their taps before this
+                // sees them.
+                .pointerInput(Unit) {
+                    detectTapGestures { local ->
+                        if (isArranging) return@detectTapGestures
+                        val open = openModule ?: return@detectTapGestures
+                        val field = tileAt(toRoot(local)) ?: return@detectTapGestures
+                        currentModules.firstOrNull { it.module == field }?.let(open)
+                    }
+                },
     ) { module, index, tileModifier ->
         val field = module.module
         // Only a MOVE lifts the tile and pins it under the finger; a resize
@@ -505,6 +523,8 @@ internal fun ModuleGrid(
             onMove = onMove,
             onResize = onResize,
             onSetForecastMode = onSetForecastMode,
+            onOpenModule = onOpenModule,
+            onOpenDetail = onOpenDetail,
             module = module,
             arranging = arranging,
             spec = spec,
@@ -603,6 +623,8 @@ private fun ModuleTile(
     onMove: (ModuleKey, Int) -> Unit,
     onResize: (ModuleKey, ModuleSize) -> Unit,
     onSetForecastMode: (ForecastMode) -> Unit,
+    onOpenModule: ((ModuleValue) -> Unit)?,
+    onOpenDetail: ((Detail) -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     val borderColor =
@@ -647,6 +669,18 @@ private fun ModuleTile(
                     stateDescription = size.label
                     customActions =
                         buildList {
+                            // The tap, for a user who cannot tap: offered
+                            // only when the tap itself would do something.
+                            // The forecast's hours and days are their own
+                            // clickable nodes and need no action here.
+                            if (onOpenModule != null && module.content !is ModuleContent.Forecast) {
+                                add(
+                                    CustomAccessibilityAction("Details") {
+                                        onOpenModule(module)
+                                        true
+                                    },
+                                )
+                            }
                             if (index > 0) {
                                 add(
                                     CustomAccessibilityAction("Move up") {
@@ -712,6 +746,7 @@ private fun ModuleTile(
                 gap = spec.moduleGap,
                 arranging = arranging,
                 onSetMode = onSetForecastMode,
+                onOpenDetail = onOpenDetail,
             )
             return@TileShell
         }

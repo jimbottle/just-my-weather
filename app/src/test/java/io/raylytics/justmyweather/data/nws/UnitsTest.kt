@@ -20,6 +20,21 @@ class UnitsTest {
     }
 
     @Test
+    fun `a bearing becomes the compass word NWS uses`() {
+        assertEquals("N", Units.compassPoint(0.0))
+        assertEquals("N", Units.compassPoint(360.0))
+        assertEquals("NNE", Units.compassPoint(22.5))
+        assertEquals("SW", Units.compassPoint(225.0))
+        // Each point owns 22.5° centred on itself: 11.24 is still N, 11.26 is NNE.
+        assertEquals("N", Units.compassPoint(11.24))
+        assertEquals("NNE", Units.compassPoint(11.26))
+        assertEquals("NNW", Units.compassPoint(348.0))
+        assertNull(Units.compassPoint(null))
+        assertNull(Units.compassPoint(-1.0))
+        assertNull(Units.compassPoint(361.0))
+    }
+
+    @Test
     fun `fahrenheit to kelvin`() {
         // Anchors, not round numbers: absolute zero and the triple point pin
         // both the offset and the scale, so an error in either shows up.

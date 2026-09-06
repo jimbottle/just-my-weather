@@ -37,6 +37,21 @@ appId: io.raylytics.justmyweather
 - assertVisible:
     id: "module_temperature"
 
+# A tap on an hour opens its detail sheet — every field the hour carries —
+# and Back puts the glance back as it was. On by default; the switch is on
+# the customize screen ("Tap a tile for details").
+- tapOn:
+    text: ".* (am|pm)"
+    index: 0
+- assertVisible:
+    id: "detailSheet"
+- assertVisible: "Chance of precipitation"
+- pressKey: Back
+- assertNotVisible:
+    id: "detailSheet"
+- assertVisible:
+    id: "module_temperature"
+
 # Turning the forecast off takes the tile AND its toggle with it: the calm
 # minimum is the glance by itself, which is what the old "Now" mode meant.
 # The switch is the module's own row in the field list, like every tile's.

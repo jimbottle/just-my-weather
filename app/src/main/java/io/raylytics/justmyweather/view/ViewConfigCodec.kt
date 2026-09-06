@@ -53,6 +53,9 @@ object ViewConfigCodec {
         // Defaulted like every field here, so a config written before the
         // safety banner existed still decodes.
         val alertBannerPosition: String = AlertBannerPosition.DEFAULT.key,
+        // Defaulted ON, so a config written before the detail sheet existed
+        // opens it: the default is the shipped behaviour, not the opt-out.
+        val tapForDetails: Boolean = true,
         // LEGACY, read-only: sun times used to be a screen-wide switch rather
         // than a module with a place on the grid. It is folded on read into
         // the "sun" module's visibility and never written again, so someone
@@ -72,6 +75,7 @@ object ViewConfigCodec {
                 forecastMode = config.defaultForecastMode.key,
                 dailyStyle = config.dailyStyle.key,
                 alertBannerPosition = config.alertBannerPosition.key,
+                tapForDetails = config.tapForDetails,
                 items =
                     config.items.map {
                         StoredSetting(
@@ -130,6 +134,7 @@ object ViewConfigCodec {
             forecastMode,
             DailyStyle.byKey(stored.dailyStyle) ?: DailyStyle.DEFAULT,
             bannerPosition,
+            stored.tapForDetails,
         )
     }
 

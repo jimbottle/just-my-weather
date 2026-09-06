@@ -25,6 +25,22 @@ object Units {
      */
     fun celsiusToFahrenheit(value: Double): Double = value * 9.0 / 5.0 + 32.0
 
+    /**
+     * A bearing in degrees clockwise from north, as the sixteen-point compass
+     * word NWS uses in its forecasts ("SW", "NNE"), so an observation's wind
+     * reads the same way a forecast's does. Each point owns 22.5° centred on
+     * itself; 360 wraps to N. Out-of-range input degrades to null rather than
+     * to a wrong point.
+     */
+    fun compassPoint(degrees: Double?): String? {
+        if (degrees == null || degrees.isNaN() || degrees < 0 || degrees > 360) return null
+        val index = ((degrees % 360) / 22.5 + 0.5).toInt() % COMPASS_POINTS.size
+        return COMPASS_POINTS[index]
+    }
+
+    private val COMPASS_POINTS =
+        listOf("N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW")
+
     fun toFahrenheit(value: Double?, unitCode: String): Double? {
         if (value == null) return null
         if (unitCode.contains("degC")) return celsiusToFahrenheit(value)

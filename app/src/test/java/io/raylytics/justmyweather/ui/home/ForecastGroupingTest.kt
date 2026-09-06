@@ -30,6 +30,31 @@ class ForecastGroupingTest {
     }
 
     @Test
+    fun `a combined day keeps both halves, and its detail carries both paragraphs`() {
+        val today =
+            day("Today", 81.0).copy(detailedForecast = "Sunny, with a high near 81.", precipProbabilityPercent = 10.0)
+        val tonight =
+            night("Tonight", 72.0).copy(
+                detailedForecast = "Clear, with a low around 72.",
+                precipProbabilityPercent = 30.0,
+            )
+        val days = combineDays(listOf(today, tonight))
+        assertEquals(today, days[0].day)
+        assertEquals(tonight, days[0].night)
+        val detail = days[0].detail()
+        assertEquals("Today", detail.title)
+        assertEquals(listOf("81°", "72°", "30%", "—", "Sunny"), detail.rows.map { it.value })
+        assertEquals("Sunny, with a high near 81.\n\nTonight: Clear, with a low around 72.", detail.body)
+        // A night-only day has no day half and no wind row.
+        val evening = combineDays(listOf(tonight))[0]
+        assertNull(evening.day)
+        assertEquals(
+            listOf("High", "Low", "Chance of precipitation", "Conditions"),
+            evening.detail().rows.map { it.label },
+        )
+    }
+
+    @Test
     fun `a leading night keeps its own name with no high`() {
         // Opening the app in the evening: NWS's first period is "Tonight".
         val days = combineDays(listOf(night("Tonight", 68.0), day("Friday", 82.0), night("Friday Night", 70.0)))

@@ -121,6 +121,9 @@ class NwsClient(
                 windMph = Units.parseWindSpeedString(p.windSpeed),
                 precipProbabilityPercent = p.probabilityOfPrecipitation?.value,
                 shortForecast = p.shortForecast?.takeIf { it.isNotBlank() },
+                windDirection = p.windDirection?.takeIf { it.isNotBlank() },
+                relativeHumidityPercent = p.relativeHumidity?.value,
+                dewpointF = p.dewpoint?.let { Units.toFahrenheit(it.value, it.unitCode.orEmpty()) },
             )
         }
     }
@@ -140,6 +143,9 @@ class NwsClient(
                 temperatureF = temperatureF,
                 shortForecast = p.shortForecast?.takeIf { it.isNotBlank() },
                 precipProbabilityPercent = p.probabilityOfPrecipitation?.value,
+                windMph = Units.parseWindSpeedString(p.windSpeed),
+                windDirection = p.windDirection?.takeIf { it.isNotBlank() },
+                detailedForecast = p.detailedForecast?.takeIf { it.isNotBlank() },
             )
         }
     }

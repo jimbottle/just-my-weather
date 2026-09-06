@@ -51,6 +51,9 @@ shapes never leak past `WeatherRepository`.
   framing). `ViewRender` turns a config
   + snapshot into the rendered module list, each module carrying a
   `ModuleContent` — a formatted reading, or richer data the tile draws itself.
+  `Details` builds what a tap on a tile opens (the whole observation behind a
+  reading, every field of a forecast hour or day) as a pure `Detail` value;
+  `ui/home/DetailSheet` only draws it.
 - **`alerts/`** — personal alerting. `AlertRule` (subject + comparison +
   threshold + window), `AlertSubject` (a `WeatherField` or forecast-only
   `PrecipChance`), `AlertWindow` (now / forecast horizons / overnight). The pure
