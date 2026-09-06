@@ -81,6 +81,12 @@ data class NwsObservationResponse(
         // omits them still parses.
         val relativeHumidity: NwsValue? = null,
         val windDirection: NwsValue? = null,
+        // The station's own apparent temperature, in degC: NWS fills heat
+        // index in the heat and wind chill in the cold, and neither the rest
+        // of the time. Both parsed so "feels like" can prefer whichever is
+        // present rather than computing one here.
+        val heatIndex: NwsValue? = null,
+        val windChill: NwsValue? = null,
     )
 }
 

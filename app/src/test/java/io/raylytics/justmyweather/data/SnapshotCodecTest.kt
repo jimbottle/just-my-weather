@@ -36,6 +36,14 @@ class SnapshotCodecTest {
     }
 
     @Test
+    fun `feels-like survives the round trip and an older entry reads as absent`() {
+        val hot = entry.copy(snapshot = entry.snapshot.copy(feelsLikeF = 101.5))
+        assertEquals(101.5, SnapshotCodec.decode(SnapshotCodec.encode(hot))!!.snapshot.feelsLikeF)
+        val older = SnapshotCodec.encode(hot).replace(",\"feelsLikeF\":101.5", "")
+        assertNull(SnapshotCodec.decode(older)!!.snapshot.feelsLikeF)
+    }
+
+    @Test
     fun `the fields a station omitted stay omitted`() {
         // A station that reports only a temperature must not come back with
         // zeroes standing in for wind, humidity or an observation time.

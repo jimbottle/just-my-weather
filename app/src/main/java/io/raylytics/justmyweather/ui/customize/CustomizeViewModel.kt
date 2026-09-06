@@ -7,6 +7,7 @@ import io.raylytics.justmyweather.data.ViewConfigRepository
 import io.raylytics.justmyweather.view.AlertBannerPosition
 import io.raylytics.justmyweather.view.DailyStyle
 import io.raylytics.justmyweather.view.Density
+import io.raylytics.justmyweather.view.ForecastElement
 import io.raylytics.justmyweather.view.ForecastMode
 import io.raylytics.justmyweather.view.ModuleKey
 import io.raylytics.justmyweather.view.ModuleSize
@@ -56,6 +57,8 @@ class CustomizeViewModel(
     fun setTapForDetails(enabled: Boolean) = edit { it.setTapForDetails(enabled) }
 
     fun setHourlyHours(hours: Int) = edit { it.setHourlyHours(hours) }
+
+    fun toggleForecastElement(element: ForecastElement) = edit { it.toggleForecastElement(element) }
 
     fun setDefaultForecastMode(mode: ForecastMode) = edit { it.setDefaultForecastMode(mode) }
 

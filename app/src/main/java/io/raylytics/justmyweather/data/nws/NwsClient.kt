@@ -78,6 +78,12 @@ class NwsClient(
             windDirectionDegrees = props.windDirection?.takeIf {
                 it.unitCode?.contains("degree") == true
             }?.value,
+            // Heat index in the heat, wind chill in the cold; a station sends
+            // at most one, and the other arrives null. Nothing is computed
+            // here — "feels like" is the station's word, or nothing.
+            feelsLikeF =
+                Units.toFahrenheit(props.heatIndex?.value, props.heatIndex?.unitCode ?: "")
+                    ?: Units.toFahrenheit(props.windChill?.value, props.windChill?.unitCode ?: ""),
         )
     }
 

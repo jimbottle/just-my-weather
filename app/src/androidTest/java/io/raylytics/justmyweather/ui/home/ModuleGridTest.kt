@@ -20,6 +20,7 @@ import io.raylytics.justmyweather.data.SunDay
 import io.raylytics.justmyweather.ui.theme.JustMyWeatherTheme
 import io.raylytics.justmyweather.view.DailyStyle
 import io.raylytics.justmyweather.view.Density
+import io.raylytics.justmyweather.view.ForecastElement
 import io.raylytics.justmyweather.view.ForecastMode
 import io.raylytics.justmyweather.view.ModuleContent
 import io.raylytics.justmyweather.view.ModuleKey
@@ -110,6 +111,7 @@ class ModuleGridTest {
                             mode = ForecastMode.DEFAULT,
                             dailyStyle = DailyStyle.DEFAULT,
                             hourlyHours = 24,
+                            elements = ForecastElement.DEFAULT,
                             zone = ZoneId.systemDefault(),
                         )
                 },

@@ -88,6 +88,14 @@ the forecast *module's* visibility (`ModuleKey.Forecast`, switched like any
 other tile), not a member of this enum. That split is deliberate — see the
 file's own comment.
 
+## Add a forecast tile element
+
+**`view/ForecastElement.kt`** — add an entry (stable `key`, chip `label`), then
+draw it in `ForecastModule`'s `ElementLines` when the entry is in the set and
+the tile's data carries a value. The customize chips iterate `entries`, so the
+toggle appears on its own. Leave it out of `DEFAULT` unless it is something
+most people plan by: the tile ships as calm as it was.
+
 ## Add a forecast window
 
 **`alerts/AlertWindow.kt`** — add an entry with its `key`, chip `label`, and

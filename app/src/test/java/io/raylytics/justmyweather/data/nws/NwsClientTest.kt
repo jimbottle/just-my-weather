@@ -59,6 +59,33 @@ class NwsClientTest {
     }
 
     @Test
+    fun `getObservation takes feels-like from the heat index, else the wind chill, else nothing`() = runTest {
+        suspend fun feelsLike(extra: String): Double? {
+            val (client, _) =
+                client(
+                    HttpResult(
+                        200,
+                        """{"properties":{"temperature":{"value":20.0,"unitCode":"wmoUnit:degC"}$extra}}""",
+                        null,
+                    ),
+                )
+            return client.getObservation("KNYC").feelsLikeF
+        }
+        assertEquals(104.0, feelsLike(""","heatIndex":{"value":40.0,"unitCode":"wmoUnit:degC"}""")!!, 1e-6)
+        assertEquals(14.0, feelsLike(""","windChill":{"value":-10.0,"unitCode":"wmoUnit:degC"}""")!!, 1e-6)
+        // NWS sends null for the one that does not apply; it must not become a number.
+        assertEquals(
+            104.0,
+            feelsLike(
+                ""","heatIndex":{"value":40.0,"unitCode":"wmoUnit:degC"},
+                "windChill":{"value":null,"unitCode":"wmoUnit:degC"}""",
+            )!!,
+            1e-6,
+        )
+        assertNull(feelsLike(""))
+    }
+
+    @Test
     fun `getObservation drops humidity and wind direction on an unexpected unit`() = runTest {
         // These two are the only source of two exported payload fields and are
         // passed through rather than converted, so the guard has to drop a

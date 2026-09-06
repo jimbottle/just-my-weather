@@ -82,6 +82,7 @@ class WeatherRepository(
                 observedAt = obs.observedAt,
                 relativeHumidityPercent = obs.relativeHumidityPercent,
                 windDirectionDegrees = obs.windDirectionDegrees,
+                feelsLikeF = obs.feelsLikeF,
                 timeZone = point.timeZone,
             )
         // Remember it for the next cold start. A failure to persist must never

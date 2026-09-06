@@ -58,6 +58,9 @@ object ViewConfigCodec {
         val tapForDetails: Boolean = true,
         // Defaulted to the day the app always showed; clamped on read.
         val hourlyHours: Int = HourlyHours.DEFAULT,
+        // Null (absent) means the default set; an empty list is the user's
+        // own choice of nothing and is kept. Unknown keys are dropped.
+        val forecastElements: List<String>? = null,
         // LEGACY, read-only: sun times used to be a screen-wide switch rather
         // than a module with a place on the grid. It is folded on read into
         // the "sun" module's visibility and never written again, so someone
@@ -79,6 +82,7 @@ object ViewConfigCodec {
                 alertBannerPosition = config.alertBannerPosition.key,
                 tapForDetails = config.tapForDetails,
                 hourlyHours = config.hourlyHours,
+                forecastElements = config.forecastElements.map { it.key },
                 items =
                     config.items.map {
                         StoredSetting(
@@ -139,6 +143,7 @@ object ViewConfigCodec {
             bannerPosition,
             stored.tapForDetails,
             stored.hourlyHours,
+            stored.forecastElements?.mapNotNull(ForecastElement::byKey)?.toSet() ?: ForecastElement.DEFAULT,
         )
     }
 

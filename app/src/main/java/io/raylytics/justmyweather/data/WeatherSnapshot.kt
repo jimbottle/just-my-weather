@@ -30,6 +30,9 @@ data class WeatherSnapshot(
     val relativeHumidityPercent: Double? = null,
     /** Wind bearing in degrees clockwise from true north, 0–360. */
     val windDirectionDegrees: Double? = null,
+    /** The station's apparent temperature — heat index or wind chill,
+     * whichever it sent — or null when it feels like the temperature. */
+    val feelsLikeF: Double? = null,
     /**
      * IANA id of the place this reading is FOR, from the NWS point lookup —
      * not the device's zone. Kept as a string so the data layer cannot fail on

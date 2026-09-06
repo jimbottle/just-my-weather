@@ -39,6 +39,9 @@ data class ViewConfig(
     /** How many hours the Hourly framing shows. Always within [HourlyHours]'s
      * bounds — every path in clamps. */
     val hourlyHours: Int = HourlyHours.DEFAULT,
+    /** What forecast tiles show beside the temperature. An empty set is
+     * legal: just the hour and the number. */
+    val forecastElements: Set<ForecastElement> = ForecastElement.DEFAULT,
     /** Where a safety-alert banner sits on the days there is one. */
     val alertBannerPosition: AlertBannerPosition = AlertBannerPosition.DEFAULT,
     /**
@@ -112,6 +115,12 @@ data class ViewConfig(
 
     fun setHourlyHours(hours: Int): ViewConfig = copy(hourlyHours = HourlyHours.clamp(hours))
 
+    fun toggleForecastElement(element: ForecastElement): ViewConfig =
+        copy(
+            forecastElements =
+                if (element in forecastElements) forecastElements - element else forecastElements + element,
+        )
+
     fun setAlertBannerPosition(position: AlertBannerPosition): ViewConfig =
         copy(alertBannerPosition = position)
 
@@ -164,6 +173,7 @@ data class ViewConfig(
             alertBannerPosition: AlertBannerPosition = AlertBannerPosition.DEFAULT,
             tapForDetails: Boolean = true,
             hourlyHours: Int = HourlyHours.DEFAULT,
+            forecastElements: Set<ForecastElement> = ForecastElement.DEFAULT,
         ): ViewConfig {
             val seen = LinkedHashMap<ModuleKey, ModuleSetting>()
             settings.forEach { setting -> seen.putIfAbsent(setting.module, setting) }
@@ -178,6 +188,7 @@ data class ViewConfig(
                 alertBannerPosition = alertBannerPosition,
                 tapForDetails = tapForDetails,
                 hourlyHours = HourlyHours.clamp(hourlyHours),
+                forecastElements = forecastElements,
             )
         }
     }

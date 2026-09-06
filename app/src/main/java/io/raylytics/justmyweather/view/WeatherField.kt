@@ -19,6 +19,10 @@ enum class WeatherField(
     val defaultLabel: String,
 ) {
     TEMPERATURE("temperature", "Temperature"),
+
+    /** The station's heat index or wind chill — what the air feels like,
+     * which on a humid or a windy day is the number people dress for. */
+    FEELS_LIKE("feels_like", "Feels like"),
     CONDITIONS("conditions", "Conditions"),
     WIND("wind", "Wind"),
     PRECIPITATION("precipitation", "Precip (last hr)"),
@@ -42,7 +46,7 @@ enum class WeatherField(
             when (this) {
                 TEMPERATURE -> ModuleSize(4, 2)
                 CONDITIONS, PRESSURE -> ModuleSize(2, 1)
-                WIND, PRECIPITATION -> ModuleSize.CELL
+                FEELS_LIKE, WIND, PRECIPITATION -> ModuleSize.CELL
             }
 
     /**
@@ -55,7 +59,7 @@ enum class WeatherField(
         get() =
             when (this) {
                 CONDITIONS -> ModuleSize(2, 1)
-                TEMPERATURE, WIND, PRECIPITATION, PRESSURE -> ModuleSize.CELL
+                TEMPERATURE, FEELS_LIKE, WIND, PRECIPITATION, PRESSURE -> ModuleSize.CELL
             }
 
     /** Whether the hourly forecast carries this field, so a forecast-window
@@ -73,7 +77,7 @@ enum class WeatherField(
         when (this) {
             TEMPERATURE -> point.temperatureF
             WIND -> point.windMph
-            CONDITIONS, PRECIPITATION, PRESSURE -> null
+            FEELS_LIKE, CONDITIONS, PRECIPITATION, PRESSURE -> null
         }
 
     /**
@@ -84,6 +88,7 @@ enum class WeatherField(
     fun numericValue(snapshot: WeatherSnapshot): Double? =
         when (this) {
             TEMPERATURE -> snapshot.temperatureF
+            FEELS_LIKE -> snapshot.feelsLikeF
             CONDITIONS -> null
             WIND -> snapshot.windMph
             PRECIPITATION -> snapshot.precipitationIn
@@ -93,7 +98,7 @@ enum class WeatherField(
     /** Format a numeric value of this field with its unit ("72°", "10 mph"). */
     fun formatValue(value: Double): String =
         when (this) {
-            TEMPERATURE -> "${value.roundToInt()}°"
+            TEMPERATURE, FEELS_LIKE -> "${value.roundToInt()}°"
             CONDITIONS -> value.roundToInt().toString()
             WIND -> "${value.roundToInt()} mph"
             PRECIPITATION -> String.format(Locale.US, "%.2f in", value)

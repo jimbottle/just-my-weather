@@ -38,7 +38,7 @@ class DetailsTest {
         // Observed in the PLACE's zone (7 PM in New York), never the fallback.
         assertEquals("Observed 7:00 PM · Louisville, KY", detail.subtitle)
         assertEquals(
-            listOf("Wind", "Temperature", "Conditions", "Precip (last hr)", "Pressure", "Humidity"),
+            listOf("Wind", "Temperature", "Feels like", "Conditions", "Precip (last hr)", "Pressure", "Humidity"),
             detail.rows.map { it.label },
         )
         // Wind gets the direction the tile has no room for; humidity, which
@@ -86,7 +86,16 @@ class DetailsTest {
                 ModuleKey.Forecast,
                 "Forecast",
                 ModuleKey.Forecast.defaultSize,
-                ModuleContent.Forecast(null, null, null, ForecastMode.DEFAULT, DailyStyle.DEFAULT, 24, newYork),
+                ModuleContent.Forecast(
+                    hours = null,
+                    periods = null,
+                    error = null,
+                    mode = ForecastMode.DEFAULT,
+                    dailyStyle = DailyStyle.DEFAULT,
+                    hourlyHours = 24,
+                    elements = ForecastElement.DEFAULT,
+                    zone = newYork,
+                ),
             )
         assertNull(Details.ofModule(forecast, snapshot, newYork))
     }

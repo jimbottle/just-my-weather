@@ -30,6 +30,7 @@ object SnapshotCodec {
         val observedAtEpochMillis: Long? = null,
         val relativeHumidityPercent: Double? = null,
         val windDirectionDegrees: Double? = null,
+        val feelsLikeF: Double? = null,
     )
 
     private val json = Json { ignoreUnknownKeys = true }
@@ -50,6 +51,7 @@ object SnapshotCodec {
                 observedAtEpochMillis = s.observedAt?.toEpochMilli(),
                 relativeHumidityPercent = s.relativeHumidityPercent,
                 windDirectionDegrees = s.windDirectionDegrees,
+                feelsLikeF = s.feelsLikeF,
             ),
         )
     }
@@ -69,6 +71,7 @@ object SnapshotCodec {
                     observedAt = stored.observedAtEpochMillis?.let(Instant::ofEpochMilli),
                     relativeHumidityPercent = stored.relativeHumidityPercent,
                     windDirectionDegrees = stored.windDirectionDegrees,
+                    feelsLikeF = stored.feelsLikeF,
                 ),
             latitude = stored.latitude,
             longitude = stored.longitude,

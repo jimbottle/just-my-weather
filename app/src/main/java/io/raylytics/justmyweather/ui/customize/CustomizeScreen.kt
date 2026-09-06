@@ -41,6 +41,7 @@ import io.raylytics.justmyweather.view.AccentChoice
 import io.raylytics.justmyweather.view.AlertBannerPosition
 import io.raylytics.justmyweather.view.DailyStyle
 import io.raylytics.justmyweather.view.Density
+import io.raylytics.justmyweather.view.ForecastElement
 import io.raylytics.justmyweather.view.ForecastMode
 import io.raylytics.justmyweather.view.HourlyHours
 import io.raylytics.justmyweather.view.ModuleKey
@@ -76,6 +77,7 @@ fun CustomizeScreen(
     onSetDefaultForecastMode: (ForecastMode) -> Unit,
     onSetDailyStyle: (DailyStyle) -> Unit,
     onSetHourlyHours: (Int) -> Unit,
+    onToggleForecastElement: (ForecastElement) -> Unit,
     onSetAlertBannerPosition: (AlertBannerPosition) -> Unit,
     theme: ThemeConfig,
     onThemeChange: (ThemeConfig) -> Unit,
@@ -118,6 +120,8 @@ fun CustomizeScreen(
                     onSetDailyStyle = onSetDailyStyle,
                     hourlyHours = config.hourlyHours,
                     onSetHourlyHours = onSetHourlyHours,
+                    elements = config.forecastElements,
+                    onToggleElement = onToggleForecastElement,
                 )
                 HorizontalDivider(
                     color = MaterialTheme.colorScheme.surfaceVariant,
@@ -306,6 +310,28 @@ private fun SizeChips(
     }
 }
 
+/** [ChipRow]'s many-of-these twin: each chip toggles on its own. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun <T> MultiChipRow(
+    options: List<T>,
+    selected: Set<T>,
+    label: (T) -> String,
+    onToggle: (T) -> Unit,
+    tag: (T) -> String,
+) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        options.forEach { option ->
+            FilterChip(
+                selected = option in selected,
+                onClick = { onToggle(option) },
+                label = { Text(label(option)) },
+                modifier = Modifier.testTag(tag(option)),
+            )
+        }
+    }
+}
+
 /** The slider's own stops are fours; a float from it becomes the nearest one. */
 private fun snapToStep(value: Float): Int {
     val stepped = Math.round((value - HourlyHours.MIN) / HourlyHours.STEP) * HourlyHours.STEP + HourlyHours.MIN
@@ -403,6 +429,8 @@ private fun ForecastPicker(
     onSetDailyStyle: (DailyStyle) -> Unit,
     hourlyHours: Int,
     onSetHourlyHours: (Int) -> Unit,
+    elements: Set<ForecastElement>,
+    onToggleElement: (ForecastElement) -> Unit,
 ) {
     // The framing options only mean something when there is a forecast to
     // frame; offered for a hidden module they read as controls that do
@@ -443,6 +471,22 @@ private fun ForecastPicker(
             valueRange = HourlyHours.MIN.toFloat()..HourlyHours.MAX.toFloat(),
             steps = (HourlyHours.MAX - HourlyHours.MIN) / HourlyHours.STEP - 1,
             modifier = Modifier.testTag("hourly-hours-slider"),
+        )
+        // What a tile carries beside its temperature. Multi-select: these
+        // are independent, and a tile with none of them is a legal, calm
+        // choice — the hour and the number.
+        Text(
+            text = "Tiles show",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+        MultiChipRow(
+            options = ForecastElement.entries,
+            selected = elements,
+            label = { it.label },
+            onToggle = onToggleElement,
+            tag = { "forecast_element_${it.key}" },
         )
         Text(
             text = "Each day shows",

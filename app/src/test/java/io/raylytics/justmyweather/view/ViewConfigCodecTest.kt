@@ -59,6 +59,18 @@ class ViewConfigCodecTest {
     }
 
     @Test
+    fun `forecast elements round-trip, an absent key means the default, and an empty list is kept`() {
+        val chosen = ViewConfig.DEFAULT.toggleForecastElement(ForecastElement.HUMIDITY)
+        assertEquals(chosen.forecastElements, ViewConfigCodec.decode(ViewConfigCodec.encode(chosen)).forecastElements)
+        val older = """{"items":[{"key":"temperature","visible":true}]}"""
+        assertEquals(ForecastElement.DEFAULT, ViewConfigCodec.decode(older).forecastElements)
+        val none = """{"forecastElements":[],"items":[{"key":"temperature","visible":true}]}"""
+        assertEquals(emptySet<ForecastElement>(), ViewConfigCodec.decode(none).forecastElements)
+        val unknown = """{"forecastElements":["wind","moonphase"],"items":[{"key":"temperature","visible":true}]}"""
+        assertEquals(setOf(ForecastElement.WIND), ViewConfigCodec.decode(unknown).forecastElements)
+    }
+
+    @Test
     fun `tap-for-details round-trips, and a config from before it reads as on`() {
         val off = ViewConfigCodec.decode(ViewConfigCodec.encode(ViewConfig.DEFAULT.setTapForDetails(false)))
         assertFalse(off.tapForDetails)

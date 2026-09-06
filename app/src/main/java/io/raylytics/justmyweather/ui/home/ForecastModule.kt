@@ -4,7 +4,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -27,8 +29,10 @@ import io.raylytics.justmyweather.data.nws.ForecastPoint
 import io.raylytics.justmyweather.view.DailyStyle
 import io.raylytics.justmyweather.view.Detail
 import io.raylytics.justmyweather.view.Details
+import io.raylytics.justmyweather.view.ForecastElement
 import io.raylytics.justmyweather.view.ForecastMode
 import io.raylytics.justmyweather.view.ModuleContent
+import io.raylytics.justmyweather.view.degrees
 import java.time.ZoneId
 import java.util.Locale
 import kotlin.math.roundToInt
@@ -120,6 +124,7 @@ internal fun ForecastModuleContent(
                             HourTile(
                                 hour = hour,
                                 zone = content.zone,
+                                elements = content.elements,
                                 modifier = tileModifier.opens(open) { Details.ofHour(hour, content.zone) },
                             )
                         }
@@ -143,7 +148,7 @@ internal fun ForecastModuleContent(
                                     gridColumns = columns,
                                     modifier = Modifier.fillMaxWidth(),
                                 ) { day, _, tileModifier ->
-                                    CombinedDayTile(day, tileModifier.opens(open) { day.detail() })
+                                    CombinedDayTile(day, content.elements, tileModifier.opens(open) { day.detail() })
                                 }
 
                             DailyStyle.HALF_DAY ->
@@ -154,7 +159,11 @@ internal fun ForecastModuleContent(
                                     gridColumns = columns,
                                     modifier = Modifier.fillMaxWidth(),
                                 ) { period, _, tileModifier ->
-                                    HalfDayTile(period, tileModifier.opens(open) { Details.ofPeriod(period) })
+                                    HalfDayTile(
+                                        period = period,
+                                        elements = content.elements,
+                                        modifier = tileModifier.opens(open) { Details.ofPeriod(period) },
+                                    )
                                 }
                         }
                     }
@@ -223,123 +232,147 @@ private fun ForecastHeader(
     }
 }
 
-/** One hour: when, how likely rain is, how warm. */
+/*
+ * The tiles. Each fills its row (the flow grid sizes a row to its tallest
+ * tile) and lays out in three zones: when at the top, how warm in the
+ * middle, what it is like at the bottom. Zoned rather than stacked so the
+ * same thing sits at the same height in every tile of a row — the eye reads
+ * the temperatures across, then the hours across — even when one tile has a
+ * chance of rain to show and its neighbour does not. The user's elements go
+ * under the temperature, in the quiet style, and conditions alone take the
+ * bottom.
+ */
+
+/** One hour: when, how warm, and whatever the user has switched on. */
 @Composable
-private fun HourTile(hour: ForecastPoint, zone: ZoneId, modifier: Modifier = Modifier) {
-    TileShell(borderColor = MaterialTheme.colorScheme.surfaceVariant, modifier = modifier) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(2.dp),
-        ) {
-            // "7 pm 9/6": the hour, then the day it belongs to, on one line.
-            val at = hour.startTime.atZone(zone)
-            Text(
-                text = "${at.format(hourFormat).lowercase(Locale.getDefault())} ${at.format(shortDateFormat)}",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-            )
-            Text(
-                text = hour.temperatureF?.let { "${it.roundToInt()}°" } ?: "—",
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onBackground,
-            )
-            // Only when there is a chance worth mentioning: a "0%" on every dry
-            // hour is a screen of noise carrying no information.
-            hour.precipProbabilityPercent?.takeIf { it > 0 }?.let {
-                Text(
-                    text = "${it.roundToInt()}%",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-            }
-            // What it will actually be like — the half of an hourly forecast a
-            // temperature cannot tell you, and NWS sends it per hour.
-            hour.shortForecast?.let {
-                Text(
-                    text = it,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    textAlign = TextAlign.Center,
-                )
-            }
-        }
+private fun HourTile(
+    hour: ForecastPoint,
+    zone: ZoneId,
+    elements: Set<ForecastElement>,
+    modifier: Modifier = Modifier,
+) {
+    val at = hour.startTime.atZone(zone)
+    ZonedTile(
+        top = "${at.format(hourFormat).lowercase(Locale.getDefault())} ${at.format(shortDateFormat)}",
+        bottom = hour.shortForecast?.takeIf { ForecastElement.CONDITIONS in elements },
+        modifier = modifier,
+    ) {
+        Text(
+            text = hour.temperatureF.degrees(),
+            style = MaterialTheme.typography.titleLarge,
+            color = MaterialTheme.colorScheme.onBackground,
+        )
+        ElementLines(
+            elements = elements,
+            precipChance = hour.precipProbabilityPercent,
+            windMph = hour.windMph,
+            windDirection = hour.windDirection,
+            humidity = hour.relativeHumidityPercent,
+            dewpointF = hour.dewpointF,
+        )
     }
 }
 
 /** One day: its name, the high beside the quieter low, and NWS's summary. */
 @Composable
-private fun CombinedDayTile(day: DayForecast, modifier: Modifier = Modifier) {
-    TileShell(borderColor = MaterialTheme.colorScheme.surfaceVariant, modifier = modifier) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(2.dp),
-        ) {
+private fun CombinedDayTile(
+    day: DayForecast,
+    elements: Set<ForecastElement>,
+    modifier: Modifier = Modifier,
+) {
+    ZonedTile(
+        top = day.name,
+        bottom = day.shortForecast?.takeIf { ForecastElement.CONDITIONS in elements },
+        modifier = modifier,
+    ) {
+        Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(
-                text = day.name,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+                text = day.highF.degrees(),
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onBackground,
             )
-            Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(
-                    text = day.highF?.let { "${it.roundToInt()}°" } ?: "—",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onBackground,
-                )
-                Text(
-                    text = day.lowF?.let { "${it.roundToInt()}°" } ?: "—",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            day.shortForecast?.let {
-                Text(
-                    text = it,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    textAlign = TextAlign.Center,
-                )
-            }
+            Text(
+                text = day.lowF.degrees(),
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
+        ElementLines(
+            elements = elements,
+            // Either half's chance: the day's rain is the day's rain.
+            precipChance =
+                listOfNotNull(day.day?.precipProbabilityPercent, day.night?.precipProbabilityPercent).maxOrNull(),
+            windMph = day.day?.windMph,
+            windDirection = day.day?.windDirection,
+        )
     }
 }
 
 /** One of NWS's native half-day periods, for the user who wants day and night
  * kept apart rather than folded into a high and a low. */
 @Composable
-private fun HalfDayTile(period: DailyPeriod, modifier: Modifier = Modifier) {
+private fun HalfDayTile(
+    period: DailyPeriod,
+    elements: Set<ForecastElement>,
+    modifier: Modifier = Modifier,
+) {
+    ZonedTile(
+        top = period.name,
+        bottom = period.shortForecast?.takeIf { ForecastElement.CONDITIONS in elements },
+        modifier = modifier,
+    ) {
+        Text(
+            text = period.temperatureF.degrees(),
+            style = MaterialTheme.typography.titleLarge,
+            // The daytime high carries the emphasis and the night the
+            // quieter tone, so which is which survives being read out of
+            // order.
+            color =
+                if (period.isDaytime) {
+                    MaterialTheme.colorScheme.onBackground
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+        )
+        ElementLines(
+            elements = elements,
+            precipChance = period.precipProbabilityPercent,
+            windMph = period.windMph,
+            windDirection = period.windDirection,
+        )
+    }
+}
+
+/**
+ * The three zones. [top] is pinned to the top edge, [bottom] (when there is
+ * one) to the bottom, and the [middle] floats between them — weighted
+ * spacers, not a Box with alignments, because a Column's intrinsic height is
+ * the SUM of its children and a Box's is the tallest, and the row is sized
+ * by that intrinsic: a Box would let the zones overlap in a short row.
+ */
+@Composable
+private fun ZonedTile(
+    top: String,
+    bottom: String?,
+    modifier: Modifier = Modifier,
+    middle: @Composable ColumnScope.() -> Unit,
+) {
     TileShell(borderColor = MaterialTheme.colorScheme.surfaceVariant, modifier = modifier) {
         Column(
+            modifier = Modifier.fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
             Text(
-                text = period.name,
+                text = top,
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Text(
-                text = period.temperatureF?.let { "${it.roundToInt()}°" } ?: "—",
-                style = MaterialTheme.typography.titleLarge,
-                // The daytime high carries the emphasis and the night the
-                // quieter tone, so which is which survives being read out of
-                // order.
-                color =
-                    if (period.isDaytime) {
-                        MaterialTheme.colorScheme.onBackground
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-            )
-            period.shortForecast?.let {
+            Spacer(Modifier.weight(1f))
+            middle()
+            Spacer(Modifier.weight(1f))
+            bottom?.let {
                 Text(
                     text = it,
                     style = MaterialTheme.typography.labelSmall,
@@ -351,6 +384,45 @@ private fun HalfDayTile(period: DailyPeriod, modifier: Modifier = Modifier) {
             }
         }
     }
+}
+
+/**
+ * The user's elements, one quiet line each under the temperature, and only
+ * when there is a value: a "0%" on every dry hour, or a "—" for a humidity
+ * the day tiles never carry, is a screen of noise carrying no information.
+ * Chance of rain keeps its accent — it is the one line worth a glance.
+ */
+@Composable
+private fun ElementLines(
+    elements: Set<ForecastElement>,
+    precipChance: Double? = null,
+    windMph: Double? = null,
+    windDirection: String? = null,
+    humidity: Double? = null,
+    dewpointF: Double? = null,
+) {
+    if (ForecastElement.PRECIP_CHANCE in elements) {
+        precipChance?.takeIf { it > 0 }?.let {
+            Text(
+                text = "${it.roundToInt()}%",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
+    }
+    if (ForecastElement.WIND in elements && windMph != null) QuietLine(Details.wind(windMph, windDirection))
+    if (ForecastElement.HUMIDITY in elements && humidity != null) QuietLine("RH ${humidity.roundToInt()}%")
+    if (ForecastElement.DEW_POINT in elements && dewpointF != null) QuietLine("Dew ${dewpointF.roundToInt()}°")
+}
+
+@Composable
+private fun QuietLine(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        maxLines = 1,
+    )
 }
 
 /** Shared load/error/empty framing: null items = first fetch still in flight;

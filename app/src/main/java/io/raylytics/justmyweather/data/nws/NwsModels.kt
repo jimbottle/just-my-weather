@@ -46,6 +46,9 @@ data class CurrentObservation(
     val relativeHumidityPercent: Double? = null,
     /** Wind bearing in degrees clockwise from true north, 0–360. */
     val windDirectionDegrees: Double? = null,
+    /** What it feels like, per the station: its heat index when it sends
+     * one, else its wind chill, else null — never computed here. */
+    val feelsLikeF: Double? = null,
 )
 
 /**

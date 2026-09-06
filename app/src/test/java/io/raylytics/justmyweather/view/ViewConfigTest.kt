@@ -70,8 +70,10 @@ class ViewConfigTest {
 
     @Test
     fun `moveUp reorders and is a no-op at the top`() {
+        // Catalog order opens temperature, feels-like; moving the second up
+        // swaps the two.
         val moved = ViewConfig.DEFAULT.moveUp(1)
-        assertEquals(reading(WeatherField.CONDITIONS), moved.items[0].module)
+        assertEquals(reading(WeatherField.FEELS_LIKE), moved.items[0].module)
         assertEquals(reading(WeatherField.TEMPERATURE), moved.items[1].module)
         // Out-of-range is ignored, not a crash.
         assertEquals(ViewConfig.DEFAULT, ViewConfig.DEFAULT.moveUp(0))
@@ -244,6 +246,23 @@ class ViewConfigTest {
         val rendered = ViewConfig.DEFAULT.setHourlyHours(48).render(snapshot)
         val forecast = rendered.modules.last().content as ModuleContent.Forecast
         assertEquals(48, forecast.hourlyHours)
+    }
+
+    @Test
+    fun `forecast elements ship as chance and conditions, toggle one at a time, and reach the tile`() {
+        assertEquals(
+            setOf(ForecastElement.PRECIP_CHANCE, ForecastElement.CONDITIONS),
+            ViewConfig.DEFAULT.forecastElements,
+        )
+        val bare =
+            ViewConfig.DEFAULT
+                .toggleForecastElement(ForecastElement.CONDITIONS)
+                .toggleForecastElement(ForecastElement.PRECIP_CHANCE)
+        assertEquals(emptySet<ForecastElement>(), bare.forecastElements)
+        val windy = bare.toggleForecastElement(ForecastElement.WIND)
+        assertEquals(setOf(ForecastElement.WIND), windy.forecastElements)
+        val forecast = windy.render(snapshot).modules.last().content as ModuleContent.Forecast
+        assertEquals(setOf(ForecastElement.WIND), forecast.elements)
     }
 
     @Test
