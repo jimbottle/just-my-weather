@@ -49,6 +49,16 @@ class ViewConfigCodecTest {
     }
 
     @Test
+    fun `hourly hours round-trip, default to a day, and clamp a stored value`() {
+        val restored = ViewConfigCodec.decode(ViewConfigCodec.encode(ViewConfig.DEFAULT.setHourlyHours(72)))
+        assertEquals(72, restored.hourlyHours)
+        val older = """{"density":"comfortable","items":[{"key":"temperature","visible":true}]}"""
+        assertEquals(24, ViewConfigCodec.decode(older).hourlyHours)
+        val wild = """{"hourlyHours":5000,"items":[{"key":"temperature","visible":true}]}"""
+        assertEquals(168, ViewConfigCodec.decode(wild).hourlyHours)
+    }
+
+    @Test
     fun `tap-for-details round-trips, and a config from before it reads as on`() {
         val off = ViewConfigCodec.decode(ViewConfigCodec.encode(ViewConfig.DEFAULT.setTapForDetails(false)))
         assertFalse(off.tapForDetails)

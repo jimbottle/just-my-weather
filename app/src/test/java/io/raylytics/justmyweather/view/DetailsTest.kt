@@ -86,7 +86,7 @@ class DetailsTest {
                 ModuleKey.Forecast,
                 "Forecast",
                 ModuleKey.Forecast.defaultSize,
-                ModuleContent.Forecast(null, null, null, ForecastMode.DEFAULT, DailyStyle.DEFAULT, newYork),
+                ModuleContent.Forecast(null, null, null, ForecastMode.DEFAULT, DailyStyle.DEFAULT, 24, newYork),
             )
         assertNull(Details.ofModule(forecast, snapshot, newYork))
     }

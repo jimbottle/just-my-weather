@@ -49,20 +49,15 @@ import kotlin.math.roundToInt
  * screen-wide mode: the forecast is one thing on the page with its own
  * option, instead of the page having three states of which two happen to be
  * forecasts.
- */
-
-/**
- * How many hours the Hourly framing offers. A day's worth: six rows of four,
- * of which the module shows a couple and the rest is a scroll away.
  *
- * This is bounded rather than NWS's full ~156 points because the grid is drawn
- * eagerly, not lazily — thirty-nine rows of tiles would be composed whether or
- * not anyone scrolled to them. Twenty-four is the span people actually plan
- * against. Every tile still names its day ("7 pm 9/6"): the strip crosses
- * midnight, and a tile scrolled into view on its own has no neighbour to
- * tell it from tomorrow's.
+ * How many hours the Hourly framing offers is the user's setting
+ * (ViewConfig.hourlyHours, 4–168, default a day), carried in on the content.
+ * The grid is drawn eagerly, not lazily, so the top of that range composes
+ * ~40 rows of tiles whether or not anyone scrolls to them — acceptable for
+ * four short texts a tile, and the ceiling is the user's to choose. Every
+ * tile names its day ("7 pm 9/6"): the strip crosses midnight, and a tile
+ * scrolled into view on its own has no neighbour to tell it from tomorrow's.
  */
-private const val HOURLY_TILES = 24
 
 /** Hours are terse enough for one cell; a period's name ("Monday Night",
  * "This Afternoon") needs two to survive without ellipsis. */
@@ -116,7 +111,7 @@ internal fun ForecastModuleContent(
                 ForecastFrame(items = content.hours, error = content.error) { list ->
                     Box(viewport) {
                         TileGrid(
-                            items = list.take(HOURLY_TILES),
+                            items = list.take(content.hourlyHours),
                             columns = { HOUR_COLUMNS },
                             gap = gap,
                             gridColumns = columns,

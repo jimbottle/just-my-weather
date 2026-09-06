@@ -16,6 +16,7 @@ import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -41,6 +42,7 @@ import io.raylytics.justmyweather.view.AlertBannerPosition
 import io.raylytics.justmyweather.view.DailyStyle
 import io.raylytics.justmyweather.view.Density
 import io.raylytics.justmyweather.view.ForecastMode
+import io.raylytics.justmyweather.view.HourlyHours
 import io.raylytics.justmyweather.view.ModuleKey
 import io.raylytics.justmyweather.view.ModuleSetting
 import io.raylytics.justmyweather.view.ModuleSize
@@ -73,6 +75,7 @@ fun CustomizeScreen(
     onSetTapForDetails: (Boolean) -> Unit,
     onSetDefaultForecastMode: (ForecastMode) -> Unit,
     onSetDailyStyle: (DailyStyle) -> Unit,
+    onSetHourlyHours: (Int) -> Unit,
     onSetAlertBannerPosition: (AlertBannerPosition) -> Unit,
     theme: ThemeConfig,
     onThemeChange: (ThemeConfig) -> Unit,
@@ -113,6 +116,8 @@ fun CustomizeScreen(
                     dailyStyle = config.dailyStyle,
                     onSetMode = onSetDefaultForecastMode,
                     onSetDailyStyle = onSetDailyStyle,
+                    hourlyHours = config.hourlyHours,
+                    onSetHourlyHours = onSetHourlyHours,
                 )
                 HorizontalDivider(
                     color = MaterialTheme.colorScheme.surfaceVariant,
@@ -301,6 +306,12 @@ private fun SizeChips(
     }
 }
 
+/** The slider's own stops are fours; a float from it becomes the nearest one. */
+private fun snapToStep(value: Float): Int {
+    val stepped = Math.round((value - HourlyHours.MIN) / HourlyHours.STEP) * HourlyHours.STEP + HourlyHours.MIN
+    return HourlyHours.clamp(stepped)
+}
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun <T> ChipRow(
@@ -390,6 +401,8 @@ private fun ForecastPicker(
     dailyStyle: DailyStyle,
     onSetMode: (ForecastMode) -> Unit,
     onSetDailyStyle: (DailyStyle) -> Unit,
+    hourlyHours: Int,
+    onSetHourlyHours: (Int) -> Unit,
 ) {
     // The framing options only mean something when there is a forecast to
     // frame; offered for a hidden module they read as controls that do
@@ -412,6 +425,24 @@ private fun ForecastPicker(
             label = { it.label },
             onSelect = onSetMode,
             tag = { "forecast_default_${it.key}" },
+        )
+        // How far the Hourly framing runs. A slider because the range is
+        // wide and continuous in the user's head ("a couple of days"), where
+        // chips would have to pick the few values that matter for them. It
+        // moves in fours and says its value in words, since a thumb on a
+        // range of 164 cannot be read from the track alone.
+        Text(
+            text = "Hourly shows $hourlyHours hours",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+        Slider(
+            value = hourlyHours.toFloat(),
+            onValueChange = { onSetHourlyHours(snapToStep(it)) },
+            valueRange = HourlyHours.MIN.toFloat()..HourlyHours.MAX.toFloat(),
+            steps = (HourlyHours.MAX - HourlyHours.MIN) / HourlyHours.STEP - 1,
+            modifier = Modifier.testTag("hourly-hours-slider"),
         )
         Text(
             text = "Each day shows",

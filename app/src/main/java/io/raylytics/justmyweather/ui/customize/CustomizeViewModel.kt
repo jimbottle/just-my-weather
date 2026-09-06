@@ -55,6 +55,8 @@ class CustomizeViewModel(
 
     fun setTapForDetails(enabled: Boolean) = edit { it.setTapForDetails(enabled) }
 
+    fun setHourlyHours(hours: Int) = edit { it.setHourlyHours(hours) }
+
     fun setDefaultForecastMode(mode: ForecastMode) = edit { it.setDefaultForecastMode(mode) }
 
     fun setDailyStyle(style: DailyStyle) = edit { it.setDailyStyle(style) }

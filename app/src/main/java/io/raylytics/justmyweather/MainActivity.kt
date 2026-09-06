@@ -258,6 +258,7 @@ private fun App(
                 onSetTapForDetails = customizeViewModel::setTapForDetails,
                 onSetDefaultForecastMode = customizeViewModel::setDefaultForecastMode,
                 onSetDailyStyle = customizeViewModel::setDailyStyle,
+                onSetHourlyHours = customizeViewModel::setHourlyHours,
                 onSetAlertBannerPosition = customizeViewModel::setAlertBannerPosition,
                 theme = themeConfig,
                 onThemeChange = onThemeChange,

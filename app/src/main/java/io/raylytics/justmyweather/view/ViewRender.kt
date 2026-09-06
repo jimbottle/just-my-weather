@@ -48,6 +48,8 @@ sealed interface ModuleContent {
         val error: String?,
         val mode: ForecastMode,
         val dailyStyle: DailyStyle,
+        /** How many of [hours] the Hourly framing shows — the user's setting. */
+        val hourlyHours: Int,
         val zone: ZoneId,
     ) : ModuleContent
 }
@@ -121,6 +123,7 @@ fun ViewConfig.render(
                                 error = forecast.error,
                                 mode = forecast.mode,
                                 dailyStyle = dailyStyle,
+                                hourlyHours = hourlyHours,
                                 zone = zone,
                             )
                     },

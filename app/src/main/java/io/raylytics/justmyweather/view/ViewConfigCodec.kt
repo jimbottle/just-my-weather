@@ -56,6 +56,8 @@ object ViewConfigCodec {
         // Defaulted ON, so a config written before the detail sheet existed
         // opens it: the default is the shipped behaviour, not the opt-out.
         val tapForDetails: Boolean = true,
+        // Defaulted to the day the app always showed; clamped on read.
+        val hourlyHours: Int = HourlyHours.DEFAULT,
         // LEGACY, read-only: sun times used to be a screen-wide switch rather
         // than a module with a place on the grid. It is folded on read into
         // the "sun" module's visibility and never written again, so someone
@@ -76,6 +78,7 @@ object ViewConfigCodec {
                 dailyStyle = config.dailyStyle.key,
                 alertBannerPosition = config.alertBannerPosition.key,
                 tapForDetails = config.tapForDetails,
+                hourlyHours = config.hourlyHours,
                 items =
                     config.items.map {
                         StoredSetting(
@@ -135,6 +138,7 @@ object ViewConfigCodec {
             DailyStyle.byKey(stored.dailyStyle) ?: DailyStyle.DEFAULT,
             bannerPosition,
             stored.tapForDetails,
+            stored.hourlyHours,
         )
     }
 

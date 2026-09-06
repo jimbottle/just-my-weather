@@ -109,6 +109,7 @@ class ModuleGridTest {
                             error = null,
                             mode = ForecastMode.DEFAULT,
                             dailyStyle = DailyStyle.DEFAULT,
+                            hourlyHours = 24,
                             zone = ZoneId.systemDefault(),
                         )
                 },

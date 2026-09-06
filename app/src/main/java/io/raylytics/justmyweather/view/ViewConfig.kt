@@ -36,6 +36,9 @@ data class ViewConfig(
     val defaultForecastMode: ForecastMode = ForecastMode.DEFAULT,
     /** How the Daily framing draws each period. */
     val dailyStyle: DailyStyle = DailyStyle.DEFAULT,
+    /** How many hours the Hourly framing shows. Always within [HourlyHours]'s
+     * bounds — every path in clamps. */
+    val hourlyHours: Int = HourlyHours.DEFAULT,
     /** Where a safety-alert banner sits on the days there is one. */
     val alertBannerPosition: AlertBannerPosition = AlertBannerPosition.DEFAULT,
     /**
@@ -107,6 +110,8 @@ data class ViewConfig(
 
     fun setDailyStyle(style: DailyStyle): ViewConfig = copy(dailyStyle = style)
 
+    fun setHourlyHours(hours: Int): ViewConfig = copy(hourlyHours = HourlyHours.clamp(hours))
+
     fun setAlertBannerPosition(position: AlertBannerPosition): ViewConfig =
         copy(alertBannerPosition = position)
 
@@ -158,6 +163,7 @@ data class ViewConfig(
             dailyStyle: DailyStyle = DailyStyle.DEFAULT,
             alertBannerPosition: AlertBannerPosition = AlertBannerPosition.DEFAULT,
             tapForDetails: Boolean = true,
+            hourlyHours: Int = HourlyHours.DEFAULT,
         ): ViewConfig {
             val seen = LinkedHashMap<ModuleKey, ModuleSetting>()
             settings.forEach { setting -> seen.putIfAbsent(setting.module, setting) }
@@ -169,8 +175,9 @@ data class ViewConfig(
                 density,
                 defaultForecastMode,
                 dailyStyle,
-                alertBannerPosition,
-                tapForDetails,
+                alertBannerPosition = alertBannerPosition,
+                tapForDetails = tapForDetails,
+                hourlyHours = HourlyHours.clamp(hourlyHours),
             )
         }
     }

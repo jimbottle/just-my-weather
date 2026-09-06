@@ -235,6 +235,18 @@ class ViewConfigTest {
     }
 
     @Test
+    fun `hourly hours ship at a day and clamp to the range`() {
+        assertEquals(24, ViewConfig.DEFAULT.hourlyHours)
+        assertEquals(168, ViewConfig.DEFAULT.setHourlyHours(999).hourlyHours)
+        assertEquals(4, ViewConfig.DEFAULT.setHourlyHours(0).hourlyHours)
+        assertEquals(48, ViewConfig.DEFAULT.setHourlyHours(48).hourlyHours)
+        // …and the rendered forecast carries the setting to the tile.
+        val rendered = ViewConfig.DEFAULT.setHourlyHours(48).render(snapshot)
+        val forecast = rendered.modules.last().content as ModuleContent.Forecast
+        assertEquals(48, forecast.hourlyHours)
+    }
+
+    @Test
     fun `tap-for-details ships on and is a plain switch`() {
         assertTrue(ViewConfig.DEFAULT.tapForDetails)
         assertFalse(ViewConfig.DEFAULT.setTapForDetails(false).tapForDetails)
