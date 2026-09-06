@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -12,6 +13,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -33,13 +35,26 @@ internal fun DetailSheet(
     detail: Detail,
     onDismiss: () -> Unit,
 ) {
-    ModalBottomSheet(onDismissRequest = onDismiss, modifier = Modifier.testTag("detailSheet")) {
+    // No half-open state: a detail is a handful of rows and a paragraph, so
+    // the sheet sizes to its content and shows all of it at once. Half-open
+    // left the last paragraph running under the navigation bar on the Pixel
+    // 9, looking cut off rather than scrollable.
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        modifier = Modifier.testTag("detailSheet"),
+    ) {
         Column(
             modifier =
                 Modifier
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState())
-                    .padding(start = 24.dp, end = 24.dp, bottom = 32.dp),
+                    .padding(start = 24.dp, end = 24.dp, bottom = 32.dp)
+                    // The sheet draws edge to edge; without this the last
+                    // paragraph sits under the navigation bar (seen on the
+                    // Pixel 9).
+                    .navigationBarsPadding(),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Text(
