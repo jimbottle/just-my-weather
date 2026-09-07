@@ -473,7 +473,14 @@ private fun ZonedLayout(
  * same thing the words are (Evan: "it is most closely tied to that"), and
  * because a line under the temperature is a line the row has to make room
  * for. A "0%" is left out: on every dry hour it is noise carrying no
- * information. Null when there is nothing to say.
+ * information.
+ *
+ * Null only when neither element is ON. When one is on but THIS tile has
+ * nothing to say — NWS sent no summary for the hour, or a dry 0% — the line
+ * is empty rather than absent, so the tile still reserves the zone: a tile
+ * that dropped its bottom zone would be shorter than its row-mates in
+ * intrinsic terms, and its temperature would sit lower than theirs. The
+ * zone is the setting's; the words are the data's.
  */
 @Composable
 private fun bottomLine(
@@ -481,9 +488,10 @@ private fun bottomLine(
     conditions: String?,
     precipChance: Double?,
 ): AnnotatedString? {
+    val wanted = ForecastElement.CONDITIONS in elements || ForecastElement.PRECIP_CHANCE in elements
+    if (!wanted) return null
     val words = conditions?.takeIf { ForecastElement.CONDITIONS in elements }
     val chance = precipChance?.takeIf { ForecastElement.PRECIP_CHANCE in elements && it > 0 }
-    if (words == null && chance == null) return null
     val accent = MaterialTheme.colorScheme.primary
     return buildAnnotatedString {
         words?.let { append(it) }

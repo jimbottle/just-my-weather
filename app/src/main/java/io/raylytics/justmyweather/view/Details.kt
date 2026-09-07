@@ -40,8 +40,9 @@ object Details {
     /**
      * The tapped module's detail, or null for one that opens nothing at the
      * module level (the forecast: its hours and days open their own). [zone]
-     * is the clock the screen reads in — the phone's or the place's, the
-     * user's choice — and every time here reads in it.
+     * is the clock the reading's timestamp reads in — the phone's, or the
+     * reading's own; see TimesIn.observedZone for why never the screen's
+     * current place.
      *
      * A reading opens the whole OBSERVATION, its own field first: the other
      * readings are the context the number was taken in, and "Temperature 93°"

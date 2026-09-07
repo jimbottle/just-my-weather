@@ -197,6 +197,8 @@ private fun GlanceView(
             TimesIn.DEVICE -> ZoneId.systemDefault()
             TimesIn.PLACE -> state.zone
         }
+    // The reading's own timestamp is the exception: see TimesIn.observedZone.
+    val observedZone = config.timesIn.observedZone(snapshot, place = state.zone)
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(spec.sectionSpacing),
@@ -235,6 +237,7 @@ private fun GlanceView(
             config = config,
             sunDays = state.sunDays,
             zone = displayZone,
+            observedZone = observedZone,
             forecast = ForecastData(state.forecastMode, state.hourly, state.daily, state.forecastError, state.zone),
             arranging = arranging,
             onStartArranging = onStartArranging,
@@ -332,6 +335,9 @@ private fun NowContent(
      * user's setting. The sun rows were computed for the place's days; this
      * is only how their instants are shown. */
     zone: ZoneId,
+    /** The clock the station reading's timestamp reads in — the reading's
+     * own in place mode, never the screen's current place. */
+    observedZone: ZoneId,
     /** The forecast module's data: a separate fetch with its own failure and
      * a session-chosen framing, so it rides beside the snapshot. */
     forecast: ForecastData,
@@ -371,7 +377,7 @@ private fun NowContent(
                 // from, which lives here and not on the tile.
                 onOpenModule = onOpenDetail?.let {
                         open ->
-                    { module -> Details.ofModule(module, snapshot, zone)?.let(open) }
+                    { module -> Details.ofModule(module, snapshot, observedZone)?.let(open) }
                 },
                 onOpenDetail = onOpenDetail,
                 modifier = Modifier.fillMaxWidth(),
@@ -389,7 +395,7 @@ private fun NowContent(
         // the time to be "just the number", but a number whose provenance is
         // undiscoverable is exactly what made this confusing, and one quiet
         // line is the smallest thing that fixes it.
-        ObservedLine(snapshot, zone = zone)
+        ObservedLine(snapshot, zone = observedZone)
     }
 }
 
