@@ -411,35 +411,50 @@ class HomeViewModel(
         if (sameChip) viewModelScope.launch { ensureForecast(forecast.value) }
     }
 
-    /** No fetch at all while the forecast grid is switched off, nor before the
+    /**
+     * No fetch at all while the forecast grid is switched off, nor before the
      * config says whether it is: the network cost of a view nobody is looking
-     * at is the reason "off" is worth having. */
+     * at is the reason "off" is worth having.
+     *
+     * A framing fetches what it needs and nothing it already has. Hourly
+     * needs the hours. Daily needs the periods AND the hours — a leading
+     * "Tonight" borrows today's high from the warmest remaining hour, and a
+     * user whose default framing is Daily would otherwise never have hours to
+     * borrow from (found in review). Each fetch fails on its own: an hourly
+     * failure must never cost the Daily view the periods it did load.
+     */
     private suspend fun ensureForecast(choice: ForecastChoice?) {
         if (choice == null || !choice.shown) return
-        val mode = choice.mode
+        val needs =
+            when (choice.mode) {
+                ForecastMode.HOURLY -> listOf(ForecastMode.HOURLY)
+                ForecastMode.DAILY -> listOf(ForecastMode.DAILY, ForecastMode.HOURLY)
+            }
         forecastMutex.withLock {
-            val current = forecasts.value
-            val needed =
-                when (mode) {
-                    ForecastMode.HOURLY -> current.hourly == null
-                    ForecastMode.DAILY -> current.daily == null
+            for (framing in needs) {
+                val current = forecasts.value
+                val needed =
+                    when (framing) {
+                        ForecastMode.HOURLY -> current.hourly == null
+                        ForecastMode.DAILY -> current.daily == null
+                    }
+                if (!needed) continue
+                val location = currentLocation()
+                runCatching {
+                    forecasts.value =
+                        when (framing) {
+                            ForecastMode.HOURLY ->
+                                current.copy(hourly = repository.loadForecast(location), hourlyError = null)
+                            ForecastMode.DAILY ->
+                                current.copy(daily = repository.loadDailyForecast(location), dailyError = null)
+                        }
+                }.onFailure { e ->
+                    forecasts.value =
+                        when (framing) {
+                            ForecastMode.HOURLY -> current.copy(hourlyError = e.toUserMessage())
+                            ForecastMode.DAILY -> current.copy(dailyError = e.toUserMessage())
+                        }
                 }
-            if (!needed) return
-            val location = currentLocation()
-            runCatching {
-                forecasts.value =
-                    when (mode) {
-                        ForecastMode.HOURLY ->
-                            current.copy(hourly = repository.loadForecast(location), hourlyError = null)
-                        ForecastMode.DAILY ->
-                            current.copy(daily = repository.loadDailyForecast(location), dailyError = null)
-                    }
-            }.onFailure { e ->
-                forecasts.value =
-                    when (mode) {
-                        ForecastMode.HOURLY -> current.copy(hourlyError = e.toUserMessage())
-                        ForecastMode.DAILY -> current.copy(dailyError = e.toUserMessage())
-                    }
             }
         }
     }

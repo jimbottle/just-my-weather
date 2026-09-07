@@ -98,6 +98,7 @@ class HomeViewModelTest {
         var hourlyFetches = 0
         var dailyFetches = 0
         var failDaily = false
+        var failHourly = false
         var failObservation = false
         var gateDaily: CompletableDeferred<Unit>? = null
         var gateObservation: CompletableDeferred<Unit>? = null
@@ -118,6 +119,7 @@ class HomeViewModelTest {
                         if (westLatPrefix?.let { url.contains(it) } == true) POINTS_WEST else points
                     url.endsWith("/forecast/hourly") -> {
                         hourlyFetches++
+                        if (failHourly) return HttpResult(500, "boom", null)
                         HOURLY
                     }
                     url.endsWith("/forecast") -> {
@@ -203,6 +205,25 @@ class HomeViewModelTest {
         h.vm.setForecastMode(ForecastMode.HOURLY)
         advanceUntilIdle()
         assertEquals(1, h.transport.hourlyFetches)
+    }
+
+    @Test
+    fun `a Daily default fetches the hours too, so Tonight can borrow today's high`() = runTest(dispatcher) {
+        // Found in review: the combined day borrows from the hourly forecast,
+        // which used to be fetched only when Hourly was viewed — a user who
+        // opens on Daily would never have had hours to borrow from.
+        val h = harness(config = ViewConfig.DEFAULT.setDefaultForecastMode(ForecastMode.DAILY))
+        advanceUntilIdle()
+        assertEquals(1, h.transport.dailyFetches)
+        assertEquals(1, h.transport.hourlyFetches)
+        assertNotNull(h.vm.ready().hourly)
+        assertNotNull(h.vm.ready().daily)
+        // And an hourly failure must not cost Daily its periods.
+        val failing = harness(config = ViewConfig.DEFAULT.setDefaultForecastMode(ForecastMode.DAILY))
+        failing.transport.failHourly = true
+        advanceUntilIdle()
+        assertNotNull(failing.vm.ready().daily)
+        assertNull(failing.vm.ready().forecastError, "the shown framing loaded; the other's failure is not its error")
     }
 
     @Test
