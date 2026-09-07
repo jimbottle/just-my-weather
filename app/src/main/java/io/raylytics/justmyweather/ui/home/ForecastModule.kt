@@ -499,10 +499,13 @@ private fun ZonedLayout(
                 }
             }
             stack(measured[0], 0)
-            // The bottom's text sits at the TOP of its reserved zone, so a
-            // one-line "Clear" lines up with the first line of a neighbour's
-            // "Mostly / Clear" rather than with its second.
-            stack(measured[3], height - botH)
+            // The bottom's text sits on the tile's bottom edge, whatever the
+            // zone reserved above it: a one-line "Clear" is bottom-aligned
+            // like everything else in the row, level with the second line of
+            // a neighbour's "Mostly / Clear". (Its first version sat at the
+            // top of the reserved zone, which left a blank line under every
+            // one-liner and read as aligned to a box inside the tile.)
+            stack(measured[3], height - heights[3])
             // The middle zone runs from under the top to above the bottom;
             // the temperature's centre is its centre, and below hangs off
             // the temperature's foot.

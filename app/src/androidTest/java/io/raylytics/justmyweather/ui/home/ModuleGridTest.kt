@@ -443,10 +443,9 @@ class ModuleGridTest {
         val conditions = bounds("Clear")
         val padding = TILE_PADDING + 4.dp
         assertTrue("hour is pinned to the top, gap ${hour.top - tile.top}", hour.top - tile.top <= padding)
-        // The bottom zone reserves two lines and the text sits at its top, so
-        // the text's bottom is about one line above the tile's padding.
+        // The conditions sit on the tile's bottom edge, inside its padding.
         val bottomGap = tile.bottom - conditions.bottom
-        assertTrue("conditions sit in the bottom zone, gap $bottomGap", bottomGap > TILE_PADDING && bottomGap < 40.dp)
+        assertTrue("conditions are pinned to the bottom, gap $bottomGap", bottomGap <= TILE_PADDING + 4.dp)
         // Level with the neighbour that has a wind line under its number.
         val other = bounds("72°")
         val drift = (temp.top + temp.bottom) / 2 - (other.top + other.bottom) / 2
@@ -499,11 +498,13 @@ class ModuleGridTest {
         val b = bounds("70°")
         val drift = (a.top + a.bottom) / 2 - (b.top + b.bottom) / 2
         assertTrue("temperatures read straight across, drift $drift", drift.value in -2f..2f)
-        // The one-liner's text sits at the TOP of its reserved zone, level
-        // with the first line of its neighbour's two.
+        // The one-liner sits on the tile's bottom edge, level with the LAST
+        // line of its neighbour's two — bottom-aligned within the tile, not
+        // within a reserved box inside it.
         val clear = bounds("Clear")
         val mostly = bounds("Mostly Cloudy")
-        assertEquals("conditions start on the same line", mostly.top.value, clear.top.value, 2f)
+        assertEquals("conditions end on the same line", mostly.bottom.value, clear.bottom.value, 2f)
+        assertTrue("conditions touch the tile's padding", oneLine.bottom - clear.bottom < TILE_PADDING + 4.dp)
     }
 
     @Test
