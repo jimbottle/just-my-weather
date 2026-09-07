@@ -33,10 +33,15 @@ class DetailsTest {
 
     @Test
     fun `a reading opens the whole observation, its own field first`() {
-        val detail = Details.ofModule(module(WeatherField.WIND), snapshot, ZoneId.of("UTC"))!!
+        val detail = Details.ofModule(module(WeatherField.WIND), snapshot, newYork)!!
         assertEquals("Wind", detail.title)
-        // Observed in the PLACE's zone (7 PM in New York), never the fallback.
+        // Observed in the zone the SCREEN reads in — the caller's choice, the
+        // place's here — not the snapshot's own.
         assertEquals("Observed 7:00 PM · Louisville, KY", detail.subtitle)
+        assertEquals(
+            "Observed 4:00 PM · Louisville, KY",
+            Details.ofModule(module(WeatherField.WIND), snapshot, ZoneId.of("America/Los_Angeles"))!!.subtitle,
+        )
         assertEquals(
             listOf("Wind", "Temperature", "Feels like", "Conditions", "Precip (last hr)", "Pressure", "Humidity"),
             detail.rows.map { it.label },

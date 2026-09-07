@@ -44,6 +44,7 @@ import io.raylytics.justmyweather.view.ForecastMode
 import io.raylytics.justmyweather.view.ModuleKey
 import io.raylytics.justmyweather.view.ModuleSize
 import io.raylytics.justmyweather.view.RenderedView
+import io.raylytics.justmyweather.view.TimesIn
 import io.raylytics.justmyweather.view.ViewConfig
 import io.raylytics.justmyweather.view.render
 import kotlinx.coroutines.delay
@@ -188,6 +189,14 @@ private fun GlanceView(
     val config = state.config
     // Density drives the sizes/spacing; the chosen level lives in the config.
     val spec = config.density.spec()
+    // Which clock every time on this screen reads in. The place's zone still
+    // decides the sun rows' calendar days; this only decides how the instants
+    // are shown.
+    val displayZone =
+        when (config.timesIn) {
+            TimesIn.DEVICE -> ZoneId.systemDefault()
+            TimesIn.PLACE -> state.zone
+        }
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(spec.sectionSpacing),
@@ -225,7 +234,7 @@ private fun GlanceView(
             snapshot = snapshot,
             config = config,
             sunDays = state.sunDays,
-            zone = state.zone,
+            zone = displayZone,
             forecast = ForecastData(state.forecastMode, state.hourly, state.daily, state.forecastError),
             arranging = arranging,
             onStartArranging = onStartArranging,
@@ -319,8 +328,9 @@ private fun NowContent(
     /** Not part of the snapshot: computed on the device, so the sun module
      * works with no signal. */
     sunDays: List<SunDay>,
-    /** The place's zone, and the one the sun rows were computed in — the same
-     * value, published together. */
+    /** The clock the screen reads in: the phone's or the place's, per the
+     * user's setting. The sun rows were computed for the place's days; this
+     * is only how their instants are shown. */
     zone: ZoneId,
     /** The forecast module's data: a separate fetch with its own failure and
      * a session-chosen framing, so it rides beside the snapshot. */
@@ -379,7 +389,7 @@ private fun NowContent(
         // the time to be "just the number", but a number whose provenance is
         // undiscoverable is exactly what made this confusing, and one quiet
         // line is the smallest thing that fixes it.
-        ObservedLine(snapshot)
+        ObservedLine(snapshot, zone = zone)
     }
 }
 
@@ -422,9 +432,16 @@ private fun NowContent(
 @Composable
 internal fun ObservedLine(
     snapshot: WeatherSnapshot,
+    /** The clock the time reads in. Defaults to the reading's own zone: a
+     * station reading is taken where the weather is, and during a place
+     * switch this reading is still the previous place's while the new one is
+     * in flight — formatting it at the new place's offset would put a time
+     * on it that never happened. The screen passes the user's choice. */
+    zone: ZoneId = snapshot.zone ?: ZoneId.systemDefault(),
     /** The wall clock, injectable so a test can decide when "now" is — the
      * defects this line has had were all in *when* it read the clock, which is
-     * untestable while the read is hard-wired. */
+     * untestable while the read is hard-wired. Last, so a test's trailing
+     * lambda lands here. */
     clock: () -> Instant = Instant::now,
 ) {
     val observedAt = snapshot.observedAt
@@ -440,11 +457,7 @@ internal fun ObservedLine(
             }
         }
     }
-    // The snapshot's OWN zone, not the screen's: a station reading is taken
-    // where the weather is, and during a place switch this reading is still
-    // the previous place's while the new one is in flight. Formatting it at
-    // the new place's offset would put a time on it that never happened.
-    val time = observedLabel(snapshot, snapshot.zone ?: ZoneId.systemDefault())
+    val time = observedLabel(snapshot, zone)
     val age = observedAt?.let { ObservationAge.label(it, now) }
     Text(
         text =

@@ -71,6 +71,16 @@ class ViewConfigCodecTest {
     }
 
     @Test
+    fun `times-in round-trips, and an absent or unknown key reads as the phone's clock`() {
+        val place = ViewConfigCodec.decode(ViewConfigCodec.encode(ViewConfig.DEFAULT.setTimesIn(TimesIn.PLACE)))
+        assertEquals(TimesIn.PLACE, place.timesIn)
+        val older = """{"items":[{"key":"temperature","visible":true}]}"""
+        assertEquals(TimesIn.DEVICE, ViewConfigCodec.decode(older).timesIn)
+        val unknown = """{"timesIn":"mars","items":[{"key":"temperature","visible":true}]}"""
+        assertEquals(TimesIn.DEVICE, ViewConfigCodec.decode(unknown).timesIn)
+    }
+
+    @Test
     fun `tap-for-details round-trips, and a config from before it reads as on`() {
         val off = ViewConfigCodec.decode(ViewConfigCodec.encode(ViewConfig.DEFAULT.setTapForDetails(false)))
         assertFalse(off.tapForDetails)

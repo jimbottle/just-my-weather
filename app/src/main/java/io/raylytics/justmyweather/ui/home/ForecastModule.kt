@@ -4,9 +4,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -18,11 +16,19 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.constrainHeight
 import androidx.compose.ui.unit.dp
 import io.raylytics.justmyweather.data.nws.DailyPeriod
 import io.raylytics.justmyweather.data.nws.ForecastPoint
@@ -254,12 +260,11 @@ private fun HourTile(
     val at = hour.startTime.atZone(zone)
     ZonedTile(
         top = "${at.format(hourFormat).lowercase(Locale.getDefault())} ${at.format(shortDateFormat)}",
-        bottom = hour.shortForecast?.takeIf { ForecastElement.CONDITIONS in elements },
+        bottom = bottomLine(elements, hour.shortForecast, hour.precipProbabilityPercent),
         modifier = modifier,
         below = {
             ElementLines(
                 elements = elements,
-                precipChance = hour.precipProbabilityPercent,
                 windMph = hour.windMph,
                 windDirection = hour.windDirection,
                 humidity = hour.relativeHumidityPercent,
@@ -284,16 +289,19 @@ private fun CombinedDayTile(
 ) {
     ZonedTile(
         top = day.name,
-        bottom = day.shortForecast?.takeIf { ForecastElement.CONDITIONS in elements },
+        bottom =
+            bottomLine(
+                elements,
+                day.shortForecast,
+                // Either half's chance: the day's rain is the day's rain.
+                listOfNotNull(day.day?.precipProbabilityPercent, day.night?.precipProbabilityPercent).maxOrNull(),
+            ),
         modifier = modifier,
         below = {
             ElementLines(
                 elements = elements,
-                // Either half's chance: the day's rain is the day's rain.
-                precipChance =
-                    listOfNotNull(day.day?.precipProbabilityPercent, day.night?.precipProbabilityPercent).maxOrNull(),
-                windMph = day.day?.windMph,
-                windDirection = day.day?.windDirection,
+                windMph = (day.day ?: day.night)?.windMph,
+                windDirection = (day.day ?: day.night)?.windDirection,
             )
         },
     ) {
@@ -322,12 +330,11 @@ private fun HalfDayTile(
 ) {
     ZonedTile(
         top = period.name,
-        bottom = period.shortForecast?.takeIf { ForecastElement.CONDITIONS in elements },
+        bottom = bottomLine(elements, period.shortForecast, period.precipProbabilityPercent),
         modifier = modifier,
         below = {
             ElementLines(
                 elements = elements,
-                precipChance = period.precipProbabilityPercent,
                 windMph = period.windMph,
                 windDirection = period.windDirection,
             )
@@ -353,90 +360,149 @@ private fun HalfDayTile(
  * The three zones. [top] is pinned to the top edge, [bottom] (when there is
  * one) to the bottom, and the [middle] — the temperature — sits exactly
  * halfway between them. What the user has switched on ([below]) hangs under
- * the temperature in the lower half, and does not move it: the two halves
- * are weighted equally, and the lower one is measured with its content, so
- * a tile with a chance of rain grows both halves by the same amount and its
- * temperature stays level with a neighbour's that has none. (Seen on the
- * Pixel 9 before this: "1%" under one tile's number lifted it a line above
- * the next tile's.)
+ * the temperature and does not move it: the layout reserves the same room
+ * above the temperature as [below] takes under it, so a tile with a chance
+ * of rain grows symmetrically and its number stays level with a
+ * neighbour's that has none.
  *
- * Weighted slots, not a Box with alignments, because a Column's intrinsic
- * height is the SUM of its children and a Box's is the tallest, and the row
- * is sized by that intrinsic: a Box would let the zones overlap in a short
- * row.
+ * An explicit Layout rather than a Column with weighted halves. The row is
+ * sized to its tallest tile's intrinsic height, and what a weighted child
+ * contributes to that is subtle enough that the first attempt reserved
+ * nothing for the lower half on the Pixel 9 — "1%" landed on top of the
+ * conditions. Here the intrinsic IS the arithmetic below: top + middle +
+ * twice below + bottom.
  */
 @Composable
 private fun ZonedTile(
     top: String,
-    bottom: String?,
+    bottom: AnnotatedString?,
     modifier: Modifier = Modifier,
-    below: @Composable ColumnScope.() -> Unit = {},
-    middle: @Composable ColumnScope.() -> Unit,
+    below: @Composable () -> Unit = {},
+    middle: @Composable () -> Unit,
 ) {
     TileShell(borderColor = MaterialTheme.colorScheme.surfaceVariant, modifier = modifier) {
-        Column(
-            modifier = Modifier.fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Text(
-                text = top,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Spacer(Modifier.weight(1f))
-            middle()
-            Column(
-                modifier = Modifier.weight(1f).fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                content = below,
-            )
-            bottom?.let {
+        ZonedLayout(
+            top = {
                 Text(
-                    text = it,
+                    text = top,
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    // Always two lines tall, even for "Clear": the bottom
-                    // zone's height is what fixes the middle's, and a row
-                    // where "Mostly Clear" wraps beside a "Clear" that does
-                    // not put the two temperatures at different heights
-                    // (seen on the Pixel 9). An empty second line is the
-                    // price of the temperatures reading straight across.
-                    minLines = 2,
-                    maxLines = 2,
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    textAlign = TextAlign.Center,
                 )
+            },
+            middle = middle,
+            below = below,
+            bottom = {
+                bottom?.let {
+                    Text(
+                        text = it,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        // Always two lines tall, even for "Clear": the bottom
+                        // zone's height is part of what fixes the middle's,
+                        // and a row where "Mostly Clear" wraps beside a
+                        // "Clear" that does not must not put the two
+                        // temperatures at different heights. An empty
+                        // second line is the price of the temperatures
+                        // reading straight across.
+                        minLines = 2,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center,
+                    )
+                }
+            },
+        )
+    }
+}
+
+/**
+ * Stacks each slot's children vertically, centred; pins [top] and [bottom]
+ * to the edges; centres [middle] between them; hangs [below] directly under
+ * [middle]. Wants top + middle + 2·below + bottom of height and, given more
+ * (the row's tallest tile decides), spends the surplus equally above and
+ * below the middle.
+ */
+@Composable
+private fun ZonedLayout(
+    top: @Composable () -> Unit,
+    middle: @Composable () -> Unit,
+    below: @Composable () -> Unit,
+    bottom: @Composable () -> Unit,
+) {
+    Layout(contents = listOf(top, middle, below, bottom), modifier = Modifier.fillMaxSize()) { slots, constraints ->
+        val loose = constraints.copy(minWidth = 0, minHeight = 0, maxHeight = Constraints.Infinity)
+        val measured = slots.map { slot -> slot.map { it.measure(loose) } }
+        val heights = measured.map { placeables -> placeables.sumOf { it.height } }
+        val (topH, midH, belowH, botH) = heights
+        val required = topH + midH + 2 * belowH + botH
+        val width =
+            if (constraints.hasBoundedWidth) constraints.maxWidth else measured.flatten().maxOfOrNull { it.width } ?: 0
+        val height = constraints.constrainHeight(required)
+        layout(width, height) {
+            fun stack(placeables: List<Placeable>, from: Int) {
+                var y = from
+                placeables.forEach { p ->
+                    p.placeRelative((width - p.width) / 2, y)
+                    y += p.height
+                }
             }
+            stack(measured[0], 0)
+            stack(measured[3], height - botH)
+            // The middle zone runs from under the top to above the bottom;
+            // the temperature's centre is its centre, and below hangs off
+            // the temperature's foot.
+            val zoneCentre = (topH + (height - botH)) / 2
+            val midTop = zoneCentre - midH / 2
+            stack(measured[1], midTop)
+            stack(measured[2], midTop + midH)
         }
     }
 }
 
 /**
- * The user's elements, one quiet line each under the temperature, and only
- * when there is a value: a "0%" on every dry hour, or a "—" for a humidity
- * the day tiles never carry, is a screen of noise carrying no information.
- * Chance of rain keeps its accent — it is the one line worth a glance.
+ * The bottom zone's line: the conditions and the chance of rain together —
+ * "Mostly Sunny · 28%", the chance in its accent — each present only when
+ * its element is on and there is a value. The chance rides with the
+ * conditions rather than under the temperature because it is about the
+ * same thing the words are (Evan: "it is most closely tied to that"), and
+ * because a line under the temperature is a line the row has to make room
+ * for. A "0%" is left out: on every dry hour it is noise carrying no
+ * information. Null when there is nothing to say.
+ */
+@Composable
+private fun bottomLine(
+    elements: Set<ForecastElement>,
+    conditions: String?,
+    precipChance: Double?,
+): AnnotatedString? {
+    val words = conditions?.takeIf { ForecastElement.CONDITIONS in elements }
+    val chance = precipChance?.takeIf { ForecastElement.PRECIP_CHANCE in elements && it > 0 }
+    if (words == null && chance == null) return null
+    val accent = MaterialTheme.colorScheme.primary
+    return buildAnnotatedString {
+        words?.let { append(it) }
+        chance?.let {
+            if (words != null) append(" · ")
+            withStyle(SpanStyle(color = accent)) { append("${it.roundToInt()}%") }
+        }
+    }
+}
+
+/**
+ * The user's other elements, one quiet line each under the temperature, and
+ * only when there is a value: a "—" for a humidity the day tiles never
+ * carry is a screen of noise carrying no information.
  */
 @Composable
 private fun ElementLines(
     elements: Set<ForecastElement>,
-    precipChance: Double? = null,
     windMph: Double? = null,
     windDirection: String? = null,
     humidity: Double? = null,
     dewpointF: Double? = null,
 ) {
-    if (ForecastElement.PRECIP_CHANCE in elements) {
-        precipChance?.takeIf { it > 0 }?.let {
-            Text(
-                text = "${it.roundToInt()}%",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary,
-            )
-        }
-    }
     if (ForecastElement.WIND in elements && windMph != null) QuietLine(Details.wind(windMph, windDirection))
     if (ForecastElement.HUMIDITY in elements && humidity != null) QuietLine("RH ${humidity.roundToInt()}%")
     if (ForecastElement.DEW_POINT in elements && dewpointF != null) QuietLine("Dew ${dewpointF.roundToInt()}°")

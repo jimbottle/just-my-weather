@@ -42,6 +42,8 @@ data class ViewConfig(
     /** What forecast tiles show beside the temperature. An empty set is
      * legal: just the hour and the number. */
     val forecastElements: Set<ForecastElement> = ForecastElement.DEFAULT,
+    /** Which clock the screen's times read in. */
+    val timesIn: TimesIn = TimesIn.DEFAULT,
     /** Where a safety-alert banner sits on the days there is one. */
     val alertBannerPosition: AlertBannerPosition = AlertBannerPosition.DEFAULT,
     /**
@@ -115,6 +117,8 @@ data class ViewConfig(
 
     fun setHourlyHours(hours: Int): ViewConfig = copy(hourlyHours = HourlyHours.clamp(hours))
 
+    fun setTimesIn(timesIn: TimesIn): ViewConfig = copy(timesIn = timesIn)
+
     fun toggleForecastElement(element: ForecastElement): ViewConfig =
         copy(
             forecastElements =
@@ -174,6 +178,7 @@ data class ViewConfig(
             tapForDetails: Boolean = true,
             hourlyHours: Int = HourlyHours.DEFAULT,
             forecastElements: Set<ForecastElement> = ForecastElement.DEFAULT,
+            timesIn: TimesIn = TimesIn.DEFAULT,
         ): ViewConfig {
             val seen = LinkedHashMap<ModuleKey, ModuleSetting>()
             settings.forEach { setting -> seen.putIfAbsent(setting.module, setting) }
@@ -189,6 +194,7 @@ data class ViewConfig(
                 tapForDetails = tapForDetails,
                 hourlyHours = HourlyHours.clamp(hourlyHours),
                 forecastElements = forecastElements,
+                timesIn = timesIn,
             )
         }
     }

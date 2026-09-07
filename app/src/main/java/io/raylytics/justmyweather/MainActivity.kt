@@ -256,6 +256,7 @@ private fun App(
                 onMoveDown = customizeViewModel::moveDown,
                 onSetDensity = customizeViewModel::setDensity,
                 onSetTapForDetails = customizeViewModel::setTapForDetails,
+                onSetTimesIn = customizeViewModel::setTimesIn,
                 onSetDefaultForecastMode = customizeViewModel::setDefaultForecastMode,
                 onSetDailyStyle = customizeViewModel::setDailyStyle,
                 onSetHourlyHours = customizeViewModel::setHourlyHours,

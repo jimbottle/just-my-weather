@@ -39,7 +39,9 @@ data class DetailRow(val label: String, val value: String)
 object Details {
     /**
      * The tapped module's detail, or null for one that opens nothing at the
-     * module level (the forecast: its hours and days open their own).
+     * module level (the forecast: its hours and days open their own). [zone]
+     * is the clock the screen reads in — the phone's or the place's, the
+     * user's choice — and every time here reads in it.
      *
      * A reading opens the whole OBSERVATION, its own field first: the other
      * readings are the context the number was taken in, and "Temperature 93°"
@@ -55,7 +57,7 @@ object Details {
     private fun ofObservation(module: ModuleValue, snapshot: WeatherSnapshot, zone: ZoneId): Detail {
         val tapped = module.module.field
         val fields = WeatherField.entries.sortedBy { if (it == tapped) 0 else 1 }
-        val observed = snapshot.observedAt?.let { "Observed ${it.clock(snapshot.zone ?: zone)}" }
+        val observed = snapshot.observedAt?.let { "Observed ${it.clock(zone)}" }
         return Detail(
             title = module.label,
             subtitle = listOfNotNull(observed, snapshot.locationLabel).joinToString(" · "),

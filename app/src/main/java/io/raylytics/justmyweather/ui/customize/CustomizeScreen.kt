@@ -49,6 +49,7 @@ import io.raylytics.justmyweather.view.ModuleSetting
 import io.raylytics.justmyweather.view.ModuleSize
 import io.raylytics.justmyweather.view.ThemeConfig
 import io.raylytics.justmyweather.view.ThemeMood
+import io.raylytics.justmyweather.view.TimesIn
 import io.raylytics.justmyweather.view.TypeChoice
 import io.raylytics.justmyweather.view.ViewConfig
 import kotlinx.coroutines.delay
@@ -74,6 +75,7 @@ fun CustomizeScreen(
     onMoveDown: (Int) -> Unit,
     onSetDensity: (Density) -> Unit,
     onSetTapForDetails: (Boolean) -> Unit,
+    onSetTimesIn: (TimesIn) -> Unit,
     onSetDefaultForecastMode: (ForecastMode) -> Unit,
     onSetDailyStyle: (DailyStyle) -> Unit,
     onSetHourlyHours: (Int) -> Unit,
@@ -112,6 +114,7 @@ fun CustomizeScreen(
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                 DensityPicker(selected = config.density, onSelect = onSetDensity)
                 TapForDetailsPicker(enabled = config.tapForDetails, onSet = onSetTapForDetails)
+                TimesInPicker(timesIn = config.timesIn, onSet = onSetTimesIn)
                 ForecastPicker(
                     show = config.shows(ModuleKey.Forecast),
                     mode = config.defaultForecastMode,
@@ -374,6 +377,34 @@ private fun DensityPicker(
             selected = selected,
             label = { it.label },
             onSelect = onSelect,
+        )
+    }
+}
+
+/** One switch: which clock the screen's times read in. Off is the phone's;
+ * on is the place's, for planning a day somewhere else. */
+@Composable
+private fun TimesInPicker(
+    timesIn: TimesIn,
+    onSet: (TimesIn) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text("Show times in the place's local time", style = MaterialTheme.typography.bodyLarge)
+            Text(
+                text = "Off: the forecast hours, sun times and observed time read in this phone's clock",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Switch(
+            checked = timesIn == TimesIn.PLACE,
+            onCheckedChange = { onSet(if (it) TimesIn.PLACE else TimesIn.DEVICE) },
+            modifier = Modifier.testTag("times-in-toggle"),
         )
     }
 }

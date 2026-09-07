@@ -11,6 +11,7 @@ import io.raylytics.justmyweather.view.ForecastElement
 import io.raylytics.justmyweather.view.ForecastMode
 import io.raylytics.justmyweather.view.ModuleKey
 import io.raylytics.justmyweather.view.ModuleSize
+import io.raylytics.justmyweather.view.TimesIn
 import io.raylytics.justmyweather.view.ViewConfig
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -55,6 +56,8 @@ class CustomizeViewModel(
     fun setDensity(density: Density) = edit { it.setDensity(density) }
 
     fun setTapForDetails(enabled: Boolean) = edit { it.setTapForDetails(enabled) }
+
+    fun setTimesIn(timesIn: TimesIn) = edit { it.setTimesIn(timesIn) }
 
     fun setHourlyHours(hours: Int) = edit { it.setHourlyHours(hours) }
 

@@ -61,6 +61,9 @@ object ViewConfigCodec {
         // Null (absent) means the default set; an empty list is the user's
         // own choice of nothing and is kept. Unknown keys are dropped.
         val forecastElements: List<String>? = null,
+        // Defaulted to the phone's clock, which is what the screen showed
+        // before the place's zone was known at all.
+        val timesIn: String = TimesIn.DEFAULT.key,
         // LEGACY, read-only: sun times used to be a screen-wide switch rather
         // than a module with a place on the grid. It is folded on read into
         // the "sun" module's visibility and never written again, so someone
@@ -83,6 +86,7 @@ object ViewConfigCodec {
                 tapForDetails = config.tapForDetails,
                 hourlyHours = config.hourlyHours,
                 forecastElements = config.forecastElements.map { it.key },
+                timesIn = config.timesIn.key,
                 items =
                     config.items.map {
                         StoredSetting(
@@ -144,6 +148,7 @@ object ViewConfigCodec {
             stored.tapForDetails,
             stored.hourlyHours,
             stored.forecastElements?.mapNotNull(ForecastElement::byKey)?.toSet() ?: ForecastElement.DEFAULT,
+            TimesIn.byKey(stored.timesIn) ?: TimesIn.DEFAULT,
         )
     }
 

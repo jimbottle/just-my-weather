@@ -266,6 +266,12 @@ class ViewConfigTest {
     }
 
     @Test
+    fun `times read in the phone's clock by default, and the place's on request`() {
+        assertEquals(TimesIn.DEVICE, ViewConfig.DEFAULT.timesIn)
+        assertEquals(TimesIn.PLACE, ViewConfig.DEFAULT.setTimesIn(TimesIn.PLACE).timesIn)
+    }
+
+    @Test
     fun `tap-for-details ships on and is a plain switch`() {
         assertTrue(ViewConfig.DEFAULT.tapForDetails)
         assertFalse(ViewConfig.DEFAULT.setTapForDetails(false).tapForDetails)
