@@ -17,6 +17,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.DpRect
 import androidx.compose.ui.unit.dp
 import io.raylytics.justmyweather.data.SunDay
+import io.raylytics.justmyweather.data.nws.ForecastPoint
 import io.raylytics.justmyweather.ui.theme.JustMyWeatherTheme
 import io.raylytics.justmyweather.view.DailyStyle
 import io.raylytics.justmyweather.view.Density
@@ -381,6 +382,85 @@ class ModuleGridTest {
         val hero = compose.onNodeWithTag("module_temperature").getUnclippedBoundsInRoot()
         val forecast = compose.onNodeWithTag("module_forecast").getUnclippedBoundsInRoot()
         assertTrue("4×4 is about twice a 4×2", forecast.height() > hero.height() * 1.8f)
+    }
+
+    /** A forecast module carrying two hours: one with a wind line under its
+     * temperature (so its row is taller than the other needs), one without.
+     * The second tile is the one with surplus height — where SPREAD and
+     * STACKED differ. */
+    private fun forecastWithHours(layout: ForecastTileLayout): ModuleValue {
+        val zone = ZoneId.of("America/New_York")
+        val hours =
+            listOf(
+                ForecastPoint(
+                    Instant.parse("2026-09-06T23:00:00Z"),
+                    72.0,
+                    12.0,
+                    shortForecast = "Sunny",
+                    windDirection = "SW",
+                ),
+                ForecastPoint(Instant.parse("2026-09-07T00:00:00Z"), 70.0, null, shortForecast = "Clear"),
+            )
+        return ModuleValue(
+            module = ModuleKey.Forecast,
+            label = "Forecast",
+            size = ModuleSize(4, 4),
+            content =
+                ModuleContent.Forecast(
+                    hours = hours,
+                    periods = null,
+                    error = null,
+                    mode = ForecastMode.HOURLY,
+                    dailyStyle = DailyStyle.DEFAULT,
+                    hourlyHours = 24,
+                    elements = setOf(ForecastElement.CONDITIONS, ForecastElement.WIND),
+                    layout = layout,
+                    zone = zone,
+                    placeZone = zone,
+                ),
+        )
+    }
+
+    private fun bounds(text: String): DpRect =
+        compose.onNodeWithText(text, useUnmergedTree = true).getUnclippedBoundsInRoot()
+
+    @Test
+    fun spreadPinsTheZonesToTheTilesEdgesAndLevelsTheTemperatures() {
+        // The regression this guards was found twice on a phone: the three
+        // zones drawn as one block (centred, then top-clustered) instead of
+        // spread across the tile. Asserted in real dp against the tile's
+        // own box, as the grid tests are, because the composables were
+        // right both times — only their positions were wrong.
+        show(forecastWithHours(ForecastTileLayout.SPREAD))
+        val tile = compose.onNodeWithTag("hour_1").getUnclippedBoundsInRoot()
+        val hour = bounds("8 pm 9/6")
+        val temp = bounds("70°")
+        val conditions = bounds("Clear")
+        val padding = TILE_PADDING + 4.dp
+        assertTrue("hour is pinned to the top, gap ${hour.top - tile.top}", hour.top - tile.top <= padding)
+        // The bottom zone reserves two lines and the text sits at its top, so
+        // the text's bottom is about one line above the tile's padding.
+        val bottomGap = tile.bottom - conditions.bottom
+        assertTrue("conditions sit in the bottom zone, gap $bottomGap", bottomGap > TILE_PADDING && bottomGap < 40.dp)
+        // Level with the neighbour that has a wind line under its number.
+        val other = bounds("72°")
+        val drift = (temp.top + temp.bottom) / 2 - (other.top + other.bottom) / 2
+        assertTrue("temperatures read straight across, drift $drift", drift.value in -2f..2f)
+        // And the temperature sits between the zones, not against the hour.
+        assertTrue("temperature is clear of the hour", temp.top - hour.bottom > 4.dp)
+    }
+
+    @Test
+    fun stackedKeepsTheZonesTogetherInTheMiddle() {
+        show(forecastWithHours(ForecastTileLayout.STACKED))
+        val tile = compose.onNodeWithTag("hour_1").getUnclippedBoundsInRoot()
+        val hour = bounds("8 pm 9/6")
+        val temp = bounds("70°")
+        // Not pinned: the surplus this tile has sits above the block too.
+        val gap = hour.top - tile.top
+        assertTrue("hour is not pinned to the top, gap $gap", gap > TILE_PADDING + 8.dp)
+        // …and the temperature follows the hour closely, as one block.
+        assertTrue("temperature hugs the hour", temp.top - hour.bottom < 8.dp)
     }
 
     @Test

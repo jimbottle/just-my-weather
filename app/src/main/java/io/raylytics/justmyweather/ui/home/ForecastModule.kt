@@ -128,13 +128,19 @@ internal fun ForecastModuleContent(
                             gap = gap,
                             gridColumns = columns,
                             modifier = Modifier.fillMaxWidth(),
-                        ) { hour, _, tileModifier ->
+                        ) { hour, index, tileModifier ->
                             HourTile(
                                 hour = hour,
                                 zone = content.zone,
                                 elements = content.elements,
                                 layout = content.layout,
-                                modifier = tileModifier.opens(open) { Details.ofHour(hour, content.zone) },
+                                modifier =
+                                    tileModifier
+                                        .opens(open) { Details.ofHour(hour, content.zone) }
+                                        // A stable handle per tile for the
+                                        // layout test, which asserts zones
+                                        // in real dp against the tile's box.
+                                        .testTag("hour_$index"),
                             )
                         }
                     }
