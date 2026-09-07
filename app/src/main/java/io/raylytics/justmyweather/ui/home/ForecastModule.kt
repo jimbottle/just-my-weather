@@ -141,8 +141,12 @@ internal fun ForecastModuleContent(
                 ForecastFrame(items = content.periods, error = content.error) { list ->
                     // Pairing the half-day periods is pure; cache per list.
                     val days =
-                        remember(list, content.dailyStyle) {
-                            if (content.dailyStyle == DailyStyle.COMBINED) combineDays(list) else emptyList()
+                        remember(list, content.hours, content.dailyStyle) {
+                            if (content.dailyStyle == DailyStyle.COMBINED) {
+                                combineDays(list, content.hours, content.placeZone)
+                            } else {
+                                emptyList()
+                            }
                         }
                     Box(viewport) {
                         when (content.dailyStyle) {

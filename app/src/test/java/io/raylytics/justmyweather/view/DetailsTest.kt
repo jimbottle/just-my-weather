@@ -100,6 +100,7 @@ class DetailsTest {
                     hourlyHours = 24,
                     elements = ForecastElement.DEFAULT,
                     zone = newYork,
+                    placeZone = newYork,
                 ),
             )
         assertNull(Details.ofModule(forecast, snapshot, newYork))

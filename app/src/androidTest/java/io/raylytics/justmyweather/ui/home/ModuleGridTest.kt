@@ -113,6 +113,7 @@ class ModuleGridTest {
                             hourlyHours = 24,
                             elements = ForecastElement.DEFAULT,
                             zone = ZoneId.systemDefault(),
+                            placeZone = ZoneId.systemDefault(),
                         )
                 },
         )

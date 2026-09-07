@@ -52,7 +52,11 @@ sealed interface ModuleContent {
         val hourlyHours: Int,
         /** What each tile shows beside its temperature — the user's setting. */
         val elements: Set<ForecastElement>,
+        /** The clock the tile's times read in — the user's setting. */
         val zone: ZoneId,
+        /** The place's own zone, for what depends on the place's calendar:
+         * which hours are "the rest of today". */
+        val placeZone: ZoneId,
     ) : ModuleContent
 }
 
@@ -68,6 +72,8 @@ data class ForecastData(
     val hours: List<ForecastPoint>? = null,
     val periods: List<DailyPeriod>? = null,
     val error: String? = null,
+    /** The place's zone, whatever clock the screen reads in. */
+    val placeZone: ZoneId = ZoneId.systemDefault(),
 )
 
 /** A module resolved to what the screen shows: its label, its content, and
@@ -128,6 +134,7 @@ fun ViewConfig.render(
                                 hourlyHours = hourlyHours,
                                 elements = forecastElements,
                                 zone = zone,
+                                placeZone = forecast.placeZone,
                             )
                     },
             )

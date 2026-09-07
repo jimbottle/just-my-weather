@@ -28,12 +28,31 @@ data class DayForecast(
     val shortForecast: String?,
     val day: DailyPeriod? = null,
     val night: DailyPeriod? = null,
+    /** True when [highF] is not NWS's high but the warmest remaining hour of
+     * today — see [combineDays]. The tile shows it like any high; the detail
+     * sheet says what it is. */
+    val highFromHours: Boolean = false,
 )
 
-/** Pair each daytime period with the night that follows it. NWS interleaves
+/**
+ * Pair each daytime period with the night that follows it. NWS interleaves
  * day/night strictly, so this is a single pass; any unpaired period still
- * yields a day rather than being dropped. */
-fun combineDays(periods: List<DailyPeriod>): List<DayForecast> {
+ * yields a day rather than being dropped.
+ *
+ * A leading night has no high of its own: after mid-afternoon NWS stops
+ * issuing today's daytime period, so the forecast opens on "Tonight" with
+ * only a low. Given the hourly forecast, that day borrows the warmest
+ * remaining hour on today's date (in the PLACE's calendar, [zone]) as its
+ * high. It is an approximation and gets more so as the evening goes on —
+ * by ten it is the evening's warmest hour, not the day's — which is why the
+ * result is flagged and the detail sheet names it. A trailing day's missing
+ * low stays missing: nothing carries it.
+ */
+fun combineDays(
+    periods: List<DailyPeriod>,
+    hours: List<ForecastPoint>? = null,
+    zone: ZoneId = ZoneId.systemDefault(),
+): List<DayForecast> {
     val days = mutableListOf<DayForecast>()
     var i = 0
     while (i < periods.size) {
@@ -51,18 +70,32 @@ fun combineDays(periods: List<DailyPeriod>): List<DayForecast> {
                 )
             i += if (night != null) 2 else 1
         } else {
+            val borrowed = if (days.isEmpty()) warmestRemainingHour(hours, zone) else null
             days +=
                 DayForecast(
                     name = period.name,
-                    highF = null,
+                    highF = borrowed,
                     lowF = period.temperatureF,
                     shortForecast = period.shortForecast,
                     night = period,
+                    highFromHours = borrowed != null,
                 )
             i++
         }
     }
     return days
+}
+
+/** The warmest of the hourly points that fall on the first point's date in
+ * [zone] — the rest of today, as the hourly forecast starts at the current
+ * hour. Null with no hours, or none carrying a temperature. */
+private fun warmestRemainingHour(hours: List<ForecastPoint>?, zone: ZoneId): Double? {
+    val first = hours?.firstOrNull() ?: return null
+    val today = first.startTime.atZone(zone).toLocalDate()
+    return hours
+        .takeWhile { it.startTime.atZone(zone).toLocalDate() == today }
+        .mapNotNull { it.temperatureF }
+        .maxOrNull()
 }
 
 /** One calendar day's worth of hourly points, for the date labels that group
@@ -102,7 +135,7 @@ fun DayForecast.detail(): Detail =
         subtitle = "Forecast",
         rows =
             buildList {
-                add(DetailRow("High", highF.degrees()))
+                add(DetailRow(if (highFromHours) "High (rest of today)" else "High", highF.degrees()))
                 add(DetailRow("Low", lowF.degrees()))
                 val chance = listOfNotNull(day?.precipProbabilityPercent, night?.precipProbabilityPercent).maxOrNull()
                 add(DetailRow("Chance of precipitation", chance.percent()))

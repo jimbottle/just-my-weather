@@ -55,6 +55,31 @@ class ForecastGroupingTest {
     }
 
     @Test
+    fun `a leading night borrows today's high from the warmest remaining hour`() {
+        val zone = ZoneId.of("America/New_York")
+
+        fun hour(iso: String, temp: Double?) = ForecastPoint(Instant.parse(iso), temp, null)
+        // 7 pm, 9 pm, 11 pm today; 1 am tomorrow is warmer but not today's.
+        val hours =
+            listOf(
+                hour("2026-09-06T23:00:00Z", 83.0),
+                hour("2026-09-07T01:00:00Z", 79.0),
+                hour("2026-09-07T03:00:00Z", null),
+                hour("2026-09-07T05:00:00Z", 90.0),
+            )
+        val days = combineDays(listOf(night("Tonight", 64.0), day("Labor Day", 89.0)), hours, zone)
+        assertEquals(83.0, days[0].highF)
+        assertEquals(true, days[0].highFromHours)
+        assertEquals("High (rest of today)", days[0].detail().rows.first().label)
+        // A leading DAY is NWS's own and is left alone; so is a later night.
+        assertEquals(89.0, days[1].highF)
+        assertEquals(false, days[1].highFromHours)
+        // No hours: honest absence, as before.
+        assertNull(combineDays(listOf(night("Tonight", 64.0)))[0].highF)
+        assertNull(combineDays(listOf(night("Tonight", 64.0)), emptyList(), zone)[0].highF)
+    }
+
+    @Test
     fun `a leading night keeps its own name with no high`() {
         // Opening the app in the evening: NWS's first period is "Tonight".
         val days = combineDays(listOf(night("Tonight", 68.0), day("Friday", 82.0), night("Friday Night", 70.0)))
