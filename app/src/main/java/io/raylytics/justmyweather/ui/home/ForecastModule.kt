@@ -18,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.Placeable
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
@@ -399,9 +400,19 @@ private fun ZonedTile(
     below: @Composable () -> Unit = {},
     middle: @Composable () -> Unit,
 ) {
+    // The bottom zone's reserved height, in pixels: two lines of the label
+    // style. Reserved here rather than through the Text's minLines because
+    // the row is sized by an INTRINSIC measurement, and in that pass a Text
+    // reports its natural height with minLines ignored — so rows whose
+    // conditions fit on one line came out a line too short and the zones had
+    // no room to spread, while rows with a wrapped "Mostly Sunny" were fine
+    // (seen on the Pixel 9: "some rows worse than others").
+    val labelStyle = MaterialTheme.typography.labelSmall
+    val bottomReserve = with(LocalDensity.current) { (labelStyle.lineHeight * 2).roundToPx() }
     TileShell(borderColor = MaterialTheme.colorScheme.surfaceVariant, modifier = modifier) {
         ZonedLayout(
             spread = layout == ForecastTileLayout.SPREAD,
+            bottomReserve = bottomReserve,
             top = {
                 Text(
                     text = top,
@@ -417,16 +428,8 @@ private fun ZonedTile(
                 bottom?.let {
                     Text(
                         text = it,
-                        style = MaterialTheme.typography.labelSmall,
+                        style = labelStyle,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        // Always two lines tall, even for "Clear": the bottom
-                        // zone's height is part of what fixes the middle's,
-                        // and a row where "Mostly Clear" wraps beside a
-                        // "Clear" that does not must not put the two
-                        // temperatures at different heights. An empty
-                        // second line is the price of the temperatures
-                        // reading straight across.
-                        minLines = 2,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                         textAlign = TextAlign.Center,
@@ -455,6 +458,10 @@ private fun ZonedTile(
 @Composable
 private fun ZonedLayout(
     spread: Boolean,
+    /** The bottom zone is at least this tall whenever it has content, so a
+     * one-line "Clear" reserves what a two-line "Mostly Clear" takes and the
+     * row's tiles agree on where the middle is. */
+    bottomReserve: Int,
     top: @Composable () -> Unit,
     middle: @Composable () -> Unit,
     below: @Composable () -> Unit,
@@ -464,7 +471,10 @@ private fun ZonedLayout(
         val loose = constraints.copy(minWidth = 0, minHeight = 0, maxHeight = Constraints.Infinity)
         val measured = slots.map { slot -> slot.map { it.measure(loose) } }
         val heights = measured.map { placeables -> placeables.sumOf { it.height } }
-        val (topH, midH, belowH, botH) = heights
+        val topH = heights[0]
+        val midH = heights[1]
+        val belowH = heights[2]
+        val botH = if (measured[3].isEmpty()) 0 else heights[3].coerceAtLeast(bottomReserve)
         val required = topH + midH + 2 * belowH + botH
         val width =
             if (constraints.hasBoundedWidth) constraints.maxWidth else measured.flatten().maxOfOrNull { it.width } ?: 0
@@ -483,6 +493,9 @@ private fun ZonedLayout(
                 }
             }
             stack(measured[0], 0)
+            // The bottom's text sits at the TOP of its reserved zone, so a
+            // one-line "Clear" lines up with the first line of a neighbour's
+            // "Mostly / Clear" rather than with its second.
             stack(measured[3], height - botH)
             // The middle zone runs from under the top to above the bottom;
             // the temperature's centre is its centre, and below hangs off
