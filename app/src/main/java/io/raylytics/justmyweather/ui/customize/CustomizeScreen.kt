@@ -43,6 +43,7 @@ import io.raylytics.justmyweather.view.DailyStyle
 import io.raylytics.justmyweather.view.Density
 import io.raylytics.justmyweather.view.ForecastElement
 import io.raylytics.justmyweather.view.ForecastMode
+import io.raylytics.justmyweather.view.ForecastTileLayout
 import io.raylytics.justmyweather.view.HourlyHours
 import io.raylytics.justmyweather.view.ModuleKey
 import io.raylytics.justmyweather.view.ModuleSetting
@@ -80,6 +81,7 @@ fun CustomizeScreen(
     onSetDailyStyle: (DailyStyle) -> Unit,
     onSetHourlyHours: (Int) -> Unit,
     onToggleForecastElement: (ForecastElement) -> Unit,
+    onSetForecastTileLayout: (ForecastTileLayout) -> Unit,
     onSetAlertBannerPosition: (AlertBannerPosition) -> Unit,
     theme: ThemeConfig,
     onThemeChange: (ThemeConfig) -> Unit,
@@ -125,6 +127,8 @@ fun CustomizeScreen(
                     onSetHourlyHours = onSetHourlyHours,
                     elements = config.forecastElements,
                     onToggleElement = onToggleForecastElement,
+                    tileLayout = config.forecastTileLayout,
+                    onSetTileLayout = onSetForecastTileLayout,
                 )
                 HorizontalDivider(
                     color = MaterialTheme.colorScheme.surfaceVariant,
@@ -462,6 +466,8 @@ private fun ForecastPicker(
     onSetHourlyHours: (Int) -> Unit,
     elements: Set<ForecastElement>,
     onToggleElement: (ForecastElement) -> Unit,
+    tileLayout: ForecastTileLayout,
+    onSetTileLayout: (ForecastTileLayout) -> Unit,
 ) {
     // The framing options only mean something when there is a forecast to
     // frame; offered for a hidden module they read as controls that do
@@ -520,6 +526,21 @@ private fun ForecastPicker(
             label = { it.label },
             onToggle = onToggleElement,
             tag = { "forecast_element_${it.key}" },
+        )
+        // How a tile arranges what it shows: zones pinned to the edges so a
+        // row reads straight across, or one block in the middle.
+        Text(
+            text = "Tile layout",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+        ChipRow(
+            options = ForecastTileLayout.entries,
+            selected = tileLayout,
+            label = { it.label },
+            onSelect = onSetTileLayout,
+            tag = { "tile_layout_${it.key}" },
         )
         Text(
             text = "Each day shows",

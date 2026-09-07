@@ -71,6 +71,17 @@ class ViewConfigCodecTest {
     }
 
     @Test
+    fun `the forecast tile layout round-trips and defaults to spread`() {
+        val stacked = ViewConfig.DEFAULT.setForecastTileLayout(ForecastTileLayout.STACKED)
+        assertEquals(
+            ForecastTileLayout.STACKED,
+            ViewConfigCodec.decode(ViewConfigCodec.encode(stacked)).forecastTileLayout,
+        )
+        val older = """{"items":[{"key":"temperature","visible":true}]}"""
+        assertEquals(ForecastTileLayout.SPREAD, ViewConfigCodec.decode(older).forecastTileLayout)
+    }
+
+    @Test
     fun `times-in round-trips, and an absent or unknown key reads as the phone's clock`() {
         val place = ViewConfigCodec.decode(ViewConfigCodec.encode(ViewConfig.DEFAULT.setTimesIn(TimesIn.PLACE)))
         assertEquals(TimesIn.PLACE, place.timesIn)

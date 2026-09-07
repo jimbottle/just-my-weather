@@ -64,6 +64,7 @@ object ViewConfigCodec {
         // Defaulted to the phone's clock, which is what the screen showed
         // before the place's zone was known at all.
         val timesIn: String = TimesIn.DEFAULT.key,
+        val forecastTileLayout: String = ForecastTileLayout.DEFAULT.key,
         // LEGACY, read-only: sun times used to be a screen-wide switch rather
         // than a module with a place on the grid. It is folded on read into
         // the "sun" module's visibility and never written again, so someone
@@ -87,6 +88,7 @@ object ViewConfigCodec {
                 hourlyHours = config.hourlyHours,
                 forecastElements = config.forecastElements.map { it.key },
                 timesIn = config.timesIn.key,
+                forecastTileLayout = config.forecastTileLayout.key,
                 items =
                     config.items.map {
                         StoredSetting(
@@ -149,6 +151,7 @@ object ViewConfigCodec {
             stored.hourlyHours,
             stored.forecastElements?.mapNotNull(ForecastElement::byKey)?.toSet() ?: ForecastElement.DEFAULT,
             TimesIn.byKey(stored.timesIn) ?: TimesIn.DEFAULT,
+            ForecastTileLayout.byKey(stored.forecastTileLayout) ?: ForecastTileLayout.DEFAULT,
         )
     }
 

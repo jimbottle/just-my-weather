@@ -9,6 +9,7 @@ import io.raylytics.justmyweather.view.DailyStyle
 import io.raylytics.justmyweather.view.Density
 import io.raylytics.justmyweather.view.ForecastElement
 import io.raylytics.justmyweather.view.ForecastMode
+import io.raylytics.justmyweather.view.ForecastTileLayout
 import io.raylytics.justmyweather.view.ModuleKey
 import io.raylytics.justmyweather.view.ModuleSize
 import io.raylytics.justmyweather.view.TimesIn
@@ -62,6 +63,8 @@ class CustomizeViewModel(
     fun setHourlyHours(hours: Int) = edit { it.setHourlyHours(hours) }
 
     fun toggleForecastElement(element: ForecastElement) = edit { it.toggleForecastElement(element) }
+
+    fun setForecastTileLayout(layout: ForecastTileLayout) = edit { it.setForecastTileLayout(layout) }
 
     fun setDefaultForecastMode(mode: ForecastMode) = edit { it.setDefaultForecastMode(mode) }
 

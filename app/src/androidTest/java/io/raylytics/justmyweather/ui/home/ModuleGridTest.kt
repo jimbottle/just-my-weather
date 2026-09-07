@@ -22,6 +22,7 @@ import io.raylytics.justmyweather.view.DailyStyle
 import io.raylytics.justmyweather.view.Density
 import io.raylytics.justmyweather.view.ForecastElement
 import io.raylytics.justmyweather.view.ForecastMode
+import io.raylytics.justmyweather.view.ForecastTileLayout
 import io.raylytics.justmyweather.view.ModuleContent
 import io.raylytics.justmyweather.view.ModuleKey
 import io.raylytics.justmyweather.view.ModuleSize
@@ -112,6 +113,7 @@ class ModuleGridTest {
                             dailyStyle = DailyStyle.DEFAULT,
                             hourlyHours = 24,
                             elements = ForecastElement.DEFAULT,
+                            layout = ForecastTileLayout.DEFAULT,
                             zone = ZoneId.systemDefault(),
                             placeZone = ZoneId.systemDefault(),
                         )

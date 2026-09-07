@@ -99,6 +99,7 @@ class DetailsTest {
                     dailyStyle = DailyStyle.DEFAULT,
                     hourlyHours = 24,
                     elements = ForecastElement.DEFAULT,
+                    layout = ForecastTileLayout.DEFAULT,
                     zone = newYork,
                     placeZone = newYork,
                 ),

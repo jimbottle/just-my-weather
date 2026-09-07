@@ -261,6 +261,7 @@ private fun App(
                 onSetDailyStyle = customizeViewModel::setDailyStyle,
                 onSetHourlyHours = customizeViewModel::setHourlyHours,
                 onToggleForecastElement = customizeViewModel::toggleForecastElement,
+                onSetForecastTileLayout = customizeViewModel::setForecastTileLayout,
                 onSetAlertBannerPosition = customizeViewModel::setAlertBannerPosition,
                 theme = themeConfig,
                 onThemeChange = onThemeChange,

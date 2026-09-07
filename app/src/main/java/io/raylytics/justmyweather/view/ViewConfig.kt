@@ -44,6 +44,8 @@ data class ViewConfig(
     val forecastElements: Set<ForecastElement> = ForecastElement.DEFAULT,
     /** Which clock the screen's times read in. */
     val timesIn: TimesIn = TimesIn.DEFAULT,
+    /** How a forecast tile arranges its zones. */
+    val forecastTileLayout: ForecastTileLayout = ForecastTileLayout.DEFAULT,
     /** Where a safety-alert banner sits on the days there is one. */
     val alertBannerPosition: AlertBannerPosition = AlertBannerPosition.DEFAULT,
     /**
@@ -119,6 +121,8 @@ data class ViewConfig(
 
     fun setTimesIn(timesIn: TimesIn): ViewConfig = copy(timesIn = timesIn)
 
+    fun setForecastTileLayout(layout: ForecastTileLayout): ViewConfig = copy(forecastTileLayout = layout)
+
     fun toggleForecastElement(element: ForecastElement): ViewConfig =
         copy(
             forecastElements =
@@ -179,6 +183,7 @@ data class ViewConfig(
             hourlyHours: Int = HourlyHours.DEFAULT,
             forecastElements: Set<ForecastElement> = ForecastElement.DEFAULT,
             timesIn: TimesIn = TimesIn.DEFAULT,
+            forecastTileLayout: ForecastTileLayout = ForecastTileLayout.DEFAULT,
         ): ViewConfig {
             val seen = LinkedHashMap<ModuleKey, ModuleSetting>()
             settings.forEach { setting -> seen.putIfAbsent(setting.module, setting) }
@@ -195,6 +200,7 @@ data class ViewConfig(
                 hourlyHours = HourlyHours.clamp(hourlyHours),
                 forecastElements = forecastElements,
                 timesIn = timesIn,
+                forecastTileLayout = forecastTileLayout,
             )
         }
     }

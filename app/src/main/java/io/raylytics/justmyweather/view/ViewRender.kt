@@ -52,6 +52,8 @@ sealed interface ModuleContent {
         val hourlyHours: Int,
         /** What each tile shows beside its temperature — the user's setting. */
         val elements: Set<ForecastElement>,
+        /** How each tile arranges its zones — the user's setting. */
+        val layout: ForecastTileLayout,
         /** The clock the tile's times read in — the user's setting. */
         val zone: ZoneId,
         /** The place's own zone, for what depends on the place's calendar:
@@ -133,6 +135,7 @@ fun ViewConfig.render(
                                 dailyStyle = dailyStyle,
                                 hourlyHours = hourlyHours,
                                 elements = forecastElements,
+                                layout = forecastTileLayout,
                                 zone = zone,
                                 placeZone = forecast.placeZone,
                             )

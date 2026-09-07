@@ -37,6 +37,7 @@ import io.raylytics.justmyweather.view.Detail
 import io.raylytics.justmyweather.view.Details
 import io.raylytics.justmyweather.view.ForecastElement
 import io.raylytics.justmyweather.view.ForecastMode
+import io.raylytics.justmyweather.view.ForecastTileLayout
 import io.raylytics.justmyweather.view.ModuleContent
 import io.raylytics.justmyweather.view.degrees
 import java.time.ZoneId
@@ -131,6 +132,7 @@ internal fun ForecastModuleContent(
                                 hour = hour,
                                 zone = content.zone,
                                 elements = content.elements,
+                                layout = content.layout,
                                 modifier = tileModifier.opens(open) { Details.ofHour(hour, content.zone) },
                             )
                         }
@@ -158,7 +160,12 @@ internal fun ForecastModuleContent(
                                     gridColumns = columns,
                                     modifier = Modifier.fillMaxWidth(),
                                 ) { day, _, tileModifier ->
-                                    CombinedDayTile(day, content.elements, tileModifier.opens(open) { day.detail() })
+                                    CombinedDayTile(
+                                        day = day,
+                                        elements = content.elements,
+                                        layout = content.layout,
+                                        modifier = tileModifier.opens(open) { day.detail() },
+                                    )
                                 }
 
                             DailyStyle.HALF_DAY ->
@@ -172,6 +179,7 @@ internal fun ForecastModuleContent(
                                     HalfDayTile(
                                         period = period,
                                         elements = content.elements,
+                                        layout = content.layout,
                                         modifier = tileModifier.opens(open) { Details.ofPeriod(period) },
                                     )
                                 }
@@ -259,12 +267,14 @@ private fun HourTile(
     hour: ForecastPoint,
     zone: ZoneId,
     elements: Set<ForecastElement>,
+    layout: ForecastTileLayout,
     modifier: Modifier = Modifier,
 ) {
     val at = hour.startTime.atZone(zone)
     ZonedTile(
         top = "${at.format(hourFormat).lowercase(Locale.getDefault())} ${at.format(shortDateFormat)}",
         bottom = bottomLine(elements, hour.shortForecast, hour.precipProbabilityPercent),
+        layout = layout,
         modifier = modifier,
         below = {
             ElementLines(
@@ -289,10 +299,12 @@ private fun HourTile(
 private fun CombinedDayTile(
     day: DayForecast,
     elements: Set<ForecastElement>,
+    layout: ForecastTileLayout,
     modifier: Modifier = Modifier,
 ) {
     ZonedTile(
         top = day.name,
+        layout = layout,
         bottom =
             bottomLine(
                 elements,
@@ -330,11 +342,13 @@ private fun CombinedDayTile(
 private fun HalfDayTile(
     period: DailyPeriod,
     elements: Set<ForecastElement>,
+    layout: ForecastTileLayout,
     modifier: Modifier = Modifier,
 ) {
     ZonedTile(
         top = period.name,
         bottom = bottomLine(elements, period.shortForecast, period.precipProbabilityPercent),
+        layout = layout,
         modifier = modifier,
         below = {
             ElementLines(
@@ -380,12 +394,14 @@ private fun HalfDayTile(
 private fun ZonedTile(
     top: String,
     bottom: AnnotatedString?,
+    layout: ForecastTileLayout,
     modifier: Modifier = Modifier,
     below: @Composable () -> Unit = {},
     middle: @Composable () -> Unit,
 ) {
     TileShell(borderColor = MaterialTheme.colorScheme.surfaceVariant, modifier = modifier) {
         ZonedLayout(
+            spread = layout == ForecastTileLayout.SPREAD,
             top = {
                 Text(
                     text = top,
@@ -424,18 +440,27 @@ private fun ZonedTile(
 /**
  * Stacks each slot's children vertically, centred; pins [top] and [bottom]
  * to the edges; centres [middle] between them; hangs [below] directly under
- * [middle]. Wants top + middle + 2·below + bottom of height and, given more
- * (the row's tallest tile decides), spends the surplus equally above and
- * below the middle.
+ * [middle]. Wants top + middle + 2·below + bottom of height and, when
+ * [spread], takes ALL the height it is offered (the row's tallest tile
+ * decides) and spends the surplus equally above and below the middle. Not
+ * spread, it takes only what it wants, and the shell centres the block.
+ *
+ * "All the height it is offered" is read off the constraints' maximum, not
+ * asked for with fillMaxSize: the tile shell hands its content loose
+ * constraints, and the first version — which reported its content height
+ * under them — came out as a stacked block the shell centred, not the three
+ * zones (seen on the Pixel 9). In the intrinsic pass the height is
+ * unbounded and the content sum is the answer.
  */
 @Composable
 private fun ZonedLayout(
+    spread: Boolean,
     top: @Composable () -> Unit,
     middle: @Composable () -> Unit,
     below: @Composable () -> Unit,
     bottom: @Composable () -> Unit,
 ) {
-    Layout(contents = listOf(top, middle, below, bottom), modifier = Modifier.fillMaxSize()) { slots, constraints ->
+    Layout(contents = listOf(top, middle, below, bottom)) { slots, constraints ->
         val loose = constraints.copy(minWidth = 0, minHeight = 0, maxHeight = Constraints.Infinity)
         val measured = slots.map { slot -> slot.map { it.measure(loose) } }
         val heights = measured.map { placeables -> placeables.sumOf { it.height } }
@@ -443,7 +468,12 @@ private fun ZonedLayout(
         val required = topH + midH + 2 * belowH + botH
         val width =
             if (constraints.hasBoundedWidth) constraints.maxWidth else measured.flatten().maxOfOrNull { it.width } ?: 0
-        val height = constraints.constrainHeight(required)
+        val height =
+            if (spread && constraints.hasBoundedHeight) {
+                constraints.maxHeight.coerceAtLeast(constraints.constrainHeight(required))
+            } else {
+                constraints.constrainHeight(required)
+            }
         layout(width, height) {
             fun stack(placeables: List<Placeable>, from: Int) {
                 var y = from
