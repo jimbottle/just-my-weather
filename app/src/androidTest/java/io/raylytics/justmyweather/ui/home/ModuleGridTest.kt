@@ -450,8 +450,12 @@ class ModuleGridTest {
         val other = bounds("72°")
         val drift = (temp.top + temp.bottom) / 2 - (other.top + other.bottom) / 2
         assertTrue("temperatures read straight across, drift $drift", drift.value in -2f..2f)
-        // And the temperature sits between the zones, not against the hour.
+        // And the temperature sits on the TILE's centre, clear of the hour —
+        // not a line above the middle, which is where centring between the
+        // label and a two-line reserved bottom zone put it.
         assertTrue("temperature is clear of the hour", temp.top - hour.bottom > 4.dp)
+        val offCentre = (temp.top + temp.bottom) / 2 - (tile.top + tile.bottom) / 2
+        assertTrue("temperature is centred in the tile, off by $offCentre", offCentre.value in -3f..3f)
     }
 
     @Test
@@ -514,8 +518,10 @@ class ModuleGridTest {
         val hour = bounds("8 pm 9/6")
         val temp = bounds("70°")
         // Not pinned: the surplus this tile has sits above the block too.
+        // The surplus is one wind line, split above and below the block, so
+        // the hour sits half a line below the padding.
         val gap = hour.top - tile.top
-        assertTrue("hour is not pinned to the top, gap $gap", gap > TILE_PADDING + 8.dp)
+        assertTrue("hour is not pinned to the top, gap $gap", gap > TILE_PADDING + 4.dp)
         // …and the temperature follows the hour closely, as one block.
         assertTrue("temperature hugs the hour", temp.top - hour.bottom < 8.dp)
     }

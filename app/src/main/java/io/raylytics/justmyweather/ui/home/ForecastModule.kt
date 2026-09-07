@@ -447,19 +447,26 @@ private fun ZonedTile(
 }
 
 /**
- * Stacks each slot's children vertically, centred; pins [top] and [bottom]
- * to the edges; centres [middle] between them; hangs [below] directly under
- * [middle]. Wants top + middle + 2·below + bottom of height and, when
- * [spread], takes ALL the height it is offered (the row's tallest tile
- * decides) and spends the surplus equally above and below the middle. Not
- * spread, it takes only what it wants, and the shell centres the block.
+ * Stacks each slot's children vertically, centred. When [spread]: pins [top]
+ * to the top edge and [bottom] to the bottom edge, centres [middle] on the
+ * TILE's own centre, and hangs [below] directly under [middle]. The tile
+ * reserves the same room above the middle as below it — the larger of the
+ * top zone and the below-plus-bottom zone — so the number is centred in the
+ * tile, never crowded by either edge, and every tile in a row (all the same
+ * height) puts its number at the same y. Not spread: one block, top to
+ * bottom, that the shell centres.
+ *
+ * Centred on the tile, not between the zones: centring between the label
+ * and the bottom zone's reserved top put the number a line above the tile's
+ * middle whenever the conditions were one line (Evan: "the temp is not
+ * bottom aligning... still upper aligned").
  *
  * "All the height it is offered" is read off the constraints' maximum, not
  * asked for with fillMaxSize: the tile shell hands its content loose
- * constraints, and the first version — which reported its content height
- * under them — came out as a stacked block the shell centred, not the three
- * zones (seen on the Pixel 9). In the intrinsic pass the height is
- * unbounded and the content sum is the answer.
+ * constraints, and a version that reported its content height under them
+ * came out as a stacked block the shell centred, not the three zones (seen
+ * on the Pixel 9). In the intrinsic pass the height is unbounded and the
+ * content sum is the answer.
  */
 @Composable
 private fun ZonedLayout(
@@ -480,8 +487,12 @@ private fun ZonedLayout(
         val topH = heights[0]
         val midH = heights[1]
         val belowH = heights[2]
-        val botH = if (measured[3].isEmpty()) 0 else heights[3].coerceAtLeast(bottomReserve)
-        val required = topH + midH + 2 * belowH + botH
+        val botTextH = heights[3]
+        val botH = if (measured[3].isEmpty()) 0 else botTextH.coerceAtLeast(bottomReserve)
+        // Room on either side of the centred middle: enough for whichever
+        // zone is taller, on both sides, so the middle clears both.
+        val flank = maxOf(topH, belowH + botH)
+        val required = if (spread) midH + 2 * flank else topH + midH + belowH + botTextH
         val width =
             if (constraints.hasBoundedWidth) constraints.maxWidth else measured.flatten().maxOfOrNull { it.width } ?: 0
         val height =
@@ -491,35 +502,39 @@ private fun ZonedLayout(
                 constraints.constrainHeight(required)
             }
         layout(width, height) {
-            fun stack(placeables: List<Placeable>, from: Int) {
+            fun stack(placeables: List<Placeable>, from: Int): Int {
                 var y = from
                 placeables.forEach { p ->
                     p.placeRelative((width - p.width) / 2, y)
                     y += p.height
                 }
+                return y
+            }
+            if (!spread) {
+                var y = stack(measured[0], 0)
+                y = stack(measured[1], y)
+                y = stack(measured[2], y)
+                stack(measured[3], y)
+                return@layout
             }
             stack(measured[0], 0)
             // The bottom's text sits on the tile's bottom edge, whatever the
             // zone reserved above it: a one-line "Clear" is bottom-aligned
             // like everything else in the row, level with the second line of
-            // a neighbour's "Mostly / Clear". (Its first version sat at the
-            // top of the reserved zone, which left a blank line under every
-            // one-liner and read as aligned to a box inside the tile.)
-            stack(measured[3], height - heights[3])
-            // The middle zone runs from under the top to above the bottom;
-            // the temperature's centre is its centre, and below hangs off
-            // the temperature's foot.
-            val zoneCentre = (topH + (height - botH)) / 2
-            val midTop = zoneCentre - midH / 2
-            stack(measured[1], midTop)
-            stack(measured[2], midTop + midH)
+            // a neighbour's "Mostly / Clear".
+            stack(measured[3], height - botTextH)
+            // The temperature's centre is the TILE's centre; below hangs off
+            // its foot.
+            val midTop = (height - midH) / 2
+            val afterMid = stack(measured[1], midTop)
+            stack(measured[2], afterMid)
         }
     }
 }
 
 /**
- * The bottom zone's line: the conditions and the chance of rain together —
- * "Mostly Sunny · 28%", the chance in its accent — each present only when
+ * The bottom zone's line: the chance of rain and the conditions together —
+ * "28% · Mostly Sunny", the chance in its accent — each present only when
  * its element is on and there is a value. The chance rides with the
  * conditions rather than under the temperature because it is about the
  * same thing the words are (Evan: "it is most closely tied to that"), and
@@ -545,11 +560,15 @@ private fun bottomLine(
     val words = conditions?.takeIf { ForecastElement.CONDITIONS in elements }
     val chance = precipChance?.takeIf { ForecastElement.PRECIP_CHANCE in elements && it > 0 }
     val accent = MaterialTheme.colorScheme.primary
+    // Chance FIRST: it is short and never wraps, so "5% · Partly / Cloudy"
+    // breaks between the words. Words first, a one-cell tile broke after
+    // "Partly" and the second line "Cloudy · 5%" ran out of room — the
+    // chance was the part ellipsised away (seen on the emulator).
     return buildAnnotatedString {
-        words?.let { append(it) }
-        chance?.let {
-            if (words != null) append(" · ")
-            withStyle(SpanStyle(color = accent)) { append("${it.roundToInt()}%") }
+        chance?.let { withStyle(SpanStyle(color = accent)) { append("${it.roundToInt()}%") } }
+        words?.let {
+            if (chance != null) append(" · ")
+            append(it)
         }
     }
 }
