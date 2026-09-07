@@ -424,6 +424,11 @@ class ModuleGridTest {
     private fun bounds(text: String): DpRect =
         compose.onNodeWithText(text, useUnmergedTree = true).getUnclippedBoundsInRoot()
 
+    /** The forecast module merges its descendants into one accessibility
+     * node, so the hour tiles' tags live in the unmerged tree only. */
+    private fun hourTile(index: Int): DpRect =
+        compose.onNodeWithTag("hour_$index", useUnmergedTree = true).getUnclippedBoundsInRoot()
+
     @Test
     fun spreadPinsTheZonesToTheTilesEdgesAndLevelsTheTemperatures() {
         // The regression this guards was found twice on a phone: the three
@@ -432,7 +437,7 @@ class ModuleGridTest {
         // own box, as the grid tests are, because the composables were
         // right both times — only their positions were wrong.
         show(forecastWithHours(ForecastTileLayout.SPREAD))
-        val tile = compose.onNodeWithTag("hour_1").getUnclippedBoundsInRoot()
+        val tile = hourTile(1)
         val hour = bounds("8 pm 9/6")
         val temp = bounds("70°")
         val conditions = bounds("Clear")
@@ -485,8 +490,8 @@ class ModuleGridTest {
                     ),
             ),
         )
-        val oneLine = compose.onNodeWithTag("hour_0").getUnclippedBoundsInRoot()
-        val twoLine = compose.onNodeWithTag("hour_1").getUnclippedBoundsInRoot()
+        val oneLine = hourTile(0)
+        val twoLine = hourTile(1)
         // In a one-cell tile "Mostly Cloudy" wraps; the row is sized to it,
         // and the one-liner's tile is exactly as tall.
         assertEquals("tiles share a row height", twoLine.height().value, oneLine.height().value, 0.5f)
@@ -504,7 +509,7 @@ class ModuleGridTest {
     @Test
     fun stackedKeepsTheZonesTogetherInTheMiddle() {
         show(forecastWithHours(ForecastTileLayout.STACKED))
-        val tile = compose.onNodeWithTag("hour_1").getUnclippedBoundsInRoot()
+        val tile = hourTile(1)
         val hour = bounds("8 pm 9/6")
         val temp = bounds("70°")
         // Not pinned: the surplus this tile has sits above the block too.
