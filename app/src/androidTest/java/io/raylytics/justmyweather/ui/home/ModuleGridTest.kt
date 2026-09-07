@@ -451,6 +451,57 @@ class ModuleGridTest {
     }
 
     @Test
+    fun aOneLineConditionsTileLevelsWithATwoLineNeighbour() {
+        // The second time this layout was wrong on the phone: rows whose
+        // conditions fit on one line measured a line shorter than rows with
+        // a wrapped "Mostly Sunny", because the row's intrinsic height ignored
+        // the text's minimum lines. The bottom zone is reserved by the layout
+        // itself now, in both passes; this pins that the two tiles agree on
+        // where the middle is, and that the one-liner's row is as tall as its
+        // neighbour's.
+        val zone = ZoneId.of("America/New_York")
+        val hours =
+            listOf(
+                ForecastPoint(Instant.parse("2026-09-06T23:00:00Z"), 72.0, null, shortForecast = "Clear"),
+                ForecastPoint(Instant.parse("2026-09-07T00:00:00Z"), 70.0, null, shortForecast = "Mostly Cloudy"),
+            )
+        show(
+            ModuleValue(
+                module = ModuleKey.Forecast,
+                label = "Forecast",
+                size = ModuleSize(4, 4),
+                content =
+                    ModuleContent.Forecast(
+                        hours = hours,
+                        periods = null,
+                        error = null,
+                        mode = ForecastMode.HOURLY,
+                        dailyStyle = DailyStyle.DEFAULT,
+                        hourlyHours = 24,
+                        elements = setOf(ForecastElement.CONDITIONS),
+                        layout = ForecastTileLayout.SPREAD,
+                        zone = zone,
+                        placeZone = zone,
+                    ),
+            ),
+        )
+        val oneLine = compose.onNodeWithTag("hour_0").getUnclippedBoundsInRoot()
+        val twoLine = compose.onNodeWithTag("hour_1").getUnclippedBoundsInRoot()
+        // In a one-cell tile "Mostly Cloudy" wraps; the row is sized to it,
+        // and the one-liner's tile is exactly as tall.
+        assertEquals("tiles share a row height", twoLine.height().value, oneLine.height().value, 0.5f)
+        val a = bounds("72°")
+        val b = bounds("70°")
+        val drift = (a.top + a.bottom) / 2 - (b.top + b.bottom) / 2
+        assertTrue("temperatures read straight across, drift $drift", drift.value in -2f..2f)
+        // The one-liner's text sits at the TOP of its reserved zone, level
+        // with the first line of its neighbour's two.
+        val clear = bounds("Clear")
+        val mostly = bounds("Mostly Cloudy")
+        assertEquals("conditions start on the same line", mostly.top.value, clear.top.value, 2f)
+    }
+
+    @Test
     fun stackedKeepsTheZonesTogetherInTheMiddle() {
         show(forecastWithHours(ForecastTileLayout.STACKED))
         val tile = compose.onNodeWithTag("hour_1").getUnclippedBoundsInRoot()
