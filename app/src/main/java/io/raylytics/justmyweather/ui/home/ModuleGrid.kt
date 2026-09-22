@@ -636,9 +636,14 @@ private fun ModuleTile(
             MaterialTheme.colorScheme.surfaceVariant
         }
     // A full-width tile drops its label — the content is big enough to speak
-    // for itself, as the old hero did, and the sun table brings its own column
-    // headings. The forecast draws its own header, with its toggle in it.
-    val showLabel = module.size.columns != ModuleSize.COLUMNS && module.content !is ModuleContent.Forecast
+    // for itself, as the old hero did. The forecast draws its own header,
+    // with its toggle in it. And the sun never takes one: every size of it
+    // already says "Sunrise" and "Sunset", so a "Sun" above them only
+    // repeated the obvious (Evan, 2026-09-22).
+    val showLabel =
+        module.size.columns != ModuleSize.COLUMNS &&
+            module.content !is ModuleContent.Forecast &&
+            module.content !is ModuleContent.Sun
     val size = module.size
     val min = module.module.minSize
     val handleColor = MaterialTheme.colorScheme.primary
