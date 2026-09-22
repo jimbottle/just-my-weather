@@ -23,6 +23,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -75,6 +76,14 @@ import kotlin.math.roundToInt
  * "This Afternoon") needs two to survive without ellipsis. */
 private const val HOUR_COLUMNS = 1
 private const val DAY_COLUMNS = 2
+
+/** One tile of the day-and-night style: an NWS half-day period, or a whole
+ * extended day past NWS's reach, which has no halves to split. */
+private sealed interface DailyTile {
+    data class Period(val period: DailyPeriod) : DailyTile
+
+    data class Day(val day: DayForecast) : DailyTile
+}
 
 /** Lines the conditions may use in a one-cell hour tile: enough for a
  * chance of rain and a two-word summary to wrap. */
@@ -167,11 +176,24 @@ internal fun ForecastModuleContent(
                     // (visibleDays): the combined style shows those rows and
                     // the day-and-night style the periods they are made of,
                     // so the two agree on how far ahead "3 days" reaches.
+                    // Past NWS's reach the days come from the extended source
+                    // (forecastDays); they carry no half-day periods, so the
+                    // day-and-night style shows them as whole-day tiles after
+                    // NWS's periods.
                     val days =
-                        remember(list, content.hours, content.placeZone, content.dailyDays) {
-                            visibleDays(combineDays(list, content.hours, content.placeZone), content.dailyDays)
+                        remember(list, content.hours, content.placeZone, content.dailyDays, content.extended) {
+                            forecastDays(
+                                combineDays(list, content.hours, content.placeZone),
+                                content.extended,
+                                content.dailyDays,
+                                content.placeZone,
+                            )
                         }
-                    val periods = remember(days) { days.periods }
+                    val halfDayTiles =
+                        remember(days) {
+                            days.filter { it.extended == null }.periods.map(DailyTile::Period) +
+                                days.filter { it.extended != null }.map(DailyTile::Day)
+                        }
                     Box(viewport) {
                         when (content.dailyStyle) {
                             DailyStyle.COMBINED ->
@@ -192,18 +214,28 @@ internal fun ForecastModuleContent(
 
                             DailyStyle.HALF_DAY ->
                                 TileGrid(
-                                    items = periods,
+                                    items = halfDayTiles,
                                     columns = { DAY_COLUMNS },
                                     gap = gap,
                                     gridColumns = columns,
                                     modifier = Modifier.fillMaxWidth(),
-                                ) { period, _, tileModifier ->
-                                    HalfDayTile(
-                                        period = period,
-                                        elements = content.elements,
-                                        layout = content.layout,
-                                        modifier = tileModifier.opens(open) { Details.ofPeriod(period) },
-                                    )
+                                ) { tile, _, tileModifier ->
+                                    when (tile) {
+                                        is DailyTile.Period ->
+                                            HalfDayTile(
+                                                period = tile.period,
+                                                elements = content.elements,
+                                                layout = content.layout,
+                                                modifier = tileModifier.opens(open) { Details.ofPeriod(tile.period) },
+                                            )
+                                        is DailyTile.Day ->
+                                            CombinedDayTile(
+                                                day = tile.day,
+                                                elements = content.elements,
+                                                layout = content.layout,
+                                                modifier = tileModifier.opens(open) { tile.day.detail() },
+                                            )
+                                    }
                                 }
                         }
                     }
@@ -327,6 +359,10 @@ private fun CombinedDayTile(
 ) {
     ZonedTile(
         top = day.name,
+        // Italic names the one quiet difference an extended day carries:
+        // past NWS's reach, from Open-Meteo. The detail sheet says so in
+        // words.
+        topItalic = day.extended != null,
         bottomLines = DAY_BOTTOM_LINES,
         layout = layout,
         bottom =
@@ -334,14 +370,14 @@ private fun CombinedDayTile(
                 elements,
                 day.shortForecast,
                 // Either half's chance: the day's rain is the day's rain.
-                listOfNotNull(day.day?.precipProbabilityPercent, day.night?.precipProbabilityPercent).maxOrNull(),
+                day.precipChance,
             ),
         modifier = modifier,
         below = {
             ElementLines(
                 elements = elements,
-                windMph = (day.day ?: day.night)?.windMph,
-                windDirection = (day.day ?: day.night)?.windDirection,
+                windMph = day.windMph,
+                windDirection = day.windDirection,
             )
         },
     ) {
@@ -421,6 +457,8 @@ private fun HalfDayTile(
 @Composable
 private fun ZonedTile(
     top: String,
+    /** Set the top label in italics — the extended-source marker. */
+    topItalic: Boolean = false,
     bottom: AnnotatedString?,
     /** Lines the bottom zone may use. */
     bottomLines: Int,
@@ -457,7 +495,7 @@ private fun ZonedTile(
                 // is worse than the same text a shade smaller.
                 FittedText(
                     text = top,
-                    style = labelStyle,
+                    style = if (topItalic) labelStyle.copy(fontStyle = FontStyle.Italic) else labelStyle,
                     ceiling = labelStyle.fontSize,
                     floor = LABEL_FLOOR,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,

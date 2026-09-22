@@ -14,6 +14,7 @@ import io.raylytics.justmyweather.data.WeatherSnapshot
 import io.raylytics.justmyweather.data.nws.HttpResult
 import io.raylytics.justmyweather.data.nws.HttpTransport
 import io.raylytics.justmyweather.data.nws.NwsClient
+import io.raylytics.justmyweather.data.openmeteo.OpenMeteoClient
 import io.raylytics.justmyweather.location.LocationProvider
 import io.raylytics.justmyweather.location.LocationResolver
 import io.raylytics.justmyweather.view.Density
@@ -97,6 +98,7 @@ class HomeViewModelTest {
 
         var hourlyFetches = 0
         var dailyFetches = 0
+        var extendedFetches = 0
         var failDaily = false
         var failHourly = false
         var failObservation = false
@@ -117,6 +119,10 @@ class HomeViewModelTest {
                     url.endsWith("/stations") -> STATIONS
                     "/points/" in url ->
                         if (westLatPrefix?.let { url.contains(it) } == true) POINTS_WEST else points
+                    "open-meteo" in url -> {
+                        extendedFetches++
+                        OPEN_METEO
+                    }
                     url.endsWith("/forecast/hourly") -> {
                         hourlyFetches++
                         if (failHourly) return HttpResult(500, "boom", null)
@@ -171,6 +177,7 @@ class HomeViewModelTest {
                         nws = NwsClient(transport = transport),
                         snapshotCache = snapshots,
                         clock = { NOW },
+                        openMeteo = OpenMeteoClient(transport = transport),
                     ),
                 // No fix and nothing remembered, so this resolves to
                 // WeatherLocation.DEFAULT — which the fixtures answer for.
@@ -224,6 +231,25 @@ class HomeViewModelTest {
         advanceUntilIdle()
         assertNotNull(failing.vm.ready().daily)
         assertNull(failing.vm.ready().forecastError, "the shown framing loaded; the other's failure is not its error")
+    }
+
+    @Test
+    fun `the extended source is asked only when the user wants more days than NWS forecasts`() = runTest(dispatcher) {
+        // Seven days is NWS's reach: Daily needs no second request.
+        val week = harness(config = ViewConfig.DEFAULT.setDefaultForecastMode(ForecastMode.DAILY))
+        advanceUntilIdle()
+        assertEquals(0, week.transport.extendedFetches)
+        assertNull(week.vm.ready().extendedDaily)
+        // Fourteen: Open-Meteo is fetched once and its days reach the state.
+        val fortnight =
+            harness(config = ViewConfig.DEFAULT.setDefaultForecastMode(ForecastMode.DAILY).setDailyDays(14))
+        advanceUntilIdle()
+        assertEquals(1, fortnight.transport.extendedFetches)
+        assertEquals(2, fortnight.vm.ready().extendedDaily?.size)
+        // Hourly never needs it, whatever the setting.
+        val hourly = harness(config = ViewConfig.DEFAULT.setDailyDays(14))
+        advanceUntilIdle()
+        assertEquals(0, hourly.transport.extendedFetches)
     }
 
     @Test
@@ -878,6 +904,12 @@ class HomeViewModelTest {
         const val HOURLY =
             """{"properties":{"periods":[{"startTime":"2026-07-31T12:00:00+00:00",
                 "temperature":72,"temperatureUnit":"F","windSpeed":"5 mph"}]}}"""
+        val OPEN_METEO =
+            """
+            {"daily":{"time":["2026-09-29","2026-09-30"],
+              "temperature_2m_max":[80.0,81.0],"temperature_2m_min":[60.0,61.0]}}
+            """.trimIndent()
+
         const val DAILY =
             """{"properties":{"periods":[{"name":"Today","isDaytime":true,
                 "temperature":81,"temperatureUnit":"F","shortForecast":"Sunny"}]}}"""

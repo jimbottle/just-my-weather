@@ -277,6 +277,8 @@ class NwsClientTest {
         assertEquals(10.0, daily[0].windMph!!, 1e-6)
         assertEquals("S", daily[0].windDirection)
         assertEquals("Sunny, with a high near 85.", daily[0].detailedForecast)
+        // No startTime in the fixture: null, never a guessed instant.
+        assertEquals(null, daily[0].startTime)
     }
 
     @Test

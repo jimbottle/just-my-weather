@@ -19,6 +19,7 @@ import io.raylytics.justmyweather.data.gadgetbridge.GadgetbridgeBroadcaster
 import io.raylytics.justmyweather.data.gadgetbridge.GadgetbridgeExporter
 import io.raylytics.justmyweather.data.nws.NwsClient
 import io.raylytics.justmyweather.data.nws.OkHttpTransport
+import io.raylytics.justmyweather.data.openmeteo.OpenMeteoClient
 import io.raylytics.justmyweather.data.places.AssetPlaceSource
 import io.raylytics.justmyweather.data.places.SavedPlacesRepository
 import io.raylytics.justmyweather.location.LocationProvider
@@ -39,6 +40,10 @@ private val Context.dataStore by preferencesDataStore(name = "settings")
  */
 class AppContainer(context: Context) {
     private val nwsClient = NwsClient(transport = OkHttpTransport())
+
+    // Only for days eight to fourteen of the Daily view, which NWS does not
+    // forecast. Same transport as NWS: one HTTP client for the app.
+    private val openMeteoClient = OpenMeteoClient(transport = OkHttpTransport())
     private val appContext = context.applicationContext
 
     // Both caches are persisted so a cold start has something to work with: the
@@ -48,6 +53,7 @@ class AppContainer(context: Context) {
     val weatherRepository =
         WeatherRepository(
             nws = nwsClient,
+            openMeteo = openMeteoClient,
             pointCache = DataStorePointCache(appContext.dataStore),
             snapshotCache = DataStoreSnapshotCache(appContext.dataStore),
         )

@@ -77,6 +77,10 @@ data class ForecastPoint(
  * ("Tonight", "Friday", "Friday Night"). */
 data class DailyPeriod(
     val name: String,
+    /** When the period starts; null if NWS omitted or garbled it. Used to
+     * know which date NWS's forecast ends on, so an extended day never
+     * repeats one it covers. */
+    val startTime: Instant? = null,
     val isDaytime: Boolean,
     val temperatureF: Double?,
     val shortForecast: String?,

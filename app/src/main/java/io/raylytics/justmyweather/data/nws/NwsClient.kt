@@ -145,6 +145,7 @@ class NwsClient(
                 p.temperature?.let { if (p.temperatureUnit == "C") Units.celsiusToFahrenheit(it) else it }
             DailyPeriod(
                 name = name,
+                startTime = p.startTime?.let { runCatching { Instant.parse(it) }.getOrNull() },
                 isDaytime = p.isDaytime ?: true,
                 temperatureF = temperatureF,
                 shortForecast = p.shortForecast?.takeIf { it.isNotBlank() },

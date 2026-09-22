@@ -4,6 +4,7 @@ import io.raylytics.justmyweather.data.SunDay
 import io.raylytics.justmyweather.data.WeatherSnapshot
 import io.raylytics.justmyweather.data.nws.DailyPeriod
 import io.raylytics.justmyweather.data.nws.ForecastPoint
+import io.raylytics.justmyweather.data.openmeteo.ExtendedDay
 import java.time.ZoneId
 
 /**
@@ -61,6 +62,8 @@ sealed interface ModuleContent {
         /** The place's own zone, for what depends on the place's calendar:
          * which hours are "the rest of today". */
         val placeZone: ZoneId,
+        /** Days past NWS's reach, from the extended source. */
+        val extended: List<ExtendedDay>? = null,
     ) : ModuleContent
 }
 
@@ -78,6 +81,7 @@ data class ForecastData(
     val error: String? = null,
     /** The place's zone, whatever clock the screen reads in. */
     val placeZone: ZoneId = ZoneId.systemDefault(),
+    val extended: List<ExtendedDay>? = null,
 )
 
 /** A module resolved to what the screen shows: its label, its content, and
@@ -141,6 +145,7 @@ fun ViewConfig.render(
                                 layout = forecastTileLayout,
                                 zone = zone,
                                 placeZone = forecast.placeZone,
+                                extended = forecast.extended,
                             )
                     },
             )

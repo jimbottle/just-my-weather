@@ -5,6 +5,7 @@ import io.raylytics.justmyweather.data.WeatherSnapshot
 import io.raylytics.justmyweather.data.nws.ActiveAlert
 import io.raylytics.justmyweather.data.nws.DailyPeriod
 import io.raylytics.justmyweather.data.nws.ForecastPoint
+import io.raylytics.justmyweather.data.openmeteo.ExtendedDay
 import io.raylytics.justmyweather.view.ForecastMode
 import io.raylytics.justmyweather.view.ViewConfig
 import java.time.ZoneId
@@ -30,6 +31,10 @@ sealed interface HomeUiState {
         val forecastMode: ForecastMode = ForecastMode.DEFAULT,
         val hourly: List<ForecastPoint>? = null,
         val daily: List<DailyPeriod>? = null,
+        /** Days past NWS's reach from the extended source; null until
+         * fetched, and only fetched when the user asks for more than NWS
+         * forecasts. */
+        val extendedDaily: List<ExtendedDay>? = null,
         /** Short message when the selected framing's fetch failed; the Now
          * glance is unaffected. */
         val forecastError: String? = null,

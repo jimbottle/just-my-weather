@@ -97,7 +97,7 @@ class ViewConfigCodecTest {
         val older = """{"items":[{"key":"temperature","visible":true}]}"""
         assertEquals(7, ViewConfigCodec.decode(older).dailyDays)
         val wild = """{"dailyDays":99,"items":[{"key":"temperature","visible":true}]}"""
-        assertEquals(7, ViewConfigCodec.decode(wild).dailyDays)
+        assertEquals(14, ViewConfigCodec.decode(wild).dailyDays)
     }
 
     @Test

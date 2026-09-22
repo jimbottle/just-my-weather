@@ -2,6 +2,7 @@ package io.raylytics.justmyweather.ui.home
 
 import io.raylytics.justmyweather.data.nws.DailyPeriod
 import io.raylytics.justmyweather.data.nws.ForecastPoint
+import io.raylytics.justmyweather.data.openmeteo.ExtendedDay
 import io.raylytics.justmyweather.view.Detail
 import io.raylytics.justmyweather.view.DetailRow
 import io.raylytics.justmyweather.view.Details
@@ -9,6 +10,8 @@ import io.raylytics.justmyweather.view.degrees
 import io.raylytics.justmyweather.view.percent
 import java.time.LocalDate
 import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 /*
  * Pure reshaping of forecast data for display: no I/O, no clock reads, no
@@ -32,7 +35,25 @@ data class DayForecast(
      * today — see [combineDays]. The tile shows it like any high; the detail
      * sheet says what it is. */
     val highFromHours: Boolean = false,
-)
+    /** Set when this day is past NWS's reach and came from Open-Meteo; the
+     * tile marks it quietly and the detail sheet names the source. */
+    val extended: ExtendedDay? = null,
+) {
+    // One answer per question, whichever source the day came from, so the
+    // tile and the detail sheet cannot disagree (an extended day's chance was
+    // once in its sheet but missing from its tile).
+
+    /** The day's chance of rain: the wetter half's for an NWS day. */
+    val precipChance: Double?
+        get() = extended?.precipChancePercent
+            ?: listOfNotNull(day?.precipProbabilityPercent, night?.precipProbabilityPercent).maxOrNull()
+
+    val windMph: Double?
+        get() = extended?.windMph ?: (day ?: night)?.windMph
+
+    val windDirection: String?
+        get() = extended?.windDirection ?: (day ?: night)?.windDirection
+}
 
 /**
  * Pair each daytime period with the night that follows it. NWS interleaves
@@ -103,6 +124,46 @@ fun visibleDays(days: List<DayForecast>, dailyDays: Int): List<DayForecast> {
     return days.take(if (leadingNight) dailyDays + 1 else dailyDays)
 }
 
+/**
+ * [visibleDays], then — when the user asked for more days than NWS forecasts
+ * — Open-Meteo's days after NWS's last date, up to [dailyDays] real days in
+ * all. A leading night-only row is still today and does not count. Days NWS
+ * covers are never repeated: the extended list is cut at the last NWS
+ * period's date in [zone], the place's. If NWS gave no dates to align on,
+ * nothing is appended rather than risk a duplicate.
+ */
+fun forecastDays(
+    nwsDays: List<DayForecast>,
+    extended: List<ExtendedDay>?,
+    dailyDays: Int,
+    zone: ZoneId,
+): List<DayForecast> {
+    val shown = visibleDays(nwsDays, dailyDays)
+    val leadingNight = shown.firstOrNull()?.let { it.day == null && it.night != null } == true
+    val needed = dailyDays - (if (leadingNight) shown.size - 1 else shown.size)
+    if (needed <= 0 || extended.isNullOrEmpty()) return shown
+    val lastNwsDate =
+        nwsDays.lastOrNull()?.let { it.night ?: it.day }?.startTime?.atZone(zone)?.toLocalDate()
+            ?: return shown
+    return shown +
+        extended
+            .filter { it.date.isAfter(lastNwsDate) }
+            .take(needed)
+            .map { day ->
+                DayForecast(
+                    name = day.date.format(EXTENDED_NAME),
+                    highF = day.highF,
+                    lowF = day.lowF,
+                    shortForecast = day.conditions,
+                    extended = day,
+                )
+            }
+}
+
+/** "Tue 10/6": an extended day has no NWS name, and a bare weekday would
+ * repeat one already on screen a week earlier. */
+private val EXTENDED_NAME: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE M/d", Locale.US)
+
 /** The half-day periods that make up [days], in order. */
 val List<DayForecast>.periods: List<DailyPeriod>
     get() = flatMap { listOfNotNull(it.day, it.night) }
@@ -150,8 +211,24 @@ fun groupHoursByDay(points: List<ForecastPoint>, zone: ZoneId): List<HourDayGrou
  * half, and both halves' prose. Pure, like everything else in this file, so
  * the sheet's content is decided on the JVM.
  */
-fun DayForecast.detail(): Detail =
-    Detail(
+fun DayForecast.detail(): Detail {
+    extended?.let { ext ->
+        return Detail(
+            title = name,
+            // Open-Meteo's data is CC BY 4.0; this is its attribution.
+            subtitle = "Extended forecast · Open-Meteo.com",
+            rows =
+                listOf(
+                    DetailRow("High", ext.highF.degrees()),
+                    DetailRow("Low", ext.lowF.degrees()),
+                    DetailRow("Chance of precipitation", ext.precipChancePercent.percent()),
+                    DetailRow("Wind", Details.wind(ext.windMph, ext.windDirection)),
+                    DetailRow("Conditions", ext.conditions ?: "—"),
+                ),
+            body = "Past the seven days the National Weather Service forecasts, this day comes from Open-Meteo.",
+        )
+    }
+    return Detail(
         title = name,
         subtitle = "Forecast",
         rows =
@@ -169,3 +246,4 @@ fun DayForecast.detail(): Detail =
                 night?.detailedForecast?.let { "${night.name}: $it" },
             ).joinToString("\n\n").ifBlank { null },
     )
+}

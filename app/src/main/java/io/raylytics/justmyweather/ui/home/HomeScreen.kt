@@ -238,7 +238,15 @@ private fun GlanceView(
             sunDays = state.sunDays,
             zone = displayZone,
             observedZone = observedZone,
-            forecast = ForecastData(state.forecastMode, state.hourly, state.daily, state.forecastError, state.zone),
+            forecast =
+                ForecastData(
+                    mode = state.forecastMode,
+                    hours = state.hourly,
+                    periods = state.daily,
+                    error = state.forecastError,
+                    placeZone = state.zone,
+                    extended = state.extendedDaily,
+                ),
             arranging = arranging,
             onStartArranging = onStartArranging,
             onResizeModule = onResizeModule,

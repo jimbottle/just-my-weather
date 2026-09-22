@@ -12,7 +12,9 @@ import io.raylytics.justmyweather.data.WeatherSnapshot
 import io.raylytics.justmyweather.data.nws.ActiveAlert
 import io.raylytics.justmyweather.data.nws.DailyPeriod
 import io.raylytics.justmyweather.data.nws.ForecastPoint
+import io.raylytics.justmyweather.data.openmeteo.ExtendedDay
 import io.raylytics.justmyweather.location.LocationResolver
+import io.raylytics.justmyweather.view.DailyDays
 import io.raylytics.justmyweather.view.ForecastMode
 import io.raylytics.justmyweather.view.ModuleKey
 import io.raylytics.justmyweather.view.ModuleSize
@@ -121,7 +123,11 @@ class HomeViewModel(
      */
     private val forecast: StateFlow<ForecastChoice?> =
         combine(chosenMode, configRepository.config) { chosen, config ->
-            ForecastChoice(config.shows(ModuleKey.Forecast), chosen ?: config.defaultForecastMode)
+            ForecastChoice(
+                config.shows(ModuleKey.Forecast),
+                chosen ?: config.defaultForecastMode,
+                extended = config.dailyDays > DailyDays.NWS_REACH,
+            )
         }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     /** Paired so the five-flow limit of the typed [combine] still fits: these
@@ -147,6 +153,7 @@ class HomeViewModel(
                         forecastMode = framing,
                         hourly = forecasts.hourly,
                         daily = forecasts.daily,
+                        extendedDaily = forecasts.extended,
                         // Only the visible framing's own error — a Daily
                         // failure must never mask loaded Hourly data — and
                         // nothing at all when the grid is switched off.
@@ -431,6 +438,11 @@ class HomeViewModel(
                 ForecastMode.DAILY -> listOf(ForecastMode.DAILY, ForecastMode.HOURLY)
             }
         forecastMutex.withLock {
+            if (choice.mode == ForecastMode.DAILY && choice.extended && forecasts.value.extended == null) {
+                val location = currentLocation()
+                val days = runCatching { repository.loadExtendedDaily(location) }.getOrDefault(emptyList())
+                forecasts.value = forecasts.value.copy(extended = days)
+            }
             for (framing in needs) {
                 val current = forecasts.value
                 val needed =
@@ -459,8 +471,9 @@ class HomeViewModel(
         }
     }
 
-    /** Whether the forecast grid is on screen, and which framing it shows. */
-    private data class ForecastChoice(val shown: Boolean, val mode: ForecastMode)
+    /** Whether the forecast grid is on screen, which framing it shows, and
+     * whether the Daily framing reaches past NWS into the extended source. */
+    private data class ForecastChoice(val shown: Boolean, val mode: ForecastMode, val extended: Boolean = false)
 
     /** Where to ask about, resolved through the one seam that remembers a
      * real fix — never a bare fallback to the built-in default. */
@@ -489,6 +502,10 @@ class HomeViewModel(
         val hourlyError: String? = null,
         val daily: List<DailyPeriod>? = null,
         val dailyError: String? = null,
+        /** Open-Meteo's days, for the Daily view past NWS's reach. Empty (not
+         * null) after a failed fetch: the extended days are a bonus, their
+         * failure is not shown, and it is not retried until a refresh. */
+        val extended: List<ExtendedDay>? = null,
     )
 
     private fun Throwable.toUserMessage(): String =

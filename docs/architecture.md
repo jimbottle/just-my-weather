@@ -25,7 +25,13 @@ shapes never leak past `WeatherRepository`.
   is a fun-interface seam isolating the HTTP call so the retry/parse logic is
   unit-tested with a fake (no network). `Units` holds pure conversions; `NwsWire`
   is the raw JSON DTOs, `NwsModels` the cleaned-up domain shapes.
-- **`data/`** — `WeatherRepository` is the single seam between NWS and the app
+- **`data/openmeteo/`** — the second source, only for Daily days eight to
+  fourteen, which NWS does not forecast. `OpenMeteoClient` over the same
+  `HttpTransport` seam, `ExtendedDay` its cleaned-up day, `WmoCodes` the weather
+  codes in NWS-style words. Fetched only when the user asks for more days than
+  NWS covers.
+- **`data/`** — `WeatherRepository` is the single seam between NWS (and the
+  extended source) and the app
   (cached point resolution, label fill, current + forecast loads). The
   `*Repository` classes persist config via Preferences DataStore; `PointCache`
   (in-memory default, `DataStorePointCache` durable) survives the grid lookup

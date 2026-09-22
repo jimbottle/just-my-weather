@@ -104,6 +104,45 @@ class ForecastGroupingTest {
         assertEquals(7, visibleDays(morning, 7).size)
     }
 
+    private fun dated(p: DailyPeriod, iso: String) = p.copy(startTime = Instant.parse(iso))
+
+    private fun ext(date: String, high: Double) =
+        io.raylytics.justmyweather.data.openmeteo.ExtendedDay(
+            LocalDate.parse(date), high, high - 20, 10.0, "Clear", 5.0, "S",
+        )
+
+    @Test
+    fun `past NWS's reach the extended days fill in, after NWS's last date and never over it`() {
+        val zone = ZoneId.of("America/New_York")
+        // Two NWS days, the second ending on Sep 30 (a night starting 10pm ET).
+        val nws =
+            combineDays(
+                listOf(
+                    dated(day("Monday", 80.0), "2026-09-28T10:00:00Z"),
+                    dated(night("Monday Night", 60.0), "2026-09-28T22:00:00Z"),
+                    dated(day("Tuesday", 81.0), "2026-09-29T10:00:00Z"),
+                    dated(night("Tuesday Night", 61.0), "2026-09-30T02:00:00Z"),
+                ),
+            )
+        // Open-Meteo starts at today like NWS does; Sep 28 and 29 must not repeat.
+        val extended =
+            listOf(ext("2026-09-28", 1.0), ext("2026-09-29", 2.0), ext("2026-09-30", 90.0), ext("2026-10-01", 91.0))
+        val four = forecastDays(nws, extended, dailyDays = 4, zone = zone)
+        assertEquals(listOf("Monday", "Tuesday", "Wed 9/30", "Thu 10/1"), four.map { it.name })
+        assertEquals(90.0, four[2].highF)
+        assertEquals(extended[2], four[2].extended)
+        assertEquals("Extended forecast · Open-Meteo.com", four[2].detail().subtitle)
+        // The tile's chance and wind come from the extended day too.
+        assertEquals(10.0, four[2].precipChance)
+        assertEquals("S", four[2].windDirection)
+        // Within NWS's reach nothing is borrowed.
+        assertEquals(listOf("Monday", "Tuesday"), forecastDays(nws, extended, 2, zone).map { it.name })
+        // No extended data, or NWS periods with no dates to align on: NWS only.
+        assertEquals(2, forecastDays(nws, null, 4, zone).size)
+        val undated = combineDays(listOf(day("Monday", 80.0), night("Monday Night", 60.0)))
+        assertEquals(1, forecastDays(undated, extended, 4, zone).size)
+    }
+
     @Test
     fun `a leading night keeps its own name with no high`() {
         // Opening the app in the evening: NWS's first period is "Tonight".
