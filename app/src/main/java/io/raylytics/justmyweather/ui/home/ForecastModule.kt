@@ -76,18 +76,19 @@ import kotlin.math.roundToInt
 private const val HOUR_COLUMNS = 1
 private const val DAY_COLUMNS = 2
 
-/** Lines the conditions zone reserves and may use in a one-cell hour tile:
- * enough for a chance of rain and a two-word summary to wrap. */
+/** Lines the conditions may use in a one-cell hour tile: enough for a
+ * chance of rain and a two-word summary to wrap. */
 private const val HOUR_BOTTOM_LINES = 3
 
-/** The same in a two-cell day tile, where "24% Partly Sunny" fits a line
- * and three reserved would leave a hole between the numbers and the words
- * (seen on the emulator). */
+/** The same in a two-cell day tile, where "24% Partly Sunny" fits a line. */
 private const val DAY_BOTTOM_LINES = 2
 
 /** Air between the hour and the temperature under it: close enough to read
  * as one thing, apart enough not to touch. */
 private val TOP_TO_MIDDLE_GAP = 6.dp
+
+/** Air between the temperature block and the conditions under it. */
+private val MIDDLE_TO_BOTTOM_GAP = 4.dp
 
 /** Below this many cells across, the header has no room for the word
  * "Forecast" beside its toggle — the toggle alone says what the tile is. */
@@ -402,11 +403,13 @@ private fun HalfDayTile(
  * The three zones. [top] is pinned to the top edge, the [middle] — the
  * temperature — sits a small gap under it, what the user has switched on
  * ([below]) hangs off the temperature's foot, and [bottom] is pinned to the
- * bottom edge with [bottomLines] of room reserved above it. Both edge zones
- * reserve their full height rather than what their text happened to take —
- * one label line at the top, [bottomLines] at the bottom — so a label that
- * shrank to fit, or a one-line "Clear", sizes its tile exactly as a
- * neighbour's does and every number in a row sits at the same y.
+ * bottom edge, using up to [bottomLines]. The top zone reserves a full label
+ * line so a label that shrank to fit puts its number where a neighbour's
+ * does. The bottom zone takes only the lines its text needs: the number is
+ * anchored under the hour, so the bottom no longer has to be padded to keep
+ * a row level, and padding it left air between the number and the words
+ * (Evan, 2026-09-22). The row is as tall as its wordiest tile; in the others
+ * the words still sit on the bottom edge.
  *
  * An explicit Layout rather than a Column with weighted halves. The row is
  * sized to its tallest tile's intrinsic height, and what a weighted child
@@ -419,7 +422,7 @@ private fun HalfDayTile(
 private fun ZonedTile(
     top: String,
     bottom: AnnotatedString?,
-    /** Lines the bottom zone reserves and may use. */
+    /** Lines the bottom zone may use. */
     bottomLines: Int,
     layout: ForecastTileLayout,
     modifier: Modifier = Modifier,
@@ -436,7 +439,7 @@ private fun ZonedTile(
     // the Pixel 9: "some rows worse than others").
     val labelStyle = MaterialTheme.typography.labelSmall
     val density = LocalDensity.current
-    val bottomReserve = with(density) { (labelStyle.lineHeight * bottomLines).roundToPx() }
+    val bottomGap = with(density) { MIDDLE_TO_BOTTOM_GAP.roundToPx() }
     // The top zone reserves a full label line for the same reason: the
     // label is fitted, and a fitted label that shrank ("10pm 9/22" at the
     // densest setting) is shorter than a neighbour's that did not, which
@@ -446,7 +449,7 @@ private fun ZonedTile(
     TileShell(borderColor = MaterialTheme.colorScheme.surfaceVariant, modifier = modifier) {
         ZonedLayout(
             spread = layout == ForecastTileLayout.SPREAD,
-            bottomReserve = bottomReserve,
+            bottomGap = bottomGap,
             topReserve = topReserve,
             topGap = topGap,
             top = {
@@ -483,10 +486,10 @@ private fun ZonedTile(
 /**
  * Stacks each slot's children vertically, centred. When [spread]: pins [top]
  * to the top edge, sets [middle] a small [topGap] under it, hangs [below]
- * directly under [middle], and pins [bottom] to the bottom edge with
- * [bottomReserve] of room. The temperature reads as the answer to the hour
- * above it, and the height the tile has left goes to the conditions, which
- * is where the words are. Every tile in a row is the same height, so every
+ * directly under [middle], and pins [bottom] to the bottom edge. The tile
+ * asks for exactly top + gap + middle + below + [bottomGap] + bottom, so the
+ * wordiest tile in a row has no slack and the others' words still sit on
+ * the same bottom edge. Every tile in a row is the same height, so every
  * number sits at the same y. Not spread: one block, top to bottom, that the
  * shell centres.
  *
@@ -505,10 +508,8 @@ private fun ZonedTile(
 @Composable
 private fun ZonedLayout(
     spread: Boolean,
-    /** The bottom zone is at least this tall whenever it has content, so a
-     * one-line "Clear" reserves what a wrapped "5% Mostly / Cloudy" takes
-     * and the row's tiles agree on where everything is. */
-    bottomReserve: Int,
+    /** Air between the middle (and anything under it) and the bottom zone. */
+    bottomGap: Int,
     /** The top zone is at least this tall: a fitted label never exceeds its
      * ceiling, so this is a true upper bound on what it draws. */
     topReserve: Int,
@@ -527,7 +528,7 @@ private fun ZonedLayout(
         val midH = heights[1]
         val belowH = heights[2]
         val botTextH = heights[3]
-        val botH = if (measured[3].isEmpty()) 0 else botTextH.coerceAtLeast(bottomReserve)
+        val botH = if (measured[3].isEmpty()) 0 else botTextH + bottomGap
         val required = if (spread) topH + topGap + midH + belowH + botH else topH + midH + belowH + botTextH
         val width =
             if (constraints.hasBoundedWidth) constraints.maxWidth else measured.flatten().maxOfOrNull { it.width } ?: 0
