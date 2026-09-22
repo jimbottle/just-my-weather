@@ -76,9 +76,14 @@ import kotlin.math.roundToInt
 private const val HOUR_COLUMNS = 1
 private const val DAY_COLUMNS = 2
 
-/** Lines the conditions zone reserves and may use: enough for a chance of
- * rain and a two-word summary to wrap in a one-cell tile. */
-private const val BOTTOM_LINES = 3
+/** Lines the conditions zone reserves and may use in a one-cell hour tile:
+ * enough for a chance of rain and a two-word summary to wrap. */
+private const val HOUR_BOTTOM_LINES = 3
+
+/** The same in a two-cell day tile, where "24% Partly Sunny" fits a line
+ * and three reserved would leave a hole between the numbers and the words
+ * (seen on the emulator). */
+private const val DAY_BOTTOM_LINES = 2
 
 /** Air between the hour and the temperature under it: close enough to read
  * as one thing, apart enough not to touch. */
@@ -289,6 +294,7 @@ private fun HourTile(
     ZonedTile(
         top = "${at.format(tileHourFormat).lowercase(Locale.getDefault())} ${at.format(shortDateFormat)}",
         bottom = bottomLine(elements, hour.shortForecast, hour.precipProbabilityPercent),
+        bottomLines = HOUR_BOTTOM_LINES,
         layout = layout,
         modifier = modifier,
         below = {
@@ -319,6 +325,7 @@ private fun CombinedDayTile(
 ) {
     ZonedTile(
         top = day.name,
+        bottomLines = DAY_BOTTOM_LINES,
         layout = layout,
         bottom =
             bottomLine(
@@ -363,6 +370,7 @@ private fun HalfDayTile(
     ZonedTile(
         top = period.name,
         bottom = bottomLine(elements, period.shortForecast, period.precipProbabilityPercent),
+        bottomLines = DAY_BOTTOM_LINES,
         layout = layout,
         modifier = modifier,
         below = {
@@ -409,13 +417,15 @@ private fun HalfDayTile(
 private fun ZonedTile(
     top: String,
     bottom: AnnotatedString?,
+    /** Lines the bottom zone reserves and may use. */
+    bottomLines: Int,
     layout: ForecastTileLayout,
     modifier: Modifier = Modifier,
     below: @Composable () -> Unit = {},
     middle: @Composable () -> Unit,
 ) {
     // The bottom zone's reserved height, in pixels: three lines of the label
-    // style — room for "5% · Mostly / Cloudy" to wrap rather than be cut
+    // style — room for "5% Mostly / Cloudy" to wrap rather than be cut
     // (Evan, 2026-09-22). Reserved here rather than through the Text's
     // minLines because the row is sized by an INTRINSIC measurement, and in
     // that pass a Text reports its natural height with minLines ignored — so
@@ -424,7 +434,7 @@ private fun ZonedTile(
     // the Pixel 9: "some rows worse than others").
     val labelStyle = MaterialTheme.typography.labelSmall
     val density = LocalDensity.current
-    val bottomReserve = with(density) { (labelStyle.lineHeight * BOTTOM_LINES).roundToPx() }
+    val bottomReserve = with(density) { (labelStyle.lineHeight * bottomLines).roundToPx() }
     val topGap = with(density) { TOP_TO_MIDDLE_GAP.roundToPx() }
     TileShell(borderColor = MaterialTheme.colorScheme.surfaceVariant, modifier = modifier) {
         ZonedLayout(
@@ -452,7 +462,7 @@ private fun ZonedTile(
                         text = it,
                         style = labelStyle,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = BOTTOM_LINES,
+                        maxLines = bottomLines,
                         overflow = TextOverflow.Ellipsis,
                         textAlign = TextAlign.Center,
                     )
@@ -474,7 +484,7 @@ private fun ZonedTile(
  *
  * The temperature used to float on the tile's centre; that spent most of
  * the tile on air between the hour and the number, and the conditions line
- * under it got cut ("5% · Mostly Clou…"). Evan, 2026-09-22: bring the
+ * under it got cut ("5% Mostly Clou…"). Evan, 2026-09-22: bring the
  * number up to 5–10dp under the time and give that room to the words.
  *
  * "All the height it is offered" is read off the constraints' maximum, not
@@ -488,7 +498,7 @@ private fun ZonedTile(
 private fun ZonedLayout(
     spread: Boolean,
     /** The bottom zone is at least this tall whenever it has content, so a
-     * one-line "Clear" reserves what a wrapped "5% · Mostly / Cloudy" takes
+     * one-line "Clear" reserves what a wrapped "5% Mostly / Cloudy" takes
      * and the row's tiles agree on where everything is. */
     bottomReserve: Int,
     /** Air between the top zone and the middle, when spread. */
@@ -548,7 +558,7 @@ private fun ZonedLayout(
 
 /**
  * The bottom zone's line: the chance of rain and the conditions together —
- * "28% · Mostly Sunny", the chance in its accent — each present only when
+ * "28% Mostly Sunny", the chance in its accent — each present only when
  * its element is on and there is a value. The chance rides with the
  * conditions rather than under the temperature because it is about the
  * same thing the words are (Evan: "it is most closely tied to that"), and
@@ -574,14 +584,16 @@ private fun bottomLine(
     val words = conditions?.takeIf { ForecastElement.CONDITIONS in elements }
     val chance = precipChance?.takeIf { ForecastElement.PRECIP_CHANCE in elements && it > 0 }
     val accent = MaterialTheme.colorScheme.primary
-    // Chance FIRST: it is short and never wraps, so "5% · Partly / Cloudy"
+    // Chance FIRST: it is short and never wraps, so "5% Partly / Cloudy"
     // breaks between the words. Words first, a one-cell tile broke after
-    // "Partly" and the second line "Cloudy · 5%" ran out of room — the
-    // chance was the part ellipsised away (seen on the emulator).
+    // "Partly" and the second line "Cloudy 5%" ran out of room — the chance
+    // was the part ellipsised away (seen on the emulator). A plain space
+    // between them, not a dot: the accent colour already sets the chance
+    // apart, and a dot left dangling at a line's end read as clutter (Evan).
     return buildAnnotatedString {
         chance?.let { withStyle(SpanStyle(color = accent)) { append("${it.roundToInt()}%") } }
         words?.let {
-            if (chance != null) append(" · ")
+            if (chance != null) append(" ")
             append(it)
         }
     }
