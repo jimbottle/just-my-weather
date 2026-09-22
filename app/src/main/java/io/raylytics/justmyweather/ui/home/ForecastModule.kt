@@ -429,21 +429,20 @@ private fun ZonedTile(
     below: @Composable () -> Unit = {},
     middle: @Composable () -> Unit,
 ) {
-    // The bottom zone's reserved height, in pixels: three lines of the label
-    // style — room for "5% Mostly / Cloudy" to wrap rather than be cut
-    // (Evan, 2026-09-22). Reserved here rather than through the Text's
-    // minLines because the row is sized by an INTRINSIC measurement, and in
-    // that pass a Text reports its natural height with minLines ignored — so
-    // rows whose conditions fit on one line came out short and the zones had
-    // no room, while rows with a wrapped "Mostly Sunny" were fine (seen on
-    // the Pixel 9: "some rows worse than others").
     val labelStyle = MaterialTheme.typography.labelSmall
     val density = LocalDensity.current
+    // The words take only the lines they need, 4dp under the temperature
+    // block. The bottom zone used to reserve a fixed two or three lines, back
+    // when the temperature was centred and the reserve kept a row level; with
+    // the number anchored under the hour it only left air between the number
+    // and the words (Evan, 2026-09-22), so it went.
     val bottomGap = with(density) { MIDDLE_TO_BOTTOM_GAP.roundToPx() }
-    // The top zone reserves a full label line for the same reason: the
-    // label is fitted, and a fitted label that shrank ("10pm 9/22" at the
-    // densest setting) is shorter than a neighbour's that did not, which
-    // would put their temperatures at different y (found in review).
+    // The top zone reserves a full label line, in the Layout rather than via
+    // the Text's minLines: the row is sized by an INTRINSIC measurement, and
+    // in that pass a Text reports its natural height with minLines ignored.
+    // The label is fitted, and one that shrank ("10pm 9/22" at the densest
+    // setting) is shorter than a neighbour's that did not; without the
+    // reserve their temperatures would sit at different y (found in review).
     val topReserve = with(density) { labelStyle.lineHeight.roundToPx() }
     val topGap = with(density) { TOP_TO_MIDDLE_GAP.roundToPx() }
     TileShell(borderColor = MaterialTheme.colorScheme.surfaceVariant, modifier = modifier) {
