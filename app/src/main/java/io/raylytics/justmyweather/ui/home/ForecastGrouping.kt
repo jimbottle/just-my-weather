@@ -86,6 +86,27 @@ fun combineDays(
     return days
 }
 
+/**
+ * The first [dailyDays] days of a combined forecast, where a leading
+ * night-only row ("Tonight", with no high) is the rest of TODAY and not a
+ * day of its own. NWS's fourteen half-day periods fetched in the evening
+ * combine to eight rows — tonight, six full days, a trailing afternoon — so
+ * counting the first row as a day would make seven days drop the last
+ * afternoon, and "3 days" would reach only two real ones (found in review).
+ *
+ * Pure, and the one place the trim happens, so both daily styles reach the
+ * same last period: the day-and-night style shows [periods] of the same
+ * rows.
+ */
+fun visibleDays(days: List<DayForecast>, dailyDays: Int): List<DayForecast> {
+    val leadingNight = days.firstOrNull()?.let { it.day == null && it.night != null } == true
+    return days.take(if (leadingNight) dailyDays + 1 else dailyDays)
+}
+
+/** The half-day periods that make up [days], in order. */
+val List<DayForecast>.periods: List<DailyPeriod>
+    get() = flatMap { listOfNotNull(it.day, it.night) }
+
 /** The warmest of the hourly points that fall on the first point's date in
  * [zone] — the rest of today, as the hourly forecast starts at the current
  * hour. Null with no hours, or none carrying a temperature. */

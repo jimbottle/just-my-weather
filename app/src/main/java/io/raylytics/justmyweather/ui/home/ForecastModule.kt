@@ -162,15 +162,15 @@ internal fun ForecastModuleContent(
             ForecastMode.DAILY ->
                 ForecastFrame(items = content.periods, error = content.error) { list ->
                     // Pairing the half-day periods is pure; cache per list.
-                    // Both styles count in DAYS: the combined style shows the
-                    // first n, and the day-and-night style shows the periods
-                    // those n days are made of — so the two styles agree on
-                    // how far ahead "3 days" reaches.
+                    // Both styles count in DAYS through the same trim
+                    // (visibleDays): the combined style shows those rows and
+                    // the day-and-night style the periods they are made of,
+                    // so the two agree on how far ahead "3 days" reaches.
                     val days =
                         remember(list, content.hours, content.placeZone, content.dailyDays) {
-                            combineDays(list, content.hours, content.placeZone).take(content.dailyDays)
+                            visibleDays(combineDays(list, content.hours, content.placeZone), content.dailyDays)
                         }
-                    val periods = remember(days) { days.flatMap { listOfNotNull(it.day, it.night) } }
+                    val periods = remember(days) { days.periods }
                     Box(viewport) {
                         when (content.dailyStyle) {
                             DailyStyle.COMBINED ->

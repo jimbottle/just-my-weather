@@ -80,6 +80,31 @@ class ForecastGroupingTest {
     }
 
     @Test
+    fun `a leading night is the rest of today, not a day against the budget`() {
+        // NWS's fourteen periods fetched in the evening: Tonight, then six
+        // full days, then a trailing afternoon — eight rows.
+        val periods =
+            listOf(night("Tonight", 60.0)) +
+                (1..6).flatMap { listOf(day("Day $it", 70.0 + it), night("Night $it", 50.0 + it)) } +
+                listOf(day("Day 7", 77.0))
+        val all = combineDays(periods)
+        assertEquals(8, all.size)
+        // At the default, every period survives — nothing NWS sent is lost.
+        val week = visibleDays(all, 7)
+        assertEquals(8, week.size)
+        assertEquals(periods, week.periods)
+        // "3 days" reaches three real days past tonight, and both styles end
+        // on the same period.
+        val three = visibleDays(all, 3)
+        assertEquals(listOf("Tonight", "Day 1", "Day 2", "Day 3"), three.map { it.name })
+        assertEquals("Night 3", three.periods.last().name)
+        // Fetched in the morning there is no leading night, and n is n.
+        val morning = combineDays(periods.drop(1))
+        assertEquals(listOf("Day 1", "Day 2", "Day 3"), visibleDays(morning, 3).map { it.name })
+        assertEquals(7, visibleDays(morning, 7).size)
+    }
+
+    @Test
     fun `a leading night keeps its own name with no high`() {
         // Opening the app in the evening: NWS's first period is "Tonight".
         val days = combineDays(listOf(night("Tonight", 68.0), day("Friday", 82.0), night("Friday Night", 70.0)))
