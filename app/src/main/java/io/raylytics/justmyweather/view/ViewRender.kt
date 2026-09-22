@@ -50,6 +50,8 @@ sealed interface ModuleContent {
         val dailyStyle: DailyStyle,
         /** How many of [hours] the Hourly framing shows — the user's setting. */
         val hourlyHours: Int,
+        /** How many days the Daily framing shows — the user's setting. */
+        val dailyDays: Int,
         /** What each tile shows beside its temperature — the user's setting. */
         val elements: Set<ForecastElement>,
         /** How each tile arranges its zones — the user's setting. */
@@ -134,6 +136,7 @@ fun ViewConfig.render(
                                 mode = forecast.mode,
                                 dailyStyle = dailyStyle,
                                 hourlyHours = hourlyHours,
+                                dailyDays = dailyDays,
                                 elements = forecastElements,
                                 layout = forecastTileLayout,
                                 zone = zone,

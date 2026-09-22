@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import io.raylytics.justmyweather.ui.theme.accentColor
 import io.raylytics.justmyweather.view.AccentChoice
 import io.raylytics.justmyweather.view.AlertBannerPosition
+import io.raylytics.justmyweather.view.DailyDays
 import io.raylytics.justmyweather.view.DailyStyle
 import io.raylytics.justmyweather.view.Density
 import io.raylytics.justmyweather.view.ForecastElement
@@ -80,6 +81,7 @@ fun CustomizeScreen(
     onSetDefaultForecastMode: (ForecastMode) -> Unit,
     onSetDailyStyle: (DailyStyle) -> Unit,
     onSetHourlyHours: (Int) -> Unit,
+    onSetDailyDays: (Int) -> Unit,
     onToggleForecastElement: (ForecastElement) -> Unit,
     onSetForecastTileLayout: (ForecastTileLayout) -> Unit,
     onSetAlertBannerPosition: (AlertBannerPosition) -> Unit,
@@ -125,6 +127,8 @@ fun CustomizeScreen(
                     onSetDailyStyle = onSetDailyStyle,
                     hourlyHours = config.hourlyHours,
                     onSetHourlyHours = onSetHourlyHours,
+                    dailyDays = config.dailyDays,
+                    onSetDailyDays = onSetDailyDays,
                     elements = config.forecastElements,
                     onToggleElement = onToggleForecastElement,
                     tileLayout = config.forecastTileLayout,
@@ -464,6 +468,8 @@ private fun ForecastPicker(
     onSetDailyStyle: (DailyStyle) -> Unit,
     hourlyHours: Int,
     onSetHourlyHours: (Int) -> Unit,
+    dailyDays: Int,
+    onSetDailyDays: (Int) -> Unit,
     elements: Set<ForecastElement>,
     onToggleElement: (ForecastElement) -> Unit,
     tileLayout: ForecastTileLayout,
@@ -510,6 +516,21 @@ private fun ForecastPicker(
             onValueChange = { onSetHourlyHours(snapToStep(it)) },
             valueRange = HourlyHours.MIN.toFloat()..HourlyHours.MAX.toFloat(),
             modifier = Modifier.testTag("hourly-hours-slider"),
+        )
+        // The Daily framing's reach, in days. Seven stops is few enough for
+        // the slider's own ticks to read as stops rather than a dotted line.
+        Text(
+            text = if (dailyDays == 1) "Daily shows 1 day" else "Daily shows $dailyDays days",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+        Slider(
+            value = dailyDays.toFloat(),
+            onValueChange = { onSetDailyDays(Math.round(it)) },
+            valueRange = DailyDays.MIN.toFloat()..DailyDays.MAX.toFloat(),
+            steps = DailyDays.MAX - DailyDays.MIN - 1,
+            modifier = Modifier.testTag("daily-days-slider"),
         )
         // What a tile carries beside its temperature. Multi-select: these
         // are independent, and a tile with none of them is a legal, calm

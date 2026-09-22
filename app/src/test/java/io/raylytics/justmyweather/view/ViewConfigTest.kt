@@ -272,6 +272,16 @@ class ViewConfigTest {
     }
 
     @Test
+    fun `daily days ship at a week and clamp to the range`() {
+        assertEquals(7, ViewConfig.DEFAULT.dailyDays)
+        assertEquals(7, ViewConfig.DEFAULT.setDailyDays(40).dailyDays)
+        assertEquals(1, ViewConfig.DEFAULT.setDailyDays(0).dailyDays)
+        val rendered = ViewConfig.DEFAULT.setDailyDays(3).render(snapshot)
+        val forecast = rendered.modules.last().content as ModuleContent.Forecast
+        assertEquals(3, forecast.dailyDays)
+    }
+
+    @Test
     fun `tap-for-details ships on and is a plain switch`() {
         assertTrue(ViewConfig.DEFAULT.tapForDetails)
         assertFalse(ViewConfig.DEFAULT.setTapForDetails(false).tapForDetails)

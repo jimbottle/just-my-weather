@@ -65,6 +65,8 @@ object ViewConfigCodec {
         // before the place's zone was known at all.
         val timesIn: String = TimesIn.DEFAULT.key,
         val forecastTileLayout: String = ForecastTileLayout.DEFAULT.key,
+        // Defaulted to the week the app always showed; clamped on read.
+        val dailyDays: Int = DailyDays.DEFAULT,
         // LEGACY, read-only: sun times used to be a screen-wide switch rather
         // than a module with a place on the grid. It is folded on read into
         // the "sun" module's visibility and never written again, so someone
@@ -89,6 +91,7 @@ object ViewConfigCodec {
                 forecastElements = config.forecastElements.map { it.key },
                 timesIn = config.timesIn.key,
                 forecastTileLayout = config.forecastTileLayout.key,
+                dailyDays = config.dailyDays,
                 items =
                     config.items.map {
                         StoredSetting(
@@ -152,6 +155,7 @@ object ViewConfigCodec {
             stored.forecastElements?.mapNotNull(ForecastElement::byKey)?.toSet() ?: ForecastElement.DEFAULT,
             TimesIn.byKey(stored.timesIn) ?: TimesIn.DEFAULT,
             ForecastTileLayout.byKey(stored.forecastTileLayout) ?: ForecastTileLayout.DEFAULT,
+            stored.dailyDays,
         )
     }
 

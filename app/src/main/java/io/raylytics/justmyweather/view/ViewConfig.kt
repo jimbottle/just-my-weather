@@ -39,6 +39,9 @@ data class ViewConfig(
     /** How many hours the Hourly framing shows. Always within [HourlyHours]'s
      * bounds — every path in clamps. */
     val hourlyHours: Int = HourlyHours.DEFAULT,
+    /** How many days the Daily framing shows. Always within [DailyDays]'s
+     * bounds — every path in clamps. */
+    val dailyDays: Int = DailyDays.DEFAULT,
     /** What forecast tiles show beside the temperature. An empty set is
      * legal: just the hour and the number. */
     val forecastElements: Set<ForecastElement> = ForecastElement.DEFAULT,
@@ -119,6 +122,8 @@ data class ViewConfig(
 
     fun setHourlyHours(hours: Int): ViewConfig = copy(hourlyHours = HourlyHours.clamp(hours))
 
+    fun setDailyDays(days: Int): ViewConfig = copy(dailyDays = DailyDays.clamp(days))
+
     fun setTimesIn(timesIn: TimesIn): ViewConfig = copy(timesIn = timesIn)
 
     fun setForecastTileLayout(layout: ForecastTileLayout): ViewConfig = copy(forecastTileLayout = layout)
@@ -184,6 +189,7 @@ data class ViewConfig(
             forecastElements: Set<ForecastElement> = ForecastElement.DEFAULT,
             timesIn: TimesIn = TimesIn.DEFAULT,
             forecastTileLayout: ForecastTileLayout = ForecastTileLayout.DEFAULT,
+            dailyDays: Int = DailyDays.DEFAULT,
         ): ViewConfig {
             val seen = LinkedHashMap<ModuleKey, ModuleSetting>()
             settings.forEach { setting -> seen.putIfAbsent(setting.module, setting) }
@@ -201,6 +207,7 @@ data class ViewConfig(
                 forecastElements = forecastElements,
                 timesIn = timesIn,
                 forecastTileLayout = forecastTileLayout,
+                dailyDays = DailyDays.clamp(dailyDays),
             )
         }
     }
