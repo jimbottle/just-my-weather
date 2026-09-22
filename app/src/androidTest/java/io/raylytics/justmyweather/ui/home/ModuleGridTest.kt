@@ -438,7 +438,7 @@ class ModuleGridTest {
         // right both times — only their positions were wrong.
         show(forecastWithHours(ForecastTileLayout.SPREAD))
         val tile = hourTile(1)
-        val hour = bounds("8 pm 9/6")
+        val hour = bounds("8pm 9/6")
         val temp = bounds("70°")
         val conditions = bounds("Clear")
         val padding = TILE_PADDING + 4.dp
@@ -450,12 +450,11 @@ class ModuleGridTest {
         val other = bounds("72°")
         val drift = (temp.top + temp.bottom) / 2 - (other.top + other.bottom) / 2
         assertTrue("temperatures read straight across, drift $drift", drift.value in -2f..2f)
-        // And the temperature sits on the TILE's centre, clear of the hour —
-        // not a line above the middle, which is where centring between the
-        // label and a two-line reserved bottom zone put it.
-        assertTrue("temperature is clear of the hour", temp.top - hour.bottom > 4.dp)
-        val offCentre = (temp.top + temp.bottom) / 2 - (tile.top + tile.bottom) / 2
-        assertTrue("temperature is centred in the tile, off by $offCentre", offCentre.value in -3f..3f)
+        // And the temperature sits a small gap under the hour — close enough
+        // to read as the hour's answer, not floating mid-tile — with the
+        // tile's spare height given to the conditions instead.
+        val gapToHour = temp.top - hour.bottom
+        assertTrue("temperature hangs just under the hour, gap $gapToHour", gapToHour.value in 2f..14f)
     }
 
     @Test
@@ -515,7 +514,7 @@ class ModuleGridTest {
     fun stackedKeepsTheZonesTogetherInTheMiddle() {
         show(forecastWithHours(ForecastTileLayout.STACKED))
         val tile = hourTile(1)
-        val hour = bounds("8 pm 9/6")
+        val hour = bounds("8pm 9/6")
         val temp = bounds("70°")
         // Not pinned: the surplus this tile has sits above the block too.
         // The surplus is one wind line, split above and below the block, so

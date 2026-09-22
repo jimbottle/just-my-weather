@@ -67,7 +67,7 @@ import kotlin.math.roundToInt
  * The grid is drawn eagerly, not lazily, so the top of that range composes
  * ~40 rows of tiles whether or not anyone scrolls to them — acceptable for
  * four short texts a tile, and the ceiling is the user's to choose. Every
- * tile names its day ("7 pm 9/6"): the strip crosses midnight, and a tile
+ * tile names its day ("7pm 9/6"): the strip crosses midnight, and a tile
  * scrolled into view on its own has no neighbour to tell it from tomorrow's.
  */
 
@@ -75,6 +75,14 @@ import kotlin.math.roundToInt
  * "This Afternoon") needs two to survive without ellipsis. */
 private const val HOUR_COLUMNS = 1
 private const val DAY_COLUMNS = 2
+
+/** Lines the conditions zone reserves and may use: enough for a chance of
+ * rain and a two-word summary to wrap in a one-cell tile. */
+private const val BOTTOM_LINES = 3
+
+/** Air between the hour and the temperature under it: close enough to read
+ * as one thing, apart enough not to touch. */
+private val TOP_TO_MIDDLE_GAP = 6.dp
 
 /** Below this many cells across, the header has no room for the word
  * "Forecast" beside its toggle — the toggle alone says what the tile is. */
@@ -279,7 +287,7 @@ private fun HourTile(
 ) {
     val at = hour.startTime.atZone(zone)
     ZonedTile(
-        top = "${at.format(hourFormat).lowercase(Locale.getDefault())} ${at.format(shortDateFormat)}",
+        top = "${at.format(tileHourFormat).lowercase(Locale.getDefault())} ${at.format(shortDateFormat)}",
         bottom = bottomLine(elements, hour.shortForecast, hour.precipProbabilityPercent),
         layout = layout,
         modifier = modifier,
@@ -406,26 +414,34 @@ private fun ZonedTile(
     below: @Composable () -> Unit = {},
     middle: @Composable () -> Unit,
 ) {
-    // The bottom zone's reserved height, in pixels: two lines of the label
-    // style. Reserved here rather than through the Text's minLines because
-    // the row is sized by an INTRINSIC measurement, and in that pass a Text
-    // reports its natural height with minLines ignored — so rows whose
-    // conditions fit on one line came out a line too short and the zones had
-    // no room to spread, while rows with a wrapped "Mostly Sunny" were fine
-    // (seen on the Pixel 9: "some rows worse than others").
+    // The bottom zone's reserved height, in pixels: three lines of the label
+    // style — room for "5% · Mostly / Cloudy" to wrap rather than be cut
+    // (Evan, 2026-09-22). Reserved here rather than through the Text's
+    // minLines because the row is sized by an INTRINSIC measurement, and in
+    // that pass a Text reports its natural height with minLines ignored — so
+    // rows whose conditions fit on one line came out short and the zones had
+    // no room, while rows with a wrapped "Mostly Sunny" were fine (seen on
+    // the Pixel 9: "some rows worse than others").
     val labelStyle = MaterialTheme.typography.labelSmall
-    val bottomReserve = with(LocalDensity.current) { (labelStyle.lineHeight * 2).roundToPx() }
+    val density = LocalDensity.current
+    val bottomReserve = with(density) { (labelStyle.lineHeight * BOTTOM_LINES).roundToPx() }
+    val topGap = with(density) { TOP_TO_MIDDLE_GAP.roundToPx() }
     TileShell(borderColor = MaterialTheme.colorScheme.surfaceVariant, modifier = modifier) {
         ZonedLayout(
             spread = layout == ForecastTileLayout.SPREAD,
             bottomReserve = bottomReserve,
+            topGap = topGap,
             top = {
-                Text(
+                // Fitted, like the glance labels: "10pm 9/22" is a hair too
+                // wide for a one-cell tile at the label size, and "10pm 9/…"
+                // is worse than the same text a shade smaller.
+                FittedText(
                     text = top,
-                    style = MaterialTheme.typography.labelSmall,
+                    style = labelStyle,
+                    ceiling = labelStyle.fontSize,
+                    floor = LABEL_FLOOR,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
                 )
             },
             middle = middle,
@@ -436,7 +452,7 @@ private fun ZonedTile(
                         text = it,
                         style = labelStyle,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2,
+                        maxLines = BOTTOM_LINES,
                         overflow = TextOverflow.Ellipsis,
                         textAlign = TextAlign.Center,
                     )
@@ -448,18 +464,18 @@ private fun ZonedTile(
 
 /**
  * Stacks each slot's children vertically, centred. When [spread]: pins [top]
- * to the top edge and [bottom] to the bottom edge, centres [middle] on the
- * TILE's own centre, and hangs [below] directly under [middle]. The tile
- * reserves the same room above the middle as below it — the larger of the
- * top zone and the below-plus-bottom zone — so the number is centred in the
- * tile, never crowded by either edge, and every tile in a row (all the same
- * height) puts its number at the same y. Not spread: one block, top to
- * bottom, that the shell centres.
+ * to the top edge, sets [middle] a small [topGap] under it, hangs [below]
+ * directly under [middle], and pins [bottom] to the bottom edge with
+ * [bottomReserve] of room. The temperature reads as the answer to the hour
+ * above it, and the height the tile has left goes to the conditions, which
+ * is where the words are. Every tile in a row is the same height, so every
+ * number sits at the same y. Not spread: one block, top to bottom, that the
+ * shell centres.
  *
- * Centred on the tile, not between the zones: centring between the label
- * and the bottom zone's reserved top put the number a line above the tile's
- * middle whenever the conditions were one line (Evan: "the temp is not
- * bottom aligning... still upper aligned").
+ * The temperature used to float on the tile's centre; that spent most of
+ * the tile on air between the hour and the number, and the conditions line
+ * under it got cut ("5% · Mostly Clou…"). Evan, 2026-09-22: bring the
+ * number up to 5–10dp under the time and give that room to the words.
  *
  * "All the height it is offered" is read off the constraints' maximum, not
  * asked for with fillMaxSize: the tile shell hands its content loose
@@ -472,9 +488,11 @@ private fun ZonedTile(
 private fun ZonedLayout(
     spread: Boolean,
     /** The bottom zone is at least this tall whenever it has content, so a
-     * one-line "Clear" reserves what a two-line "Mostly Clear" takes and the
-     * row's tiles agree on where the middle is. */
+     * one-line "Clear" reserves what a wrapped "5% · Mostly / Cloudy" takes
+     * and the row's tiles agree on where everything is. */
     bottomReserve: Int,
+    /** Air between the top zone and the middle, when spread. */
+    topGap: Int,
     top: @Composable () -> Unit,
     middle: @Composable () -> Unit,
     below: @Composable () -> Unit,
@@ -489,10 +507,7 @@ private fun ZonedLayout(
         val belowH = heights[2]
         val botTextH = heights[3]
         val botH = if (measured[3].isEmpty()) 0 else botTextH.coerceAtLeast(bottomReserve)
-        // Room on either side of the centred middle: enough for whichever
-        // zone is taller, on both sides, so the middle clears both.
-        val flank = maxOf(topH, belowH + botH)
-        val required = if (spread) midH + 2 * flank else topH + midH + belowH + botTextH
+        val required = if (spread) topH + topGap + midH + belowH + botH else topH + midH + belowH + botTextH
         val width =
             if (constraints.hasBoundedWidth) constraints.maxWidth else measured.flatten().maxOfOrNull { it.width } ?: 0
         val height =
@@ -523,10 +538,9 @@ private fun ZonedLayout(
             // like everything else in the row, level with the second line of
             // a neighbour's "Mostly / Clear".
             stack(measured[3], height - botTextH)
-            // The temperature's centre is the TILE's centre; below hangs off
+            // The temperature a small gap under the hour; below hangs off
             // its foot.
-            val midTop = (height - midH) / 2
-            val afterMid = stack(measured[1], midTop)
+            val afterMid = stack(measured[1], topH + topGap)
             stack(measured[2], afterMid)
         }
     }

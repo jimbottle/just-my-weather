@@ -547,6 +547,10 @@ internal val timeFormat: DateTimeFormatter = DateTimeFormatter.ofPattern("h:mm a
 // a shared constant exists to prevent.
 internal val hourFormat: DateTimeFormatter = DateTimeFormatter.ofPattern("h a", Locale.getDefault())
 
+/** "10pm": the hour with no space before the meridiem, for the tile label
+ * that shares a line with a date — "10 pm 9/22" overran a one-cell tile. */
+internal val tileHourFormat: DateTimeFormatter = DateTimeFormatter.ofPattern("ha", Locale.getDefault())
+
 /** "9/6": the day an hour belongs to, as short as a date gets. Numeric rather
  * than "Sep 6" because it shares one line with the hour in a one-cell tile. */
 internal val shortDateFormat: DateTimeFormatter = DateTimeFormatter.ofPattern("M/d", Locale.getDefault())
