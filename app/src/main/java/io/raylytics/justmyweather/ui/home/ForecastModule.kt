@@ -398,20 +398,21 @@ private fun HalfDayTile(
 }
 
 /**
- * The three zones. [top] is pinned to the top edge, [bottom] (when there is
- * one) to the bottom, and the [middle] — the temperature — sits exactly
- * halfway between them. What the user has switched on ([below]) hangs under
- * the temperature and does not move it: the layout reserves the same room
- * above the temperature as [below] takes under it, so a tile with a chance
- * of rain grows symmetrically and its number stays level with a
- * neighbour's that has none.
+ * The three zones. [top] is pinned to the top edge, the [middle] — the
+ * temperature — sits a small gap under it, what the user has switched on
+ * ([below]) hangs off the temperature's foot, and [bottom] is pinned to the
+ * bottom edge with [bottomLines] of room reserved above it. Both edge zones
+ * reserve their full height rather than what their text happened to take —
+ * one label line at the top, [bottomLines] at the bottom — so a label that
+ * shrank to fit, or a one-line "Clear", sizes its tile exactly as a
+ * neighbour's does and every number in a row sits at the same y.
  *
  * An explicit Layout rather than a Column with weighted halves. The row is
  * sized to its tallest tile's intrinsic height, and what a weighted child
  * contributes to that is subtle enough that the first attempt reserved
  * nothing for the lower half on the Pixel 9 — "1%" landed on top of the
- * conditions. Here the intrinsic IS the arithmetic below: top + middle +
- * twice below + bottom.
+ * conditions. Here the intrinsic IS the arithmetic in ZonedLayout: top +
+ * gap + middle + below + bottom.
  */
 @Composable
 private fun ZonedTile(
@@ -435,11 +436,17 @@ private fun ZonedTile(
     val labelStyle = MaterialTheme.typography.labelSmall
     val density = LocalDensity.current
     val bottomReserve = with(density) { (labelStyle.lineHeight * bottomLines).roundToPx() }
+    // The top zone reserves a full label line for the same reason: the
+    // label is fitted, and a fitted label that shrank ("10pm 9/22" at the
+    // densest setting) is shorter than a neighbour's that did not, which
+    // would put their temperatures at different y (found in review).
+    val topReserve = with(density) { labelStyle.lineHeight.roundToPx() }
     val topGap = with(density) { TOP_TO_MIDDLE_GAP.roundToPx() }
     TileShell(borderColor = MaterialTheme.colorScheme.surfaceVariant, modifier = modifier) {
         ZonedLayout(
             spread = layout == ForecastTileLayout.SPREAD,
             bottomReserve = bottomReserve,
+            topReserve = topReserve,
             topGap = topGap,
             top = {
                 // Fitted, like the glance labels: "10pm 9/22" is a hair too
@@ -501,6 +508,9 @@ private fun ZonedLayout(
      * one-line "Clear" reserves what a wrapped "5% Mostly / Cloudy" takes
      * and the row's tiles agree on where everything is. */
     bottomReserve: Int,
+    /** The top zone is at least this tall: a fitted label never exceeds its
+     * ceiling, so this is a true upper bound on what it draws. */
+    topReserve: Int,
     /** Air between the top zone and the middle, when spread. */
     topGap: Int,
     top: @Composable () -> Unit,
@@ -512,7 +522,7 @@ private fun ZonedLayout(
         val loose = constraints.copy(minWidth = 0, minHeight = 0, maxHeight = Constraints.Infinity)
         val measured = slots.map { slot -> slot.map { it.measure(loose) } }
         val heights = measured.map { placeables -> placeables.sumOf { it.height } }
-        val topH = heights[0]
+        val topH = if (measured[0].isEmpty()) 0 else heights[0].coerceAtLeast(topReserve)
         val midH = heights[1]
         val belowH = heights[2]
         val botTextH = heights[3]

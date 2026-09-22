@@ -70,10 +70,12 @@ class ModuleGridTest {
     private val resizes = mutableListOf<Pair<ModuleKey, ModuleSize>>()
     private val opened = mutableListOf<ModuleKey>()
 
-    private fun show(vararg modules: ModuleValue) {
+    private fun show(vararg modules: ModuleValue) = show(gridWidth, *modules)
+
+    private fun show(width: androidx.compose.ui.unit.Dp, vararg modules: ModuleValue) {
         compose.setContent {
             JustMyWeatherTheme {
-                Box(Modifier.width(gridWidth)) {
+                Box(Modifier.width(width)) {
                     ModuleGrid(
                         modules = modules.toList(),
                         arranging = false,
@@ -508,6 +510,52 @@ class ModuleGridTest {
         val mostly = bounds("Mostly Cloudy")
         assertEquals("conditions end on the same line", mostly.bottom.value, clear.bottom.value, 2f)
         assertTrue("conditions touch the tile's padding", oneLine.bottom - clear.bottom < TILE_PADDING + 4.dp)
+    }
+
+    @Test
+    fun aLabelThatShrinksToFitStillLevelsItsTemperatureWithTheRowsOthers() {
+        // In a one-cell tile on a 324dp grid, "10pm 9/22" is too wide at the
+        // label size and is fitted a shade smaller, while "6pm 9/2" fits; a
+        // fitted label's line is shorter. The top zone reserves a full label
+        // line regardless, so the shrunk label's tile puts its number at the
+        // same y as its neighbour's (found in review). The width is chosen
+        // between the two measured extremes: at 400dp neither shrinks, at
+        // 300dp both do.
+        val zone = ZoneId.of("America/New_York")
+        val hours =
+            listOf(
+                ForecastPoint(Instant.parse("2026-09-02T22:00:00Z"), 63.0, null, shortForecast = "Clear"),
+                ForecastPoint(Instant.parse("2026-09-23T02:00:00Z"), 61.0, null, shortForecast = "Clear"),
+            )
+        show(
+            324.dp,
+            ModuleValue(
+                module = ModuleKey.Forecast,
+                label = "Forecast",
+                size = ModuleSize(4, 4),
+                content =
+                    ModuleContent.Forecast(
+                        hours = hours,
+                        periods = null,
+                        error = null,
+                        mode = ForecastMode.HOURLY,
+                        dailyStyle = DailyStyle.DEFAULT,
+                        hourlyHours = 24,
+                        elements = setOf(ForecastElement.CONDITIONS),
+                        layout = ForecastTileLayout.SPREAD,
+                        zone = zone,
+                        placeZone = zone,
+                    ),
+            ),
+        )
+        val six = bounds("6pm 9/2")
+        val ten = bounds("10pm 9/22")
+        val shrank = ten.height() < six.height()
+        assertTrue("the wide label was fitted smaller, ${ten.height()} vs ${six.height()}", shrank)
+        val a = bounds("63°")
+        val b = bounds("61°")
+        val drift = (a.top + a.bottom) / 2 - (b.top + b.bottom) / 2
+        assertTrue("temperatures read straight across, drift $drift", drift.value in -1.5f..1.5f)
     }
 
     @Test
