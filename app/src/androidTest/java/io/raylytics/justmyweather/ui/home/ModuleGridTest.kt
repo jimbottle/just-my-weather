@@ -578,6 +578,28 @@ class ModuleGridTest {
     }
 
     @Test
+    fun theSunTileDropsItsDefaultCaptionWhileItHasTimes() {
+        // "Sunrise"/"Sunset" already say what it is; no "Sun" above them.
+        show(module(ModuleKey.Sun, 2))
+        compose.onNodeWithText("Sunrise", useUnmergedTree = true).assertIsDisplayed()
+        compose.onNodeWithText("Sun", useUnmergedTree = true).assertDoesNotExist()
+    }
+
+    @Test
+    fun theSunTileShowsANameTheUserChose() {
+        // The customize screen's rename box must not be a no-op for the sun.
+        show(module(ModuleKey.Sun, 2).copy(label = "Daylight"))
+        compose.onNodeWithText("Daylight", useUnmergedTree = true).assertIsDisplayed()
+    }
+
+    @Test
+    fun theSunTileKeepsItsCaptionWhenItHasNoTimesYet() {
+        // No location yet: a lone dash, so the caption is what names it.
+        show(module(ModuleKey.Sun, 2).copy(content = ModuleContent.Sun(emptyList(), ZoneId.systemDefault())))
+        compose.onNodeWithText("Sun", useUnmergedTree = true).assertIsDisplayed()
+    }
+
+    @Test
     fun aSingleCellTemperatureFitsInsideItsCell() {
         // The ask that started the lattice: the hero shrunk to one cell. The
         // value must land inside the cell in both directions — height is

@@ -637,13 +637,21 @@ private fun ModuleTile(
         }
     // A full-width tile drops its label — the content is big enough to speak
     // for itself, as the old hero did. The forecast draws its own header,
-    // with its toggle in it. And the sun never takes one: every size of it
-    // already says "Sunrise" and "Sunset", so a "Sun" above them only
-    // repeated the obvious (Evan, 2026-09-22).
+    // with its toggle in it. And the sun drops its DEFAULT caption while it
+    // has times to show: they already say "Sunrise" and "Sunset", so "Sun"
+    // above them only repeated the obvious (Evan, 2026-09-22). Two cases keep
+    // it (found in review): a name the user chose on the customize screen,
+    // which would otherwise be accepted and never shown; and the no-location
+    // state, where the tile is a lone dash and the label is all that says
+    // what it is — to the eye and to a screen reader.
+    val sunSpeaksForItself =
+        (module.content as? ModuleContent.Sun)?.let { sun ->
+            sun.days.isNotEmpty() && module.label == module.module.defaultLabel
+        } ?: false
     val showLabel =
         module.size.columns != ModuleSize.COLUMNS &&
             module.content !is ModuleContent.Forecast &&
-            module.content !is ModuleContent.Sun
+            !sunSpeaksForItself
     val size = module.size
     val min = module.module.minSize
     val handleColor = MaterialTheme.colorScheme.primary
