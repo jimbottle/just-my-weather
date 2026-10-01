@@ -84,13 +84,21 @@ class AlertWorker(
         outcome.toNotify.forEach { container.alertNotifier.notify(it.rule, it.decision, silent) }
         repository.setFiringIds(outcome.nowFiring)
         // Fire counts moved on, and a rule that just reached its limit is now
-        // off. Saved only when something changed, so a quiet tick never races
-        // an edit on the Alerts screen for no reason. A rule switching itself
+        // off. Applied as per-rule deltas inside one atomic update, never as a
+        // write-back of the list read before the fetch: that read is seconds
+        // stale by now, and saving it wholesale would resurrect a rule the user
+        // deleted meanwhile or drop one they added. A rule the user removed or
+        // switched off during the fetch is left alone. A rule switching itself
         // off is not re-synced with WorkManager from in here (cancelling the
         // periodic work from inside its own run is not worth the subtlety); the
         // next launch or edit re-syncs, and until then a poll with nothing
         // enabled returns at the top of doWork.
-        if (outcome.rules != rules) repository.save(outcome.rules)
+        val fired = outcome.toNotify.map { it.rule.id }.toSet()
+        if (fired.isNotEmpty()) {
+            repository.update { current ->
+                current.map { if (it.id in fired && it.enabled && !it.isSpent) it.afterFiring() else it }
+            }
+        }
         if (settings.safetyNotifications) notifySafetyAlerts(container, repository)
         return Result.success()
     }

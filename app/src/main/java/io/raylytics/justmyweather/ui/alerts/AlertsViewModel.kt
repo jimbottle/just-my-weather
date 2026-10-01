@@ -13,7 +13,6 @@ import io.raylytics.justmyweather.data.AlertRulesRepository
 import io.raylytics.justmyweather.data.AlertSettingsRepository
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.util.UUID
@@ -103,7 +102,7 @@ class AlertsViewModel(
         threshold: Double,
         window: AlertWindow = AlertWindow.NOW,
         limit: FireLimit = FireLimit.UNLIMITED,
-    ) = edit(check = true) {
+    ) = edit(activates = { _, _ -> true }) {
         it + AlertRule(UUID.randomUUID().toString(), subject, comparison, threshold, window = window, limit = limit)
     }
 
@@ -111,9 +110,15 @@ class AlertsViewModel(
     // skip the network check in that case. Switching a spent rule back on is
     // how it is re-armed, so the count starts over — otherwise it would be off
     // again at the next tick without ever notifying.
-    fun toggle(id: String) {
-        val enabling = rules.value.any { it.id == id && !it.enabled }
-        edit(check = enabling) { rules ->
+    fun toggle(id: String) =
+        edit(
+            // Decided from the list the transform actually saw, not the
+            // StateFlow: the worker may have just switched this rule off and
+            // the projection not caught up, and that re-arm must check now.
+            activates = { before, after ->
+                before.any { it.id == id && !it.enabled } && after.any { it.id == id && it.enabled }
+            },
+        ) { rules ->
             rules.map {
                 when {
                     it.id != id -> it
@@ -122,23 +127,32 @@ class AlertsViewModel(
                 }
             }
         }
-    }
 
     // Deleting can't make a rule fire, so no check needed.
-    fun delete(id: String) = edit(check = false) { rules -> rules.filterNot { it.id == id } }
+    fun delete(id: String) = edit { rules -> rules.filterNot { it.id == id } }
 
-    private fun edit(check: Boolean, transform: (List<AlertRule>) -> List<AlertRule>) {
+    /**
+     * Every edit is one atomic repository update: the background worker also
+     * writes this list (fire counts, a rule switching itself off), so a
+     * transform of the StateFlow's snapshot could silently undo its work.
+     * [activates] sees the before and after lists and says whether the change
+     * could make a rule newly fire, which is what warrants an immediate check.
+     */
+    private fun edit(
+        activates: (before: List<AlertRule>, after: List<AlertRule>) -> Boolean = { _, _ -> false },
+        transform: (List<AlertRule>) -> List<AlertRule>,
+    ) {
         viewModelScope.launch {
-            // Transform what is on disk, not the StateFlow's projection of it:
-            // the background worker also writes this list (fire counts, and a
-            // rule switching itself off), and an edit based on a stale snapshot
-            // would silently undo that.
-            val next = transform(repository.rules.first())
-            repository.save(next)
+            var before: List<AlertRule> = emptyList()
+            val next =
+                repository.update { current ->
+                    before = current
+                    transform(current)
+                }
             // Every edit re-syncs scheduling (add/enable starts it, removing the
             // last enabled rule stops it); only an activating change checks now.
             syncWork(next, settings.value)
-            if (check) onRuleActivated()
+            if (activates(before, next)) onRuleActivated()
         }
     }
 

@@ -27,6 +27,24 @@ class AlertRulesRepository(
         dataStore.edit { prefs -> prefs[RULES] = AlertRulesCodec.encode(rules) }
     }
 
+    /**
+     * Change the rule list atomically: decode, transform, and encode inside one
+     * DataStore edit, so the transform always sees the list as it is on disk at
+     * that instant. Both writers go through this — the Alerts screen and the
+     * background worker (fire counts, a rule switching itself off) — because a
+     * read-then-[save] from either side would let one overwrite the other: the
+     * worker's read-to-write window spans a network fetch, long enough for a
+     * rule deleted meanwhile to come back. Returns the list as saved.
+     */
+    suspend fun update(transform: (List<AlertRule>) -> List<AlertRule>): List<AlertRule> {
+        var result: List<AlertRule> = emptyList()
+        dataStore.edit { prefs ->
+            result = transform(AlertRulesCodec.decode(prefs[RULES]))
+            prefs[RULES] = AlertRulesCodec.encode(result)
+        }
+        return result
+    }
+
     suspend fun firingIds(): Set<String> = dataStore.data.first()[FIRING].orEmpty()
 
     /**
