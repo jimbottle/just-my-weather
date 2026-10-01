@@ -17,10 +17,11 @@ analytics, and no crash reporting. The developer never sees anything you do in
 the app.
 
 Everything you set up — which modules show, how they are arranged, your theme,
-your saved places, your alert rules — stays on your phone. The only data that
-leaves your device is the latitude and longitude of the place you are viewing,
-or that your alerts watch, sent to public weather services so the app can
-fetch the forecast.
+your saved places, your alert rules — stays on your phone (and in your own
+Android backup, if you use it). The only data the app itself sends off your
+device is the latitude and longitude of the place you are viewing, or that your
+alerts watch, sent to public weather services so the app can fetch the
+forecast.
 
 ## What the app accesses
 
@@ -61,7 +62,7 @@ All of the app's network traffic uses HTTPS.
 
 ## What stays on your phone
 
-The app stores the following on your device only, in its private app storage:
+The app stores the following on your device, in its private app storage:
 
 - your view configuration (modules, sizes, order, labels, density, theme);
 - your saved places and the last location the app used;
@@ -90,9 +91,10 @@ No notification service outside your device is involved.
 
 If you turn on "Send to Gadgetbridge" in Customize, the app shares the current
 weather, and the name of the place it is for, with the Gadgetbridge app
-installed on the same phone, which can relay it to a paired watch. This is a local hand-off between two apps on your device;
-Gadgetbridge's own privacy terms cover what it does from there. The option is
-off by default and only appears when Gadgetbridge is installed.
+installed on the same phone, which can relay it to a paired watch. This is a
+local hand-off between two apps on your device; Gadgetbridge's own privacy
+terms cover what it does from there. The option is off by default and only
+appears when Gadgetbridge is installed.
 
 ## Permissions
 
