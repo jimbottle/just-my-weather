@@ -18,8 +18,9 @@ INTERNET
   being viewed. No other hosts are contacted.
 
 ACCESS_NETWORK_STATE
-  Decide whether a fetch is worth attempting before making it, so an
-  offline phone shows the cached reading instead of a spinner.
+  Required by WorkManager's NetworkType.CONNECTED constraint on the alert
+  poll (AlertWorker), so the periodic check waits for connectivity instead
+  of failing offline. The app itself never queries ConnectivityManager.
 
 ACCESS_COARSE_LOCATION  (runtime, optional)
   Resolve the NWS grid point for where the user is. Coarse only; the app

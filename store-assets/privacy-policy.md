@@ -25,9 +25,15 @@ at, sent to public weather services so the app can fetch the forecast.
 
 **Your device's approximate location (optional).** If you grant the coarse
 location permission, the app reads your device's approximate position to show
-the weather where you are. It never requests precise (GPS-level) location and
-never reads location in the background on its own. You can decline the
-permission and pick a place by name instead.
+the weather where you are. It never requests precise (GPS-level) location. You
+can decline the permission and pick a place by name instead.
+
+Alert checks run in the background on the schedule you set. They watch the
+place you chose or, if you follow the device, the last position the app knew.
+On Android 9 and earlier that background check may also read your device's
+current approximate position to keep that up to date; on Android 10 and later
+the system does not give this app location in the background, so it uses the
+last position from when the app was open.
 
 **Places you choose.** You can search a list of about 32,000 US towns and
 cities that is bundled inside the app, or type coordinates. The search runs
@@ -96,7 +102,7 @@ off by default and only appears when Gadgetbridge is installed.
 - No advertising and no advertising ID.
 - No analytics, telemetry, or crash reporting.
 - No selling or sharing of personal information.
-- No precise location and no background location tracking.
+- No precise location, and no location history beyond the last position used.
 
 ## Open source
 

@@ -37,8 +37,26 @@ scripts/verify.sh
 
 NEW_VC="$(bash "$SCRIPT_DIR/bump-version-code.sh" | tail -n 1)"
 echo "==> versionCode bumped to $NEW_VC (versionName $(read_version_name))" >&2
+
+# From here the tree is dirty (the bump). A failure must say how to get back
+# to a state this script's own clean-tree guard will accept.
+uploaded=0
+on_fail() {
+  [ "$uploaded" = 1 ] && return
+  cat >&2 <<MSG
+
+!! release-internal.sh failed after bumping versionCode to $NEW_VC.
+   Nothing was uploaded, so the number is NOT burned:
+     git checkout app/build.gradle.kts        # undo the bump, fix, re-run
+   If upload-play.sh got as far as "uploaded: versionCode=$NEW_VC" before
+   failing, the number IS burned — commit the bump instead and re-run.
+MSG
+}
+trap 'on_fail' EXIT
 bash "$SCRIPT_DIR/bundle-release.sh"
 bash "$SCRIPT_DIR/upload-play.sh" --track internal ${forwarded_args[@]+"${forwarded_args[@]}"}
+uploaded=1
+trap - EXIT
 
 cat >&2 <<MSG
 

@@ -23,7 +23,11 @@ echo "==> Bundling signed release AAB (versionName $(read_version_name), version
 [ -f "$AAB_PATH" ] || die "bundle failed: $AAB_PATH was not produced"
 
 # Belt and braces: an unsigned bundle has no META-INF signature block.
-if ! unzip -l "$AAB_PATH" | grep -qE 'META-INF/.*\.(RSA|EC|DSA)$'; then
+# Capture the listing first: with pipefail on, `unzip | grep -q` can return
+# 141 when grep matches early and unzip gets SIGPIPE, which would read as
+# "not signed" on a correctly signed bundle.
+listing="$(unzip -l "$AAB_PATH")"
+if ! grep -qE 'META-INF/.*\.(RSA|EC|DSA)$' <<<"$listing"; then
   die "$AAB_PATH is NOT signed: check app/keystore.properties (storeFile, storePassword, keyAlias, keyPassword)."
 fi
 

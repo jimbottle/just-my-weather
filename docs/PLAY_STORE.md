@@ -69,6 +69,13 @@ uploaded through the console. Upload the first AAB by hand: Testing →
 Internal testing → Create release → drop `app-release.aab`. Every upload
 after that can go through the scripts.
 
+**Until the first production release is live, the API only accepts
+`draft` releases on every track** ("Only releases with status draft may be
+created on draft app"). Scripted uploads in that window need
+`upload-play.sh --status draft` (so `release-internal.sh`, which uploads as
+completed, is for after launch) and the draft is rolled out from the console.
+A rejected upload still burns its versionCode.
+
 ### 6. Service account for scripted uploads (after the first manual upload)
 
 1. Cloud Console → IAM & Admin → Service Accounts → create "just-my-weather

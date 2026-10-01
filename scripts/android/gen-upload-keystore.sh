@@ -29,11 +29,22 @@ if [ -z "${KEYSTORE_PASSWORD:-}" ]; then
   read -rs KEYSTORE_PASSWORD; echo >&2
 fi
 [ "${#KEYSTORE_PASSWORD}" -ge 6 ] || die "password must be at least 6 characters."
+# keystore.properties is a Java .properties file: a backslash escapes, leading
+# whitespace is stripped, and a trailing space is invisible — any of those
+# would store a password that does not match the keystore, and signing would
+# fail months later. Refuse rather than escape.
+case "$KEYSTORE_PASSWORD" in
+  *\\*) die "password must not contain a backslash (Java .properties escape character)." ;;
+  [[:space:]]*|*[[:space:]]) die "password must not start or end with whitespace." ;;
+esac
 
+# -storepass:env keeps the password out of argv, where any local process
+# could read it from the process table while keytool runs.
+export KEYSTORE_PASSWORD
 keytool -genkeypair -v \
   -keystore "$KEYSTORE" -storetype PKCS12 \
   -alias "$ALIAS" -keyalg RSA -keysize 4096 -validity 10000 \
-  -storepass "$KEYSTORE_PASSWORD" -keypass "$KEYSTORE_PASSWORD" \
+  -storepass:env KEYSTORE_PASSWORD -keypass:env KEYSTORE_PASSWORD \
   -dname "CN=Just My Weather, O=Raylytics LLC, L=Louisville, ST=Kentucky, C=US"
 
 umask 077
