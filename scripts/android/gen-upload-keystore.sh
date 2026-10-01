@@ -30,13 +30,17 @@ if [ -z "${KEYSTORE_PASSWORD:-}" ]; then
 fi
 [ "${#KEYSTORE_PASSWORD}" -ge 6 ] || die "password must be at least 6 characters."
 # keystore.properties is a Java .properties file: a backslash escapes, leading
-# whitespace is stripped, and a trailing space is invisible — any of those
-# would store a password that does not match the keystore, and signing would
-# fail months later. Refuse rather than escape.
+# whitespace is stripped, a trailing space is invisible, and Gradle reads it
+# as ISO-8859-1 while this shell writes UTF-8 — any of those would store a
+# password that does not match the keystore, and signing would fail months
+# later. Refuse rather than escape: printable ASCII only.
 case "$KEYSTORE_PASSWORD" in
   *\\*) die "password must not contain a backslash (Java .properties escape character)." ;;
   [[:space:]]*|*[[:space:]]) die "password must not start or end with whitespace." ;;
 esac
+if printf '%s' "$KEYSTORE_PASSWORD" | LC_ALL=C grep -q '[^ -~]'; then
+  die "password must be printable ASCII: Gradle reads keystore.properties as ISO-8859-1."
+fi
 
 # -storepass:env keeps the password out of argv, where any local process
 # could read it from the process table while keytool runs.

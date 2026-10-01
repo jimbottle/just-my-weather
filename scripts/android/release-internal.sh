@@ -8,8 +8,11 @@
 #   5. upload-play --track internal   — live for testers in minutes, no review
 #
 # Afterwards: commit the versionCode bump and log the cut in docs/RELEASES.md.
-# Only --notes is accepted; anything else (a different track, an explicit
-# AAB) contradicts the intent of this script — run upload-play.sh directly.
+# Only --notes and --status are accepted; anything else (a different track,
+# an explicit AAB) contradicts the intent of this script — run upload-play.sh
+# directly. Before the app's first production release Play accepts only
+# draft releases, so until launch run this with `--status draft` and roll
+# the draft out from the console (docs/PLAY_STORE.md).
 #
 # Agents: CLAUDE.md "Release confirmation gate" — every run needs Evan's
 # go-ahead for THIS upload, in the current exchange.
@@ -23,7 +26,9 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --notes) shift; [ $# -gt 0 ] || die "--notes requires a value"; forwarded_args+=(--notes "$1"); shift ;;
     --notes=*) forwarded_args+=("$1"); shift ;;
-    *) die "release-internal.sh only accepts --notes <text>. For other tracks or AAB paths, run upload-play.sh directly." ;;
+    --status) shift; [ $# -gt 0 ] || die "--status requires draft or completed"; forwarded_args+=(--status "$1"); shift ;;
+    --status=*) forwarded_args+=("$1"); shift ;;
+    *) die "release-internal.sh only accepts --notes <text> and --status draft|completed. For other tracks or AAB paths, run upload-play.sh directly." ;;
   esac
 done
 
@@ -46,10 +51,13 @@ on_fail() {
   cat >&2 <<MSG
 
 !! release-internal.sh failed after bumping versionCode to $NEW_VC.
-   Nothing was uploaded, so the number is NOT burned:
-     git checkout app/build.gradle.kts        # undo the bump, fix, re-run
-   If upload-play.sh got as far as "uploaded: versionCode=$NEW_VC" before
-   failing, the number IS burned — commit the bump instead and re-run.
+   Look at the output above:
+   - If it shows "uploaded: versionCode=$NEW_VC", the number is BURNED even
+     though the release failed: commit the bump, then re-run (a fresh bump).
+   - Otherwise nothing reached Play: git checkout app/build.gradle.kts
+     to undo the bump, fix the cause, and re-run.
+   A "draft app" rejection means the app has never been published: re-run
+   with --status draft and roll the draft out from Play Console.
 MSG
 }
 trap 'on_fail' EXIT

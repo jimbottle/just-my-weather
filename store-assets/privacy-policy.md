@@ -18,8 +18,9 @@ the app.
 
 Everything you set up — which modules show, how they are arranged, your theme,
 your saved places, your alert rules — stays on your phone. The only data that
-leaves your device is the latitude and longitude of the place you are looking
-at, sent to public weather services so the app can fetch the forecast.
+leaves your device is the latitude and longitude of the place you are viewing,
+or that your alerts watch, sent to public weather services so the app can
+fetch the forecast.
 
 ## What the app accesses
 
@@ -64,7 +65,11 @@ The app stores the following on your device only, in its private app storage:
 - your view configuration (modules, sizes, order, labels, density, theme);
 - your saved places and the last location the app used;
 - your alert rules, whether each has fired, and your quiet-hours setting;
-- a short-lived cache of the most recent weather so the app opens instantly.
+- a short-lived cache of the most recent weather so the app opens instantly;
+- a small cache of up to 32 recently used approximate areas (coordinates
+  rounded to about 1 km) with the weather-station grid each one maps to, so
+  that lookup is not repeated. Entries are replaced oldest-first and leave
+  with the rest of the app's data.
 
 Clearing the app's data in Android settings, or uninstalling the app, deletes
 all of it. If you use Android's device backup, Android may include the app's
@@ -73,9 +78,11 @@ no access to that backup.
 
 ## Notifications
 
-Personal alerts are evaluated on your phone, by the app, against the forecast
-it already fetched. Notifications are generated and delivered locally. No
-notification service outside your device is involved.
+When you have alert rules (or safety alerts) turned on, the app periodically
+fetches the current conditions, forecast, and active NWS alerts for the place
+your alerts watch, in the background on the schedule you chose, and evaluates
+your rules on your phone. Notifications are generated and delivered locally.
+No notification service outside your device is involved.
 
 ## Optional watch hand-off
 
@@ -102,7 +109,8 @@ off by default and only appears when Gadgetbridge is installed.
 - No advertising and no advertising ID.
 - No analytics, telemetry, or crash reporting.
 - No selling or sharing of personal information.
-- No precise location, and no location history beyond the last position used.
+- No precise location. The only positions kept are the ones listed above, and
+  they never leave your phone.
 
 ## Open source
 
