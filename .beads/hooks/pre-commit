@@ -1,4 +1,10 @@
 #!/usr/bin/env sh
+# --- BEGIN PROJECT GATE ---
+# git runs THIS file (core.hooksPath=.beads/hooks), not .git/hooks/pre-commit,
+# so the tracked project gate is invoked from here. Keep this block above the
+# beads block: bd regenerates only what sits between its own markers.
+_root=$(git rev-parse --show-toplevel) && sh "$_root/scripts/hooks/pre-commit" "$@" || exit $?
+# --- END PROJECT GATE ---
 # --- BEGIN BEADS INTEGRATION v1.0.4 ---
 # This section is managed by beads. Do not remove these markers.
 if command -v bd >/dev/null 2>&1; then

@@ -26,28 +26,21 @@ bd close <id>         # Complete work
 
 ## Session Completion
 
-**When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until `git push` succeeds.
+When ending a work session:
 
-**MANDATORY WORKFLOW:**
+1. **File issues for remaining work** — `wyk create` an issue for anything
+   that needs follow-up
+2. **Run quality gates** (if code changed) — `scripts/verify.sh`
+3. **Update issue status** — close finished work, update in-progress items
+4. **Commit everything** — no work left uncommitted
+5. **Hand off** — update `.claude/state/QUEUE.md` with context for the next
+   session
 
-1. **File issues for remaining work** - Create issues for anything that needs follow-up
-2. **Run quality gates** (if code changed) - Tests, linters, builds
-3. **Update issue status** - Close finished work, update in-progress items
-4. **PUSH TO REMOTE** - This is MANDATORY:
-   ```bash
-   git pull --rebase
-   git push
-   git status  # MUST show "up to date with origin"
-   ```
-5. **Clean up** - Clear stashes, prune remote branches
-6. **Verify** - All changes committed AND pushed
-7. **Hand off** - Provide context for next session
+Pushing follows the "Commit cadence" rule below: **confirm with the user
+before pushing** — local commits are the completion bar for a session, not
+`git push`. Never clear stashes or prune branches you didn't create; that
+state may be someone else's WIP.
 
-**CRITICAL RULES:**
-- Work is NOT complete until `git push` succeeds
-- NEVER stop before pushing - that leaves work stranded locally
-- NEVER say "ready to push when you are" - YOU must push
-- If push fails, resolve and retry until it succeeds
 <!-- END BEADS INTEGRATION -->
 
 
@@ -72,11 +65,100 @@ scripts/verify.sh                   # the whole JVM gate; --fix formats first
 ./gradlew :app:ktlintCheck          # style gate
 ./gradlew :app:ktlintFormat         # auto-fix style
 ./gradlew :app:assembleDebug        # build the debug APK
-scripts/hooks/install.sh            # install the pre-commit gate (test + ktlint)
+scripts/hooks/install.sh            # verify/install the pre-commit gate wiring
+scripts/android/release-internal.sh # cut + upload a Play internal build (needs approval)
 ```
 
 The pre-commit hook runs `:app:testDebugUnitTest :app:ktlintCheck` on any
-Kotlin/resource change. Bypass with `--no-verify` only in emergencies.
+Kotlin/resource change (see "The pre-commit gate" below for how it is wired
+under bd's `core.hooksPath`). Bypass with `--no-verify` only in emergencies.
+
+## Commit cadence
+
+Commit after any significant change rather than batching unrelated work into
+one big commit. "Significant" means: a working bug fix, a completed refactor,
+a feature in a shippable state, or a doc/process change. One logical concern
+per commit, with a message that explains **why**. The pre-commit gate runs
+unit tests + ktlint on every Kotlin/resource commit, so each commit is
+runnable.
+
+**Don't push without explicit user approval, even when committing
+autonomously.** Local commits are cheap to rewrite; pushed ones are not.
+
+This section is the single authoritative push policy. If any bd-generated
+guidance says otherwise — the managed "Beads Issue Tracker" block above
+(which bd may regenerate) or `bd prime` hook output — this section wins. The
+repo sets `no-git-ops: true` in `.beads/config.yaml` so `bd prime` omits git
+commands from its session-close protocol; don't unset it. (Adopted
+2026-10-01 from open-frame, where it has worked well.)
+
+## The pre-commit gate
+
+`scripts/hooks/pre-commit` is the tracked gate (unit tests + ktlint +
+instrumented-test compile on any staged `.kt/.kts/.xml/.pro/.properties`;
+docs-only commits skip it). **bd sets `core.hooksPath` to `.beads/hooks`**, so
+git never reads `.git/hooks/` — the old symlink there ran nothing. The gate is
+therefore *called* from the tracked `.beads/hooks/pre-commit`, in a
+`PROJECT GATE` block above bd's own markers (bd regenerates only what sits
+between its markers). `scripts/hooks/install.sh` verifies that wiring, or
+installs the symlink on a clone that has no `core.hooksPath`.
+
+- The hook runs against the **working tree**, not the staged snapshot: stage
+  everything you intend to ship, or stash the noise first.
+- Bypass in emergencies only: `git commit --no-verify`.
+- Not in the hook: Maestro flows (CI's `ui` job) and anything needing a
+  device.
+
+## Release confirmation gate (agents)
+
+Uploading ANY build to Google Play — internal track included — requires
+Evan's explicit confirmation or direct request for **that specific upload**,
+given in the current exchange. A prior "release to internal" does NOT carry
+forward: a same-day respin needs its own go-ahead. When a fix is ready, stop
+and ask; "proceed" on a bug fix is not approval to ship it. The release
+scripts (`scripts/android/release-internal.sh`, `upload-play.sh`,
+`promote-play.sh`) are the only things that upload; `bundleRelease` alone is
+local and safe.
+
+## Play Store Releases
+
+See `docs/PLAY_STORE.md` for the bootstrap, console quirks, and signing;
+`store-assets/play-store-listing.md` for every console field;
+`docs/RELEASES.md` for the per-version log.
+
+### Versioning
+
+- **`versionName`** (semver, human-facing) and **`versionCode`** (integer,
+  Play-facing) both live in `app/build.gradle.kts`.
+- `versionCode` must increase on **every upload** to Play, failed and
+  internal ones included. Play rejects a reused number; gaps are fine.
+  `scripts/android/bump-version-code.sh` bumps by one.
+- **A released `versionName` is FROZEN.** Once a version reaches production
+  the next change of any kind gets a new one. Builds for testing carry the
+  version they *will be promoted as* — bump `versionName` first, then let
+  `versionCode` tick underneath it. A `versionCode` bump alone is not a
+  substitute when behaviour changed.
+- Log every cut (versionCode, date, track) in `docs/RELEASES.md`.
+
+### Release procedure (day-to-day)
+
+```bash
+# One-time per machine: docs/PLAY_STORE.md "Bootstrap"
+cp play.properties.example play.properties         # service-account key path
+scripts/android/preflight-play.sh                  # auth + permissions, no side effects
+
+# Cut: refuses a dirty tree, runs scripts/verify.sh, bumps versionCode,
+# builds a SIGNED AAB, uploads to the internal track (no Play review).
+scripts/android/release-internal.sh --notes "What testers will see"
+git commit app/build.gradle.kts -m "release: versionCode N to internal"
+
+# Promote the tested build (a track move, not a re-upload):
+scripts/android/promote-play.sh [--rollout 0.2]
+```
+
+CI's `ui` job (Maestro on API 35) must be green on the commit being cut; the
+orchestrator does not run the flows itself. The very first upload is manual
+(Play's API refuses an app with no prior console upload).
 
 ## Devices & background processes — leave the machine as you found it
 

@@ -53,3 +53,6 @@
 # Secret keys (stored in this file but prefer env vars to avoid git exposure):
 # - linear.api_key  → use LINEAR_API_KEY env var instead
 # - github.token    → use GITHUB_TOKEN env var instead
+# Keep bd prime from telling agents to push at session close; CLAUDE.md
+# "Commit cadence" is the push policy (push only with explicit approval).
+no-git-ops: true

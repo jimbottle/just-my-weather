@@ -15,10 +15,13 @@ captures/
 /build/
 **/build/
 
-# Keystores
+# Keystores and Play credentials — bearer secrets, never committed.
 *.keystore
 !debug.keystore
 keystore.properties
+play.properties
+**/play-service-account.json
+**/*service-account*.json
 
 # Test/coverage artefacts
 /coverage

@@ -2,6 +2,12 @@
 
 This project uses **bd** (beads) for issue tracking. Run `bd prime` for full workflow context.
 
+Issue-tracking boilerplate below is bd-managed (bd may regenerate it) — where
+it conflicts with CLAUDE.md, CLAUDE.md wins. In particular, pushing follows
+CLAUDE.md's "Commit cadence" rule: confirm with the user before `git push`;
+local commits are the session completion bar. File new issues with
+`wyk create`, never raw bd.
+
 > **Architecture in one line:** Issues live in a local Dolt database
 > (`.beads/dolt/`); cross-machine sync uses `bd dolt push/pull` (a
 > git-compatible protocol), stored under `refs/dolt/data` on your git
