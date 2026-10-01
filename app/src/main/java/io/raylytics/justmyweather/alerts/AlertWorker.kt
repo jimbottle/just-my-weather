@@ -83,6 +83,14 @@ class AlertWorker(
         val silent = settings.isQuietAt(now.atZone(zone).hour)
         outcome.toNotify.forEach { container.alertNotifier.notify(it.rule, it.decision, silent) }
         repository.setFiringIds(outcome.nowFiring)
+        // Fire counts moved on, and a rule that just reached its limit is now
+        // off. Saved only when something changed, so a quiet tick never races
+        // an edit on the Alerts screen for no reason. A rule switching itself
+        // off is not re-synced with WorkManager from in here (cancelling the
+        // periodic work from inside its own run is not worth the subtlety); the
+        // next launch or edit re-syncs, and until then a poll with nothing
+        // enabled returns at the top of doWork.
+        if (outcome.rules != rules) repository.save(outcome.rules)
         if (settings.safetyNotifications) notifySafetyAlerts(container, repository)
         return Result.success()
     }

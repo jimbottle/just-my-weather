@@ -42,8 +42,9 @@ Pre-1.0, but the core product is in place:
   a two-day table, narrower condenses to today's pair
 - ✅ Personal rule-based alerting — thresholds on current conditions *and* the
   forecast ("overnight low below 35°", "chance of rain above 50% within 12h"),
-  quiet by default, fires once per onset, with optional quiet hours and a
-  configurable polling cadence
+  quiet by default, fires once per onset, with a per-rule limit (once, up to
+  99 times, or every time), optional quiet hours, and a configurable polling
+  cadence
 - ✅ Saved places — search bundled US towns and cities offline, or enter
   coordinates; a chosen place drives the glance and the alert poll alike
 - ⏳ Custom quiet-hours window, per-rule tone/snooze

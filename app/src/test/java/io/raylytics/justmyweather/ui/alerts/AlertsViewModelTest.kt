@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.emptyPreferences
 import io.raylytics.justmyweather.alerts.AlertRule
 import io.raylytics.justmyweather.alerts.AlertSubject
 import io.raylytics.justmyweather.alerts.Comparison
+import io.raylytics.justmyweather.alerts.FireLimit
 import io.raylytics.justmyweather.data.AlertRulesRepository
 import io.raylytics.justmyweather.data.AlertSettingsRepository
 import io.raylytics.justmyweather.view.WeatherField
@@ -13,6 +14,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -71,6 +73,47 @@ class AlertsViewModelTest {
 
         assertTrue(changes.last()) // an enabled rule means the worker must run
         assertEquals(1, checks) // adding a rule can newly fire → check now
+    }
+
+    @Test
+    fun `switching a spent rule back on re-arms it with a fresh count`() = runTest(dispatcher) {
+        val repository = AlertRulesRepository(FakePreferencesDataStore())
+        val spent =
+            AlertRule("a", temp, Comparison.BELOW, 40.0, enabled = false, limit = FireLimit.times(2), firedCount = 2)
+        repository.save(listOf(spent))
+        var checks = 0
+        val vm =
+            AlertsViewModel(
+                repository,
+                AlertSettingsRepository(FakePreferencesDataStore()),
+                onRuleActivated = { checks++ },
+            )
+        val collector = launch { vm.rules.collect {} }
+        advanceUntilIdle()
+
+        vm.toggle("a")
+        advanceUntilIdle()
+
+        val saved = repository.rules.first().single()
+        assertTrue(saved.enabled)
+        assertEquals(0, saved.firedCount)
+        assertEquals(FireLimit.times(2), saved.limit) // the limit itself is kept
+        assertEquals(1, checks) // re-arming can newly fire → check now
+        collector.cancel()
+    }
+
+    @Test
+    fun `a rule is added with the limit the builder chose`() = runTest(dispatcher) {
+        val repository = AlertRulesRepository(FakePreferencesDataStore())
+        val vm = AlertsViewModel(repository, AlertSettingsRepository(FakePreferencesDataStore()))
+        val collector = launch { vm.rules.collect {} }
+        advanceUntilIdle()
+
+        vm.add(temp, Comparison.BELOW, 40.0, limit = FireLimit.ONCE)
+        advanceUntilIdle()
+
+        assertEquals(FireLimit.ONCE, repository.rules.first().single().limit)
+        collector.cancel()
     }
 
     @Test

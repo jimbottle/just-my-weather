@@ -16,6 +16,8 @@ class AlertRulesCodecTest {
                 AlertRule("b", wind, Comparison.ABOVE, 20.0, enabled = false),
                 AlertRule("c", temp, Comparison.BELOW, 35.0, window = AlertWindow.OVERNIGHT),
                 AlertRule("d", AlertSubject.PrecipChance, Comparison.ABOVE, 50.0, window = AlertWindow.NEXT_12H),
+                AlertRule("e", temp, Comparison.BELOW, 32.0, limit = FireLimit.ONCE, firedCount = 1, enabled = false),
+                AlertRule("f", temp, Comparison.BELOW, 32.0, limit = FireLimit.times(5), firedCount = 2),
             )
         assertEquals(rules, AlertRulesCodec.decode(AlertRulesCodec.encode(rules)))
     }
@@ -26,6 +28,22 @@ class AlertRulesCodecTest {
         val raw = """[{"id":"a","field":"temperature","comparison":"below","threshold":32.0,"enabled":true}]"""
         val rules = AlertRulesCodec.decode(raw)
         assertEquals(AlertWindow.NOW, rules.single().window)
+    }
+
+    @Test
+    fun `a rule stored before fire limits existed decodes as unlimited with no firings`() {
+        val raw = """[{"id":"a","field":"temperature","comparison":"below","threshold":32.0,"window":"now"}]"""
+        val rule = AlertRulesCodec.decode(raw).single()
+        assertEquals(FireLimit.UNLIMITED, rule.limit)
+        assertEquals(0, rule.firedCount)
+    }
+
+    @Test
+    fun `an out-of-range stored limit reads as unlimited rather than dropping the rule`() {
+        val raw = """[{"id":"a","field":"temperature","comparison":"below","threshold":32.0,"limit":250,"fired":-4}]"""
+        val rule = AlertRulesCodec.decode(raw).single()
+        assertEquals(FireLimit.UNLIMITED, rule.limit)
+        assertEquals(0, rule.firedCount)
     }
 
     @Test

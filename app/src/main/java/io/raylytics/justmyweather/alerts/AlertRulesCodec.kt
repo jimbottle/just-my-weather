@@ -26,6 +26,10 @@ object AlertRulesCodec {
         // Defaulted so rules written before forecast windows existed decode as
         // NOW rules rather than being dropped.
         val window: String = AlertWindow.NOW.key,
+        // 0 = unlimited. Defaulted so rules saved before fire limits existed
+        // keep firing every time, which is what they always did.
+        val limit: Int = 0,
+        val fired: Int = 0,
     )
 
     private val json = Json { ignoreUnknownKeys = true }
@@ -33,7 +37,16 @@ object AlertRulesCodec {
     fun encode(rules: List<AlertRule>): String =
         json.encodeToString(
             rules.map {
-                StoredRule(it.id, it.subject.key, it.comparison.key, it.threshold, it.enabled, it.window.key)
+                StoredRule(
+                    it.id,
+                    it.subject.key,
+                    it.comparison.key,
+                    it.threshold,
+                    it.enabled,
+                    it.window.key,
+                    it.limit.stored,
+                    it.firedCount,
+                )
             },
         )
 
@@ -46,7 +59,16 @@ object AlertRulesCodec {
             val comparison = Comparison.byKey(s.comparison) ?: return@mapNotNull null
             // An unknown window key falls back to NOW rather than dropping the rule.
             val window = AlertWindow.byKey(s.window) ?: AlertWindow.NOW
-            AlertRule(s.id, subject, comparison, s.threshold, s.enabled, window)
+            AlertRule(
+                s.id,
+                subject,
+                comparison,
+                s.threshold,
+                s.enabled,
+                window,
+                FireLimit.fromStored(s.limit),
+                s.fired.coerceAtLeast(0),
+            )
         }
     }
 }

@@ -3,6 +3,7 @@ package io.raylytics.justmyweather.alerts
 import io.raylytics.justmyweather.data.WeatherSnapshot
 import io.raylytics.justmyweather.view.WeatherField
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import java.time.Instant
@@ -62,6 +63,57 @@ class AlertTransitionsTest {
             AlertTransitions.compute(listOf(disabled), context(temp = 35.0), previouslyFiring = setOf("cold"))
         assertTrue(outcome.toNotify.isEmpty())
         assertTrue(outcome.nowFiring.isEmpty()) // dropped, so re-enabling later re-notifies
+    }
+
+    @Test
+    fun `an unlimited rule returns unchanged apart from its count`() {
+        val outcome = AlertTransitions.compute(listOf(cold), context(temp = 35.0), previouslyFiring = emptySet())
+        assertEquals(listOf(cold.copy(firedCount = 1)), outcome.rules)
+    }
+
+    @Test
+    fun `a once rule fires, switches itself off, and leaves the firing set`() {
+        val once = cold.copy(limit = FireLimit.ONCE)
+        val outcome = AlertTransitions.compute(listOf(once), context(temp = 35.0), previouslyFiring = emptySet())
+        assertEquals(listOf("cold"), outcome.toNotify.map { it.rule.id })
+        val saved = outcome.rules.single()
+        assertFalse(saved.enabled)
+        assertEquals(1, saved.firedCount)
+        // Off means off: not in the firing set, so a later re-enable can notify.
+        assertTrue(outcome.nowFiring.isEmpty())
+    }
+
+    @Test
+    fun `an up-to rule keeps notifying per onset until the limit, then stops`() {
+        val twice = cold.copy(limit = FireLimit.times(2))
+        // Onset 1.
+        val first = AlertTransitions.compute(listOf(twice), context(temp = 35.0), previouslyFiring = emptySet())
+        assertEquals(1, first.toNotify.size)
+        val afterFirst = first.rules.single()
+        assertTrue(afterFirst.enabled)
+        assertEquals(setOf("cold"), first.nowFiring)
+        // Still cold: no second notification, count unchanged.
+        val held =
+            AlertTransitions.compute(listOf(afterFirst), context(temp = 35.0), previouslyFiring = first.nowFiring)
+        assertTrue(held.toNotify.isEmpty())
+        assertEquals(afterFirst, held.rules.single())
+        // Warms up, then a second onset: the last allowed firing switches it off.
+        val warm =
+            AlertTransitions.compute(listOf(afterFirst), context(temp = 50.0), previouslyFiring = held.nowFiring)
+        val second =
+            AlertTransitions.compute(listOf(afterFirst), context(temp = 35.0), previouslyFiring = warm.nowFiring)
+        assertEquals(1, second.toNotify.size)
+        assertFalse(second.rules.single().enabled)
+        assertEquals(2, second.rules.single().firedCount)
+    }
+
+    @Test
+    fun `a spent rule that is somehow still enabled is ignored`() {
+        val spent = cold.copy(limit = FireLimit.ONCE, firedCount = 1)
+        val outcome = AlertTransitions.compute(listOf(spent), context(temp = 35.0), previouslyFiring = emptySet())
+        assertTrue(outcome.toNotify.isEmpty())
+        assertTrue(outcome.nowFiring.isEmpty())
+        assertEquals(listOf(spent), outcome.rules)
     }
 
     @Test

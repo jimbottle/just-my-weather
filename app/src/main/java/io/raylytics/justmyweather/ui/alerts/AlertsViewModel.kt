@@ -8,10 +8,12 @@ import io.raylytics.justmyweather.alerts.AlertSettings
 import io.raylytics.justmyweather.alerts.AlertSubject
 import io.raylytics.justmyweather.alerts.AlertWindow
 import io.raylytics.justmyweather.alerts.Comparison
+import io.raylytics.justmyweather.alerts.FireLimit
 import io.raylytics.justmyweather.data.AlertRulesRepository
 import io.raylytics.justmyweather.data.AlertSettingsRepository
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.util.UUID
@@ -100,15 +102,26 @@ class AlertsViewModel(
         comparison: Comparison,
         threshold: Double,
         window: AlertWindow = AlertWindow.NOW,
+        limit: FireLimit = FireLimit.UNLIMITED,
     ) = edit(check = true) {
-        it + AlertRule(UUID.randomUUID().toString(), subject, comparison, threshold, window = window)
+        it + AlertRule(UUID.randomUUID().toString(), subject, comparison, threshold, window = window, limit = limit)
     }
 
     // Only an *enable* can make a rule newly fire; disabling just drops it, so
-    // skip the network check in that case.
+    // skip the network check in that case. Switching a spent rule back on is
+    // how it is re-armed, so the count starts over — otherwise it would be off
+    // again at the next tick without ever notifying.
     fun toggle(id: String) {
         val enabling = rules.value.any { it.id == id && !it.enabled }
-        edit(check = enabling) { rules -> rules.map { if (it.id == id) it.copy(enabled = !it.enabled) else it } }
+        edit(check = enabling) { rules ->
+            rules.map {
+                when {
+                    it.id != id -> it
+                    it.enabled -> it.copy(enabled = false)
+                    else -> it.copy(enabled = true, firedCount = if (it.isSpent) 0 else it.firedCount)
+                }
+            }
+        }
     }
 
     // Deleting can't make a rule fire, so no check needed.
@@ -116,7 +129,11 @@ class AlertsViewModel(
 
     private fun edit(check: Boolean, transform: (List<AlertRule>) -> List<AlertRule>) {
         viewModelScope.launch {
-            val next = transform(rules.value)
+            // Transform what is on disk, not the StateFlow's projection of it:
+            // the background worker also writes this list (fire counts, and a
+            // rule switching itself off), and an edit based on a stale snapshot
+            // would silently undo that.
+            val next = transform(repository.rules.first())
             repository.save(next)
             // Every edit re-syncs scheduling (add/enable starts it, removing the
             // last enabled rule stops it); only an activating change checks now.

@@ -36,6 +36,11 @@ data class AlertRule(
     val threshold: Double,
     val enabled: Boolean = true,
     val window: AlertWindow = AlertWindow.NOW,
+    /** How many times this rule may fire before switching itself off. */
+    val limit: FireLimit = FireLimit.UNLIMITED,
+    /** Notifications sent so far under the current [limit]. Reset to zero when
+     * a spent rule is switched back on. Meaningless for an unlimited rule. */
+    val firedCount: Int = 0,
 ) {
     /** A plain-language description for the rule list: "Temperature above 75°",
      * or "Chance of rain above 50% within 12 hours" for a forecast window. */
@@ -44,4 +49,30 @@ data class AlertRule(
             val core = "${subject.label} ${comparison.word} ${subject.format(threshold)}"
             return if (window.isForecast) "$core ${window.phrase}" else core
         }
+
+    /** True once the rule has fired as many times as its [limit] allows. */
+    val isSpent: Boolean
+        get() = limit.times?.let { firedCount >= it } == true
+
+    /** The second line of the rule row: the limit and how far along it is. */
+    val limitSummary: String
+        get() {
+            val times = limit.times ?: return limit.label
+            return when {
+                isSpent -> "Done · fired $times of $times"
+                times == 1 -> limit.label
+                else -> "${limit.label} · fired $firedCount so far"
+            }
+        }
+
+    /**
+     * The rule after one notification: the count moves on, and a rule that has
+     * just reached its limit switches itself off. Off, not merely quiet, so the
+     * list shows it as done, the worker stops polling for it like any other
+     * disabled rule, and the toggle is the one obvious way to arm it again.
+     */
+    fun afterFiring(): AlertRule {
+        val next = copy(firedCount = firedCount + 1)
+        return if (next.isSpent) next.copy(enabled = false) else next
+    }
 }

@@ -39,7 +39,9 @@ the upload keystore, and the console app entry (see the tracked epic).
   forecast tiles (hourly, daily 1–7 days from NWS, 8–14 from Open-Meteo);
   saved places with the bundled Census gazetteer; tap-for-details; sun
   module; Gadgetbridge hand-off; safety-alert opt-in; configurable alert
-  cadence and quiet hours.
+  cadence and quiet hours; per-rule fire limit (once, up to 99 times, or
+  every time) — a rule that reaches its limit switches itself off and the
+  toggle re-arms it (just-my-weather-8di).
 - Internal: Play release tooling under `scripts/android/`, `store-assets/`,
   this file.
 

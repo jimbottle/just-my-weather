@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -46,6 +47,7 @@ import io.raylytics.justmyweather.alerts.AlertSettings
 import io.raylytics.justmyweather.alerts.AlertSubject
 import io.raylytics.justmyweather.alerts.AlertWindow
 import io.raylytics.justmyweather.alerts.Comparison
+import io.raylytics.justmyweather.alerts.FireLimit
 import java.util.Locale
 
 /**
@@ -59,7 +61,7 @@ import java.util.Locale
 fun AlertsScreen(
     rules: List<AlertRule>,
     settings: AlertSettings,
-    onAdd: (AlertSubject, Comparison, Double, AlertWindow) -> Unit,
+    onAdd: (AlertSubject, Comparison, Double, AlertWindow, FireLimit) -> Unit,
     onToggle: (String) -> Unit,
     onDelete: (String) -> Unit,
     onSetQuietHours: (Boolean) -> Unit,
@@ -362,17 +364,26 @@ private fun RuleRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text(
-            text = rule.summary,
-            style = MaterialTheme.typography.bodyMedium,
-            color =
-                if (rule.enabled) {
-                    MaterialTheme.colorScheme.onBackground
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                },
-            modifier = Modifier.weight(1f),
-        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = rule.summary,
+                style = MaterialTheme.typography.bodyMedium,
+                color =
+                    if (rule.enabled) {
+                        MaterialTheme.colorScheme.onBackground
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+            )
+            // How often it may fire, and where it stands. A spent rule reads
+            // "Done" here with its switch off — flipping the switch re-arms it.
+            Text(
+                text = rule.limitSummary,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.testTag("ruleLimit"),
+            )
+        }
         TextButton(
             onClick = onDelete,
             modifier = Modifier.testTag("removeRule"),
@@ -385,15 +396,31 @@ private fun RuleRow(
     }
 }
 
+/** The three ways to answer "how many times?" in the builder. */
+private enum class LimitChoice(val label: String) {
+    EVERY_TIME("Every time"),
+    ONCE("Once"),
+    UP_TO("Up to…"),
+}
+
 @Composable
 private fun AddRuleForm(
-    onAdd: (AlertSubject, Comparison, Double, AlertWindow) -> Unit,
+    onAdd: (AlertSubject, Comparison, Double, AlertWindow, FireLimit) -> Unit,
 ) {
     var window by remember { mutableStateOf(AlertWindow.NOW) }
     var subject by remember { mutableStateOf(AlertSubject.current.first()) }
     var comparison by remember { mutableStateOf(Comparison.BELOW) }
     var thresholdText by remember { mutableStateOf("") }
     val threshold = thresholdText.toDoubleOrNull()
+    var limitChoice by remember { mutableStateOf(LimitChoice.EVERY_TIME) }
+    var limitText by remember { mutableStateOf("") }
+    // Only "Up to…" needs the number, and only a number in range makes a rule.
+    val limit: FireLimit? =
+        when (limitChoice) {
+            LimitChoice.EVERY_TIME -> FireLimit.UNLIMITED
+            LimitChoice.ONCE -> FireLimit.ONCE
+            LimitChoice.UP_TO -> limitText.toIntOrNull()?.takeIf { it in 1..FireLimit.MAX }?.let(FireLimit::times)
+        }
 
     // A forecast window narrows the subjects to what the forecast carries
     // (temperature, wind, plus chance of rain); "right now" offers every
@@ -441,15 +468,43 @@ private fun AddRuleForm(
             )
             TextButton(
                 onClick = {
+                    val chosen = limit ?: return@TextButton
                     threshold?.let {
-                        onAdd(subject, comparison, it, window)
+                        onAdd(subject, comparison, it, window, chosen)
                         thresholdText = ""
                     }
                 },
-                enabled = threshold != null,
+                enabled = threshold != null && limit != null,
                 modifier = Modifier.testTag("addRule"),
             ) {
                 Text("Add")
+            }
+        }
+
+        // How many times it may fire. Every time is the default and what every
+        // rule did before this existed; the other two are for alerts that are
+        // really reminders ("tell me the first frost") or that should not keep
+        // nagging through a week of the same weather.
+        Text("Notify", style = MaterialTheme.typography.labelMedium)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            ChipRow(
+                options = LimitChoice.entries,
+                selected = limitChoice,
+                label = { it.label },
+                onSelect = { limitChoice = it },
+            )
+            if (limitChoice == LimitChoice.UP_TO) {
+                OutlinedTextField(
+                    value = limitText,
+                    // Two digits at most: FireLimit.MAX is 99, and refusing a
+                    // third keystroke is clearer than an error line.
+                    onValueChange = { text -> if (text.length <= 2 && text.all(Char::isDigit)) limitText = text },
+                    placeholder = { Text("times") },
+                    singleLine = true,
+                    keyboardOptions =
+                        KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+                    modifier = Modifier.width(96.dp).testTag("limitTimes"),
+                )
             }
         }
     }
