@@ -32,8 +32,15 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@da187c8e6ffbd3802e00f2477aa5a822b25f2dda # v4.4.4
 
+      # `packages` is explicit because the action's default list still names
+      # "tools", a package Google removed from the SDK repository; sdkmanager
+      # then exits 1 and the job dies before Gradle runs (every run on main
+      # from 2026-09-23 on). The platform and build-tools are installed by the
+      # step below, so platform-tools is all this step needs.
       - name: Set up Android SDK
         uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3.2.2
+        with:
+          packages: platform-tools
 
       - name: Install required SDK packages
         run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
@@ -88,8 +95,15 @@ jobs:
 
       # Same explicit SDK install as `gate`: don't trust whatever the runner
       # image happens to preinstall, which rotates.
+      # `packages` is explicit because the action's default list still names
+      # "tools", a package Google removed from the SDK repository; sdkmanager
+      # then exits 1 and the job dies before Gradle runs (every run on main
+      # from 2026-09-23 on). The platform and build-tools are installed by the
+      # step below, so platform-tools is all this step needs.
       - name: Set up Android SDK
         uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3.2.2
+        with:
+          packages: platform-tools
 
       - name: Install required SDK packages
         run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
