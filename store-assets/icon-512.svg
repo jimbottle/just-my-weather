@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Play Store icon: the launcher icon's sun-on-dark-field, full-bleed.
+     The paths are the launcher vector (ic_launcher_foreground.xml, 108dp
+     viewport) unchanged; the viewBox crops to the adaptive icon's 72dp safe
+     zone so the store icon shows what a device shows. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="18 18 72 72">
+  <rect x="18" y="18" width="72" height="72" fill="#0E1726"/>
+  <g fill="#F2B705">
+    <path d="M54,40a14,14 0,1 0,0.01 0z"/>
+    <path d="M53,22h2v10h-2z"/>
+    <path d="M53,76h2v10h-2z"/>
+    <path d="M22,53h10v2h-10z"/>
+    <path d="M76,53h10v2h-10z"/>
+    <path d="M31,30l7,7l-1.5,1.5l-7,-7z"/>
+    <path d="M70,69l7,7l-1.5,1.5l-7,-7z"/>
+    <path d="M77,30l-7,7l1.5,1.5l7,-7z"/>
+    <path d="M38,69l-7,7l1.5,1.5l7,-7z"/>
+  </g>
+</svg>

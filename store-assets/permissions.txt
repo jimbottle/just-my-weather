@@ -1,0 +1,45 @@
+Just My Weather — Android permissions explained
+================================================
+
+The rationale for each permission in the MERGED manifest (what Play
+Console sees after library manifests are merged in — check with
+`aapt2 dump permissions app/build/outputs/apk/debug/app-debug.apk`).
+None of these is a Play "sensitive permission", so there is no
+justification form to fill in. The Data safety form and the privacy
+policy still describe them; keep the three in sync.
+
+Declared in app/src/main/AndroidManifest.xml
+--------------------------------------------
+
+INTERNET
+  Fetch observations and forecasts from the US National Weather Service
+  (api.weather.gov) and, for daily forecasts past seven days, Open-Meteo
+  (api.open-meteo.com). The only payload is the coordinates of the place
+  being viewed. No other hosts are contacted.
+
+ACCESS_NETWORK_STATE
+  Decide whether a fetch is worth attempting before making it, so an
+  offline phone shows the cached reading instead of a spinner.
+
+ACCESS_COARSE_LOCATION  (runtime, optional)
+  Resolve the NWS grid point for where the user is. Coarse only; the app
+  never requests ACCESS_FINE_LOCATION or background location. Declining
+  it leaves the app fully usable with a saved place.
+
+POST_NOTIFICATIONS  (runtime on Android 13+, optional)
+  Deliver the user's own alert rules as local notifications. No
+  notification is ever sent without a rule the user created.
+
+Merged in by androidx.work (WorkManager), not declared by the app
+----------------------------------------------------------------
+
+WAKE_LOCK, RECEIVE_BOOT_COMPLETED, FOREGROUND_SERVICE
+  WorkManager's standard set so the periodic alert-poll survives a
+  reboot and can finish a check the device would otherwise doze through.
+  The app never starts a foreground service of its own and never shows
+  a foreground-service notification.
+
+<queries> (package visibility, not a permission)
+  Names the Gadgetbridge package variants so the optional "Send to
+  Gadgetbridge" hand-off can detect whether Gadgetbridge is installed.
+  Visibility only; no data is read from it.

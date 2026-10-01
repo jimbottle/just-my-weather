@@ -1,0 +1,15 @@
+# Google Play release properties — copy to play.properties (gitignored) and
+# fill in. Scripts in scripts/android/ read these; env vars of the same
+# meaning (PLAY_SERVICE_ACCOUNT, PLAY_TRACK, PLAY_PACKAGE_NAME) override.
+
+# Service-account JSON key for non-interactive uploads via the Play Android
+# Developer API. One-time setup is in docs/PLAY_STORE.md "Bootstrap". Drop the
+# key at this default path and no edit is needed; the pattern is gitignored.
+serviceAccountJsonPath=play-service-account.json
+
+# Default track: internal (no review, instant) | alpha | beta | production.
+# release-internal.sh always uses internal regardless.
+track=internal
+
+# applicationId from app/build.gradle.kts.
+packageName=io.raylytics.justmyweather

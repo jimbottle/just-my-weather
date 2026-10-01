@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Play feature graphic (1024x500). The listing hero: the launcher sun at
+     left, the name and the one-line pitch at right, on the icon's dark field.
+     Fonts resolve through fontconfig at render time; the stack falls back to
+     whatever sans the machine has, which is fine for a hero. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="500" viewBox="0 0 1024 500">
+  <rect width="1024" height="500" fill="#0E1726"/>
+  <!-- Sun: the launcher geometry (108 viewport) scaled 3.2x and centred at (210,250). -->
+  <g transform="translate(37.2 77.2) scale(3.2)" fill="#F2B705">
+    <path d="M54,40a14,14 0,1 0,0.01 0z"/>
+    <path d="M53,22h2v10h-2z"/>
+    <path d="M53,76h2v10h-2z"/>
+    <path d="M22,53h10v2h-10z"/>
+    <path d="M76,53h10v2h-10z"/>
+    <path d="M31,30l7,7l-1.5,1.5l-7,-7z"/>
+    <path d="M70,69l7,7l-1.5,1.5l-7,-7z"/>
+    <path d="M77,30l-7,7l1.5,1.5l7,-7z"/>
+    <path d="M38,69l-7,7l1.5,1.5l7,-7z"/>
+  </g>
+  <g font-family="Helvetica Neue, Helvetica, Arial, sans-serif" fill="#F4F6FA">
+    <text x="400" y="225" font-size="72" font-weight="300" letter-spacing="-1">Just My Weather</text>
+    <text x="402" y="290" font-size="30" font-weight="400" fill="#AEB7C6">Pick what you see. Set your own alerts.</text>
+    <text x="402" y="340" font-size="22" font-weight="400" fill="#F2B705" letter-spacing="3">MODULAR · PRIVATE · OPEN SOURCE</text>
+  </g>
+</svg>

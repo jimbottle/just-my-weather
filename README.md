@@ -61,10 +61,12 @@ echo "sdk.dir=$HOME/Library/Android/sdk" > local.properties   # adjust path
 scripts/hooks/install.sh              # optional: install the pre-commit gate
 ```
 
-Install the debug APK on a device/emulator:
+Install the debug APK on a specific device or emulator (a bare `installDebug`
+fans out to every attached device):
 
 ```bash
-./gradlew :app:installDebug
+adb devices                       # pick the serial
+adb -s <serial> install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
 ## Contributing
@@ -87,6 +89,9 @@ search does no network call and needs no geocoding key — the list is public
 -domain US Census Gazetteer data, rebuildable with `scripts/build-gazetteer.sh`.
 A chosen place is what the background alert poll watches too. Personal alerts
 are evaluated and delivered on-device.
+
+Full privacy policy: <https://raylytics.io/justmyweather/privacy> (source in
+[`store-assets/privacy-policy.md`](store-assets/privacy-policy.md)).
 
 ### Why the "Observed" time doesn't move when you refresh
 
