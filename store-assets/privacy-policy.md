@@ -66,14 +66,15 @@ The app stores the following on your device only, in its private app storage:
 - your saved places and the last location the app used;
 - your alert rules, whether each has fired, and your quiet-hours setting;
 - a short-lived cache of the most recent weather so the app opens instantly;
-- a small cache of up to 32 recently used approximate areas (coordinates
+- a small cache of up to 32 recently looked-up approximate areas (coordinates
   rounded to about 1 km) with the weather-station grid each one maps to, so
-  that lookup is not repeated. Entries are replaced oldest-first and leave
-  with the rest of the app's data.
+  that lookup is not repeated. The oldest lookups are replaced first, and the
+  cache leaves with the rest of the app's data.
 
 Clearing the app's data in Android settings, or uninstalling the app, deletes
-all of it. If you use Android's device backup, Android may include the app's
-settings in your Google account backup under your control; the developer has
+all of it. If you use Android's device backup, Android may include all of the
+app's stored data — your settings, saved places, last position, and the area
+cache — in your Google account backup, under your control; the developer has
 no access to that backup.
 
 ## Notifications
@@ -109,8 +110,9 @@ off by default and only appears when Gadgetbridge is installed.
 - No advertising and no advertising ID.
 - No analytics, telemetry, or crash reporting.
 - No selling or sharing of personal information.
-- No precise location. The only positions kept are the ones listed above, and
-  they never leave your phone.
+- No precise location. The only positions kept are the ones listed above; they
+  are sent only as coordinates to the weather services described here, never
+  to the developer.
 
 ## Open source
 
