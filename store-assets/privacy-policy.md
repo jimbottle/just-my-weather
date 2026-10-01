@@ -1,6 +1,6 @@
 # Privacy Policy — Just My Weather
 
-_Last updated: October 1, 2026_
+_Last updated: 2026-10-01_
 
 Just My Weather is a free, open-source Android weather app published by
 Raylytics, LLC. It shows the weather for a place you choose, lets you build your
@@ -45,9 +45,10 @@ entirely on your phone; nothing you type is sent anywhere.
 To fetch the weather, the app sends the coordinates of the selected place to:
 
 - **The US National Weather Service** (api.weather.gov), a US federal agency,
-  for current conditions and the hourly and seven-day forecasts. As the NWS
-  requires, each request identifies the app and includes the developer's
-  contact email; it does not include anything that identifies you.
+  for current conditions, the hourly and seven-day forecasts, and active
+  weather alerts. As the NWS requires, each request identifies the app and
+  includes the developer's contact email; it does not include anything that
+  identifies you.
 - **Open-Meteo** (api.open-meteo.com), an open-source weather service, only
   when you have set the daily forecast to show more than seven days. Days
   eight onward come from Open-Meteo and are marked as such in the app.
@@ -69,7 +70,7 @@ The app stores the following on your device only, in its private app storage:
 - a small cache of up to 32 recently looked-up approximate areas (coordinates
   rounded to about 1 km) with the weather-station grid each one maps to, so
   that lookup is not repeated. The oldest lookups are replaced first, and the
-  cache leaves with the rest of the app's data.
+  cache is deleted along with the rest of the app's data.
 
 Clearing the app's data in Android settings, or uninstalling the app, deletes
 all of it. If you use Android's device backup, Android may include all of the
@@ -88,8 +89,8 @@ No notification service outside your device is involved.
 ## Optional watch hand-off
 
 If you turn on "Send to Gadgetbridge" in Customize, the app shares the current
-weather with the Gadgetbridge app installed on the same phone, which can relay
-it to a paired watch. This is a local hand-off between two apps on your device;
+weather, and the name of the place it is for, with the Gadgetbridge app
+installed on the same phone, which can relay it to a paired watch. This is a local hand-off between two apps on your device;
 Gadgetbridge's own privacy terms cover what it does from there. The option is
 off by default and only appears when Gadgetbridge is installed.
 
@@ -111,8 +112,9 @@ off by default and only appears when Gadgetbridge is installed.
 - No analytics, telemetry, or crash reporting.
 - No selling or sharing of personal information.
 - No precise location. The only positions kept are the ones listed above; they
-  are sent only as coordinates to the weather services described here, never
-  to the developer.
+  leave your phone only as forecast coordinates sent to the weather services
+  described here, or inside your own Android backup if you use it; never to
+  the developer.
 
 ## Open source
 
