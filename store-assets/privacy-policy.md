@@ -18,10 +18,11 @@ the app.
 
 Everything you set up — which modules show, how they are arranged, your theme,
 your saved places, your alert rules — stays on your phone (and in your own
-Android backup, if you use it, or on your watch, if you turn on the
-Gadgetbridge hand-off). The only data the app itself sends off your device is
-the latitude and longitude of the place you are viewing, or that your alerts
-watch, sent to public weather services so the app can fetch the forecast.
+Android backup, if you use it). If you turn on the Gadgetbridge hand-off, the
+current weather and that place's name can also reach your paired watch. The
+only data the app itself sends off your device is the latitude and longitude
+of the place you are viewing, or that your alerts watch, sent to public
+weather services so the app can fetch the forecast.
 
 ## What the app accesses
 
