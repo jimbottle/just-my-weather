@@ -21,8 +21,11 @@ ALIAS="justmyweather-upload"
 [ ! -e "$KEYSTORE" ] || die "$KEYSTORE already exists; refusing to overwrite an upload key."
 [ ! -e "$PROPS" ] || die "$PROPS already exists; refusing to overwrite."
 command -v keytool >/dev/null || die "keytool not found (it ships with the JDK)."
-git -C "$PROJECT_ROOT" check-ignore -q app/release.keystore app/keystore.properties \
-  || die ".gitignore does not cover the keystore files; fix that before creating secrets."
+# One path per call: `check-ignore -q` refuses more than one pathname.
+for secret in app/release.keystore app/keystore.properties; do
+  git -C "$PROJECT_ROOT" check-ignore -q "$secret" \
+    || die ".gitignore does not cover $secret; fix that before creating secrets."
+done
 
 if [ -z "${KEYSTORE_PASSWORD:-}" ]; then
   printf 'Keystore password (min 6 chars, store it in the password manager): ' >&2
