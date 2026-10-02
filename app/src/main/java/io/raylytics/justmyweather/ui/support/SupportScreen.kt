@@ -78,7 +78,8 @@ private fun copyFor(kind: SupportKind) =
 @Composable
 fun SupportScreen(
     kind: SupportKind,
-    attached: String,
+    /** Null while still being gathered; sending waits for it. */
+    attached: String?,
     onSend: (message: String) -> Boolean,
     onDone: () -> Unit,
     modifier: Modifier = Modifier,
@@ -126,7 +127,7 @@ fun SupportScreen(
                 // itself by not being pressable.
                 Button(
                     onClick = { noMailApp = !onSend(message) },
-                    enabled = message.isNotBlank(),
+                    enabled = message.isNotBlank() && attached != null,
                     modifier = Modifier.fillMaxWidth(),
                 ) { Text(copy.send) }
                 Text(
@@ -147,7 +148,7 @@ fun SupportScreen(
                     modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
                 ) {
                     Text(
-                        text = attached,
+                        text = attached ?: "Collecting…",
                         style = MaterialTheme.typography.bodySmall,
                         fontFamily = FontFamily.Monospace,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,

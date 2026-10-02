@@ -51,15 +51,17 @@ fun recentLogLines(): List<String> =
 
 /**
  * Open the user's email app with [mail] addressed to [SUPPORT_ADDRESS].
- * ACTION_SENDTO with a bare mailto: matches email apps only (not every app
- * that can share text), and the subject and body ride as extras rather than
- * query parameters, which some mail apps mangle at length. Returns false when
- * no email app is installed, so the form can say so instead of failing
- * silently.
+ * ACTION_SENDTO with a mailto: URI matches email apps only (not every app
+ * that can share text). The address rides in the URI because some clients
+ * ignore EXTRA_EMAIL for SENDTO and open a draft with no recipient; it stays
+ * in the extra too for the ones that read only that. The subject and body
+ * ride as extras rather than query parameters, which some mail apps mangle
+ * at length. Returns false when no email app is installed, so the form can
+ * say so instead of failing silently.
  */
 fun Context.composeSupportMail(mail: SupportMail): Boolean {
     val intent =
-        Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:")).apply {
+        Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:$SUPPORT_ADDRESS")).apply {
             putExtra(Intent.EXTRA_EMAIL, arrayOf(SUPPORT_ADDRESS))
             putExtra(Intent.EXTRA_SUBJECT, mail.subject)
             putExtra(Intent.EXTRA_TEXT, mail.body)

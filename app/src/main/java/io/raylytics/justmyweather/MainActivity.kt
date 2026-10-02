@@ -20,6 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -59,8 +60,15 @@ import io.raylytics.justmyweather.ui.theme.JustMyWeatherTheme
 import io.raylytics.justmyweather.ui.theme.ThemeViewModel
 import io.raylytics.justmyweather.ui.theme.themeResolvesToDark
 import io.raylytics.justmyweather.view.ThemeConfig
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import java.time.Instant
+
+/** How long a bug report waits for the glance to report its state. */
+private const val GLANCE_WAIT_MS = 2_000L
 
 /** The screens this app has. A plain enum + state switch is all the navigation
  * a handful of destinations need — no nav library to learn or wire. */
@@ -198,11 +206,37 @@ class MainActivity : ComponentActivity() {
                         themeConfig = themeConfig,
                         onThemeChange = themeViewModel::save,
                         onEnterAlerts = ::requestNotificationsIfNeeded,
-                        hasLocationPermission = container.locationProvider::hasPermission,
+                        loadBugReportState = ::bugReportState,
                     )
                 }
             }
         }
+    }
+
+    /**
+     * What a bug report says about the app, read from the persisted stores and
+     * not from any screen's StateFlow: those are shared WhileSubscribed and
+     * report their defaults to a reader that arrives before a subscriber.
+     * The glance state is the exception — it lives only in the ViewModel —
+     * so it is awaited briefly, and named as unknown rather than blocking the
+     * report when it never settles.
+     */
+    private suspend fun bugReportState(): List<Pair<String, String>> {
+        val config = container.viewConfigRepository.config.first()
+        val home = withTimeoutOrNull(GLANCE_WAIT_MS) { homeViewModel.state.first() }
+        return listOf(
+            "Glance" to
+                when (home) {
+                    null -> "unknown (no state within ${GLANCE_WAIT_MS}ms)"
+                    is HomeUiState.Error -> "Error: ${home.message}"
+                    else -> home.javaClass.simpleName
+                },
+            "Location permission" to container.locationProvider.hasPermission().toString(),
+            "Visible modules" to config.visible.size.toString(),
+            "Density" to config.density.name,
+            "Theme" to container.themeConfigRepository.config.first().toString(),
+            "Gadgetbridge" to container.gadgetbridgeSettingsRepository.enabled.first().toString(),
+        )
     }
 
     private fun requestNotificationsIfNeeded() {
@@ -222,7 +256,8 @@ private fun App(
     themeConfig: ThemeConfig,
     onThemeChange: (ThemeConfig) -> Unit,
     onEnterAlerts: () -> Unit,
-    hasLocationPermission: () -> Boolean,
+    /** The app state a bug report attaches, read fresh from the stores. */
+    loadBugReportState: suspend () -> List<Pair<String, String>>,
 ) {
     var screen by rememberSaveable { mutableStateOf(Screen.HOME) }
 
@@ -307,40 +342,32 @@ private fun App(
         // Each form returns to the page it was opened from.
         Screen.REPORT_BUG -> {
             BackHandler { screen = Screen.APP_SETTINGS }
-            val home by homeViewModel.state.collectAsStateWithLifecycle()
-            val config by customizeViewModel.config.collectAsStateWithLifecycle()
-            val gadgetbridgeEnabled by appSettingsViewModel.gadgetbridgeEnabled.collectAsStateWithLifecycle()
             val context = LocalContext.current
             val app = remember { currentAppInfo() }
-            // Read once per visit: the form shows exactly what will be sent,
-            // so the attachment must not change under the user while they type.
-            val attached =
-                remember {
-                    bugDiagnostics(
-                        app = app,
-                        sourceScreen = "App Settings",
-                        state =
-                            listOf(
-                                "Glance" to
-                                    when (val h = home) {
-                                        is HomeUiState.Error -> "Error: ${h.message}"
-                                        else -> h.javaClass.simpleName
-                                    },
-                                "Location permission" to hasLocationPermission().toString(),
-                                "Visible modules" to config.visible.size.toString(),
-                                "Density" to config.density.name,
-                                "Theme" to themeConfig.toString(),
-                                "Gadgetbridge" to gadgetbridgeEnabled.toString(),
-                            ),
-                        logs = recentLogLines(),
-                        timestamp = Instant.now().toString(),
-                    )
-                }
+            // Built once per visit and off the main thread: the state is read
+            // from the stores rather than from screen-scoped flows (which hold
+            // their defaults until something subscribes — Customize's config
+            // never has, on the way here), and logcat is a process spawn. The
+            // form shows exactly what will be sent, so it waits for this
+            // rather than showing a guess that changes under the user.
+            val attached by produceState<String?>(null) {
+                value =
+                    withContext(Dispatchers.IO) {
+                        bugDiagnostics(
+                            app = app,
+                            sourceScreen = "App Settings",
+                            state = loadBugReportState(),
+                            logs = recentLogLines(),
+                            timestamp = Instant.now().toString(),
+                        )
+                    }
+            }
             SupportScreen(
                 kind = SupportKind.BUG,
                 attached = attached,
                 onSend = { message ->
-                    context.composeSupportMail(supportMail(SupportKind.BUG, app, message, attached))
+                    val diagnostics = attached ?: return@SupportScreen false
+                    context.composeSupportMail(supportMail(SupportKind.BUG, app, message, diagnostics))
                 },
                 onDone = { screen = Screen.APP_SETTINGS },
             )
