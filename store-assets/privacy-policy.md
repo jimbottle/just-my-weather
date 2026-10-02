@@ -112,9 +112,10 @@ review and send yourself. The app never sends it on its own.
   the form before you send: the app version, your Android version and phone
   model, a few app settings (whether location permission is granted, how many
   modules are shown, density, theme, whether the Gadgetbridge hand-off is on,
-  and whether the weather loaded), and the app's own most recent log lines (up
-  to 50, including any error messages). It does not include your location,
-  saved places, or alert rules.
+  and whether the weather loaded, with a fixed description of the error if it
+  did not), the screen you sent it from, the time, and the app's own most
+  recent log lines (up to 50). It does not include your location, saved
+  places, or alert rules.
 - **An idea** includes what you write, the app version, your Android version
   and phone model, and which screen you sent it from.
 

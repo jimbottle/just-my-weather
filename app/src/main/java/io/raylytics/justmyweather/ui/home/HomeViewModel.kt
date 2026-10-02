@@ -12,6 +12,7 @@ import io.raylytics.justmyweather.data.WeatherSnapshot
 import io.raylytics.justmyweather.data.nws.ActiveAlert
 import io.raylytics.justmyweather.data.nws.DailyPeriod
 import io.raylytics.justmyweather.data.nws.ForecastPoint
+import io.raylytics.justmyweather.data.nws.NwsHttpException
 import io.raylytics.justmyweather.data.openmeteo.ExtendedDay
 import io.raylytics.justmyweather.location.LocationResolver
 import io.raylytics.justmyweather.view.DailyDays
@@ -508,10 +509,23 @@ class HomeViewModel(
         val extended: List<ExtendedDay>? = null,
     )
 
-    private fun Throwable.toUserMessage(): String =
-        when (this) {
-            is java.net.UnknownHostException, is java.io.IOException ->
-                "Couldn't reach the weather service. Check your connection."
-            else -> message ?: "Something went wrong fetching the weather."
-        }
+    private fun Throwable.toUserMessage(): String = weatherErrorMessage(this)
 }
+
+/**
+ * The sentence a failed fetch shows — on the glance, and in a bug report's
+ * diagnostics. Always one of a fixed set: the data layer's own messages are
+ * for developers and carry the request path, which holds the place's
+ * coordinates (`/points/lat,lon`), so passing them through would put a
+ * location on screen and into a mail the privacy policy says has none. The
+ * HTTP status is kept because it is what a bug report needs.
+ */
+internal fun weatherErrorMessage(e: Throwable): String =
+    when {
+        e is java.io.IOException -> "Couldn't reach the weather service. Check your connection."
+        // NWS answers /points with 404 for anywhere it doesn't forecast.
+        e is NwsHttpException && e.status == 404 && e.path.startsWith("/points/") ->
+            "The National Weather Service doesn't forecast for this place. It covers the US."
+        e is NwsHttpException -> "The weather service returned an error (HTTP ${e.status}). Try again shortly."
+        else -> "Something went wrong fetching the weather."
+    }
