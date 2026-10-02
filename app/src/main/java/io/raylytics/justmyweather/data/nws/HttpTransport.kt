@@ -37,6 +37,12 @@ class OkHttpTransport(
         }
 
     companion object {
+        /**
+         * Deliberately no logging interceptor. Every request URL holds the
+         * place's coordinates, and a bug report attaches this process's recent
+         * logcat — the privacy policy promises that mail carries no location.
+         * Debug logging of requests would quietly break that promise.
+         */
         val defaultClient: OkHttpClient =
             OkHttpClient.Builder()
                 .callTimeout(10, TimeUnit.SECONDS)
