@@ -18,13 +18,14 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 
 /**
  * Settings that are about the app, not the canvas. Customize is for what the
  * glance shows and how it looks; anything else — handing readings to another
- * app, getting in touch with the developer — belongs here, so Customize stays
+ * app, getting in touch with the developer, what the app is — belongs here, so Customize stays
  * a page about the glance.
  */
 @Composable
@@ -56,12 +57,11 @@ fun AppSettingsScreen(
                     modifier = Modifier.padding(top = 16.dp),
                 )
                 HelpSection(onReportBug = onReportBug)
-                Text(
-                    text = "Just My Weather $version",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 24.dp),
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    modifier = Modifier.padding(top = 16.dp),
                 )
+                AboutSection(version = version)
             }
         }
     }
@@ -127,5 +127,70 @@ private fun HelpSection(onReportBug: () -> Unit) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+    }
+}
+
+/** Where the policy and the source live. The policy URL is also the one in
+ * the Play listing (store-assets/play-store-listing.md); change both together. */
+const val PRIVACY_POLICY_URL = "https://raylytics.io/justmyweather/privacy"
+const val SOURCE_CODE_URL = "https://github.com/jimbottle/just-my-weather"
+
+/**
+ * What the app is and whose data it shows. The attribution is not a courtesy:
+ * Open-Meteo's CC BY 4.0 licence asks for it wherever its data appears, and a
+ * store build is the place a user would look for it.
+ */
+@Composable
+private fun AboutSection(version: String) {
+    val uriHandler = LocalUriHandler.current
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text("About", style = MaterialTheme.typography.labelMedium)
+        Text(
+            text = "Just My Weather $version",
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.padding(vertical = 8.dp).testTag("about-version"),
+        )
+        AboutLink(
+            title = "Privacy policy",
+            detail = "No accounts, no ads, no tracking. What leaves your phone, and why.",
+            onClick = { uriHandler.openUri(PRIVACY_POLICY_URL) },
+        )
+        AboutLink(
+            title = "Source code",
+            detail = "Open source under the Apache License 2.0.",
+            onClick = { uriHandler.openUri(SOURCE_CODE_URL) },
+        )
+        Text(
+            text = "Weather data from the US National Weather Service (public domain). " +
+                "Daily forecasts past seven days from Open-Meteo.com (CC BY 4.0).",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 8.dp),
+        )
+    }
+}
+
+@Composable
+private fun AboutLink(
+    title: String,
+    detail: String,
+    onClick: () -> Unit,
+) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick)
+                .padding(vertical = 8.dp),
+    ) {
+        Text(title, style = MaterialTheme.typography.bodyLarge)
+        Text(
+            text = detail,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }

@@ -42,6 +42,9 @@ Required: the app requests location. URL
 `https://raylytics.io/justmyweather/privacy`, served by the `raylytics-site`
 repo (`justmyweather/privacy.html`, Netlify pretty URLs strip `.html`). Source
 of truth is `store-assets/privacy-policy.md`; change both and re-date both.
+The app links the same URL from App settings → About
+(`PRIVACY_POLICY_URL` in `ui/settings/AppSettingsScreen.kt`) — a URL change
+touches the listing, that constant, and this line.
 
 ### 4. Signing
 
