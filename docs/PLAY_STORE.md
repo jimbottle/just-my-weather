@@ -22,14 +22,13 @@ the lessons. Store copy and assets live in `store-assets/`
 ### 1. Target API
 
 Since 2026-08-31 Play requires **new apps and updates to target API 36**
-(Android 16); an extension to 2026-11-01 can be requested in the console.
-`app/build.gradle.kts` targets 35 today, so the first upload is blocked until
-the SDK bump lands (see the tracked issue; AGP 8.7.3 only warns at 36, the
-bump needs a newer AGP). Native libraries (`androidx.graphics.path`,
-`datastore_shared_counter`) are already 16 KB page-aligned — verified on the
+(Android 16) on every track, the internal track included; an extension to
+2026-11-01 can be requested in the console. `app/build.gradle.kts` targets 36
+on AGP 8.13.2 since 2026-10-02. Native libraries (`androidx.graphics.path`,
+`datastore_shared_counter`) are 16 KB page-aligned — verified on the
 2026-10-01 bundle, so the 16 KB requirement is met.
 
-### 2. Create the app entry (console, by hand)
+### 2. Create the app entry (console, by hand) — done 2026-10-02
 
 Play Console → Create app: name (≤30 chars, see the listing file), default
 language English (US), App, Free. Then **App content** declarations and the
@@ -94,6 +93,38 @@ A rejected upload still burns its versionCode.
    `scripts/android/preflight-play.sh`. Its failure messages name the panel to
    fix.
 
+## Internal testing (replaces APK sideloads)
+
+Until 2026-10 testing meant `adb install` of a debug APK, or a GitHub release
+APK. From the first internal-track build, testers (that is, Evan's phone)
+take builds from the Play Store app like any other update. The loop:
+
+1. **Testers list (once).** Play Console → Testing → Internal testing →
+   Testers → create an email list ("Internal") with the Google accounts on the
+   test phones (up to 100). Save, then copy the **opt-in URL** from the same
+   page and paste it into this section when it exists. Each tester opens the
+   link once on their phone and accepts.
+2. **Phone prep (once per device).** The Play build is signed with the upload
+   key (and re-signed by Play App Signing), not the debug key, so Android
+   refuses it over a sideloaded debug build. Uninstall the sideload first —
+   this **wipes the app's data** (rules, places, view config) — then install
+   from the Play Store via the opt-in page. Debug builds can still go on the
+   emulator; keep the phone on Play builds from here so what is tested is
+   what ships.
+3. **Each build.** `scripts/android/release-internal.sh --notes "..."` (with
+   Evan's go-ahead for that upload) bumps `versionCode`, builds the signed
+   AAB, uploads it, and the release goes live to the list within minutes with
+   no Play review. Until the app's first production release, pass
+   `--status draft` and roll the draft out from the console. Commit the
+   versionCode bump and log the cut in `docs/RELEASES.md`.
+4. **On the phone.** The Play Store app shows the update within an hour or so;
+   opening the listing from the opt-in link and pulling to refresh hurries it.
+
+The very first upload is manual (Testing → Internal testing → Create release
+→ drop `app/build/outputs/bundle/release/app-release.aab`), and it is also
+what registers the upload certificate with Play App Signing. Every upload
+after that can go through the scripts once the service account exists.
+
 ## Versioning
 
 - `versionCode` lives in `app/build.gradle.kts`; `bump-version-code.sh`
@@ -102,8 +133,9 @@ A rejected upload still burns its versionCode.
 - `versionName` is frozen once it reaches production. Work destined for a new
   release bumps `versionName` first, then `versionCode` ticks underneath it
   per upload. v0.1.0 and v0.1.1 shipped as GitHub sideload releases; the
-  first Play build should carry the next version (0.2.0: places, the module
-  grid, forecast tiles, fourteen-day daily).
+  first Play build carries 0.2.0 (places, the module grid, forecast tiles,
+  fourteen-day daily, alert fire limits). GitHub releases stop here: Play
+  internal testing is the test channel from 0.2.0 on.
 - Log every cut in `docs/RELEASES.md` with its versionCode, date, and track.
 
 ## Console quirks (inherited from Open Frame; not yet seen here)

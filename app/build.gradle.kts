@@ -22,14 +22,20 @@ val keystoreProperties =
 
 android {
     namespace = "io.raylytics.justmyweather"
-    compileSdk = 35
+    // Google Play has required new apps and updates to target API 36 since
+    // 2026-08-31; the internal track is not exempt. AGP 8.13 is the matching
+    // toolchain (8.7 only warned at 36).
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "io.raylytics.justmyweather"
         minSdk = 24
-        targetSdk = 35
+        targetSdk = 36
+        // versionCode is bumped per upload by scripts/android/bump-version-code.sh;
+        // versionName is the release (CLAUDE.md "Versioning"). 0.2.0 is the first
+        // Play build: everything since the v0.1.x sideloads.
         versionCode = 2
-        versionName = "0.1.1"
+        versionName = "0.2.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

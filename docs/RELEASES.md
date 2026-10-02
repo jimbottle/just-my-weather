@@ -42,8 +42,9 @@ the upload keystore, and the console app entry (see the tracked epic).
   cadence and quiet hours; per-rule fire limit (once, up to 99 times, or
   every time) — a rule that reaches its limit switches itself off and the
   toggle re-arms it (just-my-weather-8di).
-- Internal: Play release tooling under `scripts/android/`, `store-assets/`,
-  this file.
+- Internal: targetSdk/compileSdk 36 on AGP 8.13.2 (Play requires API 36 for
+  new apps since 2026-08-31); Play release tooling under `scripts/android/`,
+  `store-assets/`, this file.
 
 ## 0.1.1 — GitHub release, 2026-07-31 (versionCode 2)
 

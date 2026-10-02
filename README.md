@@ -62,8 +62,10 @@ echo "sdk.dir=$HOME/Library/Android/sdk" > local.properties   # adjust path
 scripts/hooks/install.sh              # optional: install the pre-commit gate
 ```
 
-Install the debug APK on a specific device or emulator (a bare `installDebug`
-fans out to every attached device):
+Testing builds ship through Google Play's internal testing track (see
+[`docs/PLAY_STORE.md`](docs/PLAY_STORE.md)); the GitHub releases were the
+pre-Play sideloads. For development, install the debug APK on a specific
+device or emulator (a bare `installDebug` fans out to every attached device):
 
 ```bash
 adb devices                       # pick the serial

@@ -43,7 +43,7 @@ jobs:
           packages: platform-tools
 
       - name: Install required SDK packages
-        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
 
       # The same gate the pre-commit hook runs locally.
       #
@@ -106,7 +106,7 @@ jobs:
           packages: platform-tools
 
       - name: Install required SDK packages
-        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
 
       - name: Build the debug APK
         run: ./gradlew :app:assembleDebug --no-daemon --stacktrace
