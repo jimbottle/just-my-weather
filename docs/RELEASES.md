@@ -19,10 +19,12 @@ Per-version log of what shipped where. Two audiences:
 
 ---
 
-## 0.2.0 — unreleased (first Play Store build)
+## 0.2.0 — Play INTERNAL (versionCode 2, uploaded 2026-10-02 11:39)
 
-Target: Play internal testing, then production. Blocked on the API 36 bump,
-the upload keystore, and the console app entry (see the tracked epic).
+The first Play Store build. Internal testing track, manual upload from the
+console (the Developer API needs a prior console upload). Production follows
+once the privacy policy is live and the listing is complete (epic
+just-my-weather-zi8). versionCode 2 is burned: the next upload is 3.
 
 ### Store-facing (≤500 chars)
 

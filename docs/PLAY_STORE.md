@@ -61,7 +61,7 @@ of truth is `store-assets/privacy-policy.md`; change both and re-date both.
   uninstall first (`INSTALL_FAILED_UPDATE_INCOMPATIBLE` otherwise), and an
   uninstall takes the app's data with it.
 
-### 5. First upload is manual
+### 5. First upload is manual — done 2026-10-02 (versionCode 2)
 
 The Play Developer API refuses bundles for an app that has never had one
 uploaded through the console. Upload the first AAB by hand: Testing →
@@ -101,9 +101,9 @@ take builds from the Play Store app like any other update. The loop:
 
 1. **Testers list (once).** Play Console → Testing → Internal testing →
    Testers → create an email list ("Internal") with the Google accounts on the
-   test phones (up to 100). Save, then copy the **opt-in URL** from the same
-   page and paste it into this section when it exists. Each tester opens the
-   link once on their phone and accepts.
+   test phones (up to 100). Opt-in URL (created 2026-10-02):
+   <https://play.google.com/apps/internaltest/4701057288991278508>. Each
+   tester opens the link once on their phone and accepts.
 2. **Phone prep (once per device).** The Play build is signed with the upload
    key (and re-signed by Play App Signing), not the debug key, so Android
    refuses it over a sideloaded debug build. Uninstall the sideload first —
@@ -120,10 +120,12 @@ take builds from the Play Store app like any other update. The loop:
 4. **On the phone.** The Play Store app shows the update within an hour or so;
    opening the listing from the opt-in link and pulling to refresh hurries it.
 
-The very first upload is manual (Testing → Internal testing → Create release
-→ drop `app/build/outputs/bundle/release/app-release.aab`), and it is also
-what registers the upload certificate with Play App Signing. Every upload
-after that can go through the scripts once the service account exists.
+The very first upload was manual (Testing → Internal testing → Create release
+→ drop `app/build/outputs/bundle/release/app-release.aab`): versionCode 2,
+0.2.0, released 2026-10-02 11:39, which also registered the upload
+certificate with Play App Signing. Every upload after that can go through the
+scripts once the service account exists; versionCode 2 is burned, so the next
+cut bumps to 3.
 
 ## Versioning
 
