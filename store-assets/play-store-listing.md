@@ -86,9 +86,21 @@ Regenerate the icon and feature graphic with
 (2.22:1), over Play's 2:1 limit — crop them with
 `store-assets/crop-screenshots.sh`.
 
-**Screenshots are stale.** `docs/screenshots/*.png` show the v0.1 glance
-(before the module grid, forecast tiles, and places). Capture fresh ones on
-the API 35 emulator from the current build before submitting.
+Screenshots captured 2026-10-02 from 0.2.0 on the Pixel_7_API_35 emulator
+(Louisville, KY, live NWS data; status bar in demo mode at 9:41), upload in
+filename order — the first two carry the listing:
+
+1. `01-your-glance` — a customized glance, dark look (Conditions + Wind beside
+   a 2×2 temperature, Sun, Forecast)
+2. `02-arrange` — long-press arrange mode with corner handles
+3. `03-details` — tap a tile: the full observation sheet
+4. `04-daily` — the forecast tile on Daily
+5. `05-alerts` — three personal rules and the builder
+6. `06-places` — saved places from the bundled US list
+7. `07-customize` — per-tile width/height, light look
+8. `08-default-glance` — the out-of-the-box glance, light look
+
+Re-capture when a listed screen changes visibly.
 
 ## App content declarations (Policy → App content)
 
