@@ -217,17 +217,23 @@ class MainActivity : ComponentActivity() {
      * What a bug report says about the app, read from the persisted stores and
      * not from any screen's StateFlow: those are shared WhileSubscribed and
      * report their defaults to a reader that arrives before a subscriber.
-     * The glance state is the exception — it lives only in the ViewModel —
-     * so it is awaited briefly, and named as unknown rather than blocking the
-     * report when it never settles.
+     * The glance state is the exception — it lives only in the ViewModel.
+     * Its StateFlow starts at Loading, and first() on a StateFlow returns the
+     * current value at once, so the wait is for a SETTLED state: first {}
+     * subscribes, which starts the upstream. A glance still loading when the
+     * wait ends is reported as exactly that — a stuck fetch is the kind of
+     * thing a bug report is for — rather than blocking the report.
      */
     private suspend fun bugReportState(): List<Pair<String, String>> {
         val config = container.viewConfigRepository.config.first()
-        val home = withTimeoutOrNull(GLANCE_WAIT_MS) { homeViewModel.state.first() }
+        val home =
+            withTimeoutOrNull(GLANCE_WAIT_MS) {
+                homeViewModel.state.first { it !is HomeUiState.Loading }
+            }
         return listOf(
             "Glance" to
                 when (home) {
-                    null -> "unknown (no state within ${GLANCE_WAIT_MS}ms)"
+                    null -> "Loading (still, after ${GLANCE_WAIT_MS}ms)"
                     is HomeUiState.Error -> "Error: ${home.message}"
                     else -> home.javaClass.simpleName
                 },
