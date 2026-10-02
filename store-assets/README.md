@@ -9,6 +9,7 @@ Everything the Google Play listing needs, with sources so it can be regenerated.
 | `full-description.txt` | ≤4000-char full description (pasted verbatim; plain text, no Markdown) |
 | `privacy-policy.md` | Policy source; rendered at https://raylytics.io/justmyweather/privacy from the `raylytics-site` repo |
 | `permissions.txt` | Why each merged-manifest permission exists |
+| `ASO_NOTES.md` | Search targets ("modular weather app", "custom weather"), where they live in the copy, and the rules that keep it policy-clean |
 | `icon-512.svg` → `icon-512.png` | Play Store icon (same sun as the launcher icon, full-bleed) |
 | `feature-graphic-1024x500.svg` → `.png` | Listing hero |
 | `generate-graphics.sh` | Renders both PNGs from the SVGs (needs `rsvg-convert`, `brew install librsvg`) |

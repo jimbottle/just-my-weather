@@ -12,32 +12,21 @@ as headers and plain bullets.
 
 ## App name (max 30 chars)
 
-> ⚠ **Decision needed.** The working name "Just My Weather - Modular Weather
-> App" is **37 chars**; Play caps the app name at 30. Candidates:
->
-> | Candidate | Chars |
-> |---|---|
-> | `Just My Weather - Modular App` | 29 |
-> | `Just My Weather: Modular` | 24 |
-> | `Just My Weather` | 15 |
->
-> The descriptor is only worth keeping if it carries a search term; "modular"
-> is the differentiator, "weather app" is already implied by the name and the
-> category. Whichever is chosen, `app_name` in `strings.xml` stays
-> "Just My Weather" (the launcher label has no reason to carry a descriptor).
-
-Working value until decided:
+Decided 2026-10-02 (Evan): the plain name. The "Modular Weather App" descriptor
+from the working title does not fit the 30-char cap, so the search terms it was
+carrying live in the descriptions and tags instead — see `ASO_NOTES.md`.
 
 ```
-Just My Weather - Modular App
+Just My Weather
 ```
 
 ## Short description (max 80 chars)
 
-Source of truth: `store-assets/short-description.txt` (78 chars).
+Source of truth: `store-assets/short-description.txt` (79 chars). Carries the
+two target phrases, "modular weather app" and "custom".
 
 ```
-A modular weather app. Pick what you see, arrange it, and set your own alerts.
+Modular weather app with a custom view: pick what you see, set your own alerts.
 ```
 
 ## Full description (max 4000 chars)
@@ -45,13 +34,21 @@ A modular weather app. Pick what you see, arrange it, and set your own alerts.
 Source of truth: `store-assets/full-description.txt` (about 2300 chars).
 Paste that file verbatim.
 
+## Search targets (ASO)
+
+The listing is written to be found for **"modular weather app"** and **"custom
+weather"** (and the near variants "customizable weather app", "custom weather
+view"). Both phrases appear in the short description and several times in the
+full description; the app name stays plain. Rationale, rules, and the review
+checklist are in `store-assets/ASO_NOTES.md`.
+
 ## Categorization
 
 | Field | Value |
 |---|---|
 | App or game | App |
 | Category | Weather |
-| Tags | Weather, Forecast |
+| Tags | Pick from Play's fixed list, up to five: Weather, Forecast, and whichever of its entries read closest to Modular / Custom / Customization (the list is only visible in the console; record the exact picks here once chosen). See `ASO_NOTES.md`. |
 | Free or paid | Free |
 | Contains ads | No |
 | In-app purchases | None |

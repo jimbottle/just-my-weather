@@ -1,13 +1,13 @@
-Just My Weather shows you exactly what you care about, arranged exactly how you want it, and alerts you on exactly the conditions you choose. Nothing else.
+Just My Weather is a modular weather app: a custom weather view built from the data points you care about, arranged how you want, with alerts on exactly the conditions you choose. Nothing else.
 
-Most weather apps decide for you: ten-day forecasts, radar, air quality, pollen, UV, hourly scrubbers, and then they bury the one number you opened the app to check. Just My Weather inverts that. The default is quiet and sparse. The power is building your own view and your own alerts, and editing everything else away.
+Most weather apps decide for you: ten-day forecasts, radar, air quality, pollen, UV, hourly scrubbers, and then they bury the one number you opened the app to check. Just My Weather inverts that. The default is quiet and sparse. The power is building your own custom weather view and your own alerts, and editing everything else away.
 
-MODULAR BY DESIGN
+A MODULAR, CUSTOM WEATHER VIEW
 
 • The glance is a grid of modules. Choose which data points show: temperature, feels like, conditions, humidity, wind, pressure, dew point, visibility, sun times, hourly forecast, daily forecast, and more.
 • Set each module's width. Width is prominence: the thing you care about most gets the biggest tile.
 • Long-press to arrange the grid in place, launcher-style. Drag a corner to resize.
-• Rename any module. Pick a density from spacious to compact. Theme it: light, dark, or system; your accent color; your typeface.
+• Rename any module. Pick a density from spacious to compact. Theme it: light, dark, or system; your accent color; your typeface. Every part of the view is customizable.
 • Tap a tile for the details behind it.
 
 YOUR OWN ALERTS
@@ -23,11 +23,13 @@ FORECASTS FROM THE SOURCE
 • The daily view can reach fourteen days: seven from the NWS, then Open-Meteo for the rest, clearly marked.
 • Saved places: search a bundled offline list of about 32,000 US towns and cities, or enter coordinates. No geocoding service sees what you type.
 
-PRIVATE AND OPEN
+PRIVATE AND OPEN SOURCE
 
 • No accounts, no ads, no analytics, no tracking.
 • Location is coarse and optional. The only data that leaves your phone is the coordinates of the place you are looking at, sent to the weather services to fetch the forecast.
 • Open source under the Apache 2.0 license. Read the code, fork it, build on it.
 • Privacy policy: https://raylytics.io/justmyweather/privacy
+
+If you have been looking for a customizable weather app that shows only what you ask for, this is it.
 
 Weather data is for the United States (National Weather Service coverage).
