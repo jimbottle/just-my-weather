@@ -55,6 +55,7 @@ import io.raylytics.justmyweather.view.ModuleSize
 import io.raylytics.justmyweather.view.ModuleValue
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
@@ -90,6 +91,15 @@ private enum class DragOwner { LONG_PRESS, IMMEDIATE }
  * one or the other for its whole life.
  */
 private enum class DragKind { MOVE, RESIZE }
+
+/**
+ * How long a tile must be held, without moving, to LEAVE arrange mode — timed
+ * from the finger landing. Deliberately well past the platform's long-press
+ * (~400ms), which while arranging already lifts the tile for a drag: the hold
+ * that exits must not be one a user makes by grabbing a tile and pausing to
+ * think. Any movement past touch slop forfeits the exit for that gesture.
+ */
+private const val EXIT_HOLD_MS = 1_000L
 
 /** The dragged tile lifts slightly, the way a launcher icon does. */
 private const val DRAG_SCALE = 1.04f
@@ -153,7 +163,8 @@ private class TileMotion {
  * same hold flows straight into a drag. While arranging, drag a tile to move
  * it and drag its bottom-right corner to resize it — the corner snaps to
  * cells as the finger draws the rectangle, and stops at the module's own
- * minimum. Every edit lands as a
+ * minimum. Holding a tile still for [EXIT_HOLD_MS] while arranging leaves the
+ * mode, as Done, Back and a tap on empty ground do. Every edit lands as a
  * [ViewConfig][io.raylytics.justmyweather.view.ViewConfig] transform through
  * [onMove]/[onResize], so a drag persists like any other customization —
  * there is no separate "editing copy" to commit or lose.
@@ -179,6 +190,8 @@ internal fun ModuleGrid(
     arranging: Boolean,
     spec: DensitySpec,
     onStartArranging: () -> Unit,
+    /** A still hold on a tile while arranging: leave the mode. */
+    onStopArranging: () -> Unit,
     /** Give a module this footprint. The config clamps it to the module's
      * minimum, so the grid asks for whatever the finger drew. */
     onResize: (ModuleKey, ModuleSize) -> Unit,
@@ -207,6 +220,7 @@ internal fun ModuleGrid(
     val currentModules by rememberUpdatedState(modules)
     val isArranging by rememberUpdatedState(arranging)
     val startArranging by rememberUpdatedState(onStartArranging)
+    val stopArranging by rememberUpdatedState(onStopArranging)
     val resize by rememberUpdatedState(onResize)
     val move by rememberUpdatedState(onMove)
     val openModule by rememberUpdatedState(onOpenModule)
@@ -257,6 +271,15 @@ internal fun ModuleGrid(
     // Counts drags, so a drop's deferred clean-up can tell whether the drag it
     // belongs to is still the current one.
     var dragSerial by remember { mutableStateOf(0) }
+    // Whether the current long-press drag has strayed past touch slop from
+    // where it began — once it has, it is a drag, never a hold-to-exit.
+    var holdMoved by remember { mutableStateOf(false) }
+    var holdOrigin by remember { mutableStateOf(Offset.Zero) }
+    // Counts hold-to-exits. The release that ends such a hold must not then
+    // be read as a tap on the tile — by then the mode is off, so it would open
+    // the tile's detail. The tap detector compares this against its value at
+    // the press, which holds whatever order the detectors see the up in.
+    var holdExits by remember { mutableStateOf(0) }
 
     // Gesture positions arrive grid-local; tiles report window-root bounds.
     fun toRoot(local: Offset): Offset = gridCoords?.localToRoot(local) ?: local
@@ -425,16 +448,45 @@ internal fun ModuleGrid(
                             // the mode is a hold on a tile, not on a handle
                             // that was not there to be held.
                             val (field, kind) = dragAt(rootPos) ?: return@detectDragGesturesAfterLongPress
-                            if (!isArranging) {
+                            val wasArranging = isArranging
+                            if (!wasArranging) {
                                 haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                                 startArranging()
                             }
-                            beginDrag(DragOwner.LONG_PRESS, field, kind, rootPos)
+                            if (!beginDrag(DragOwner.LONG_PRESS, field, kind, rootPos)) {
+                                return@detectDragGesturesAfterLongPress
+                            }
+                            holdMoved = false
+                            holdOrigin = rootPos
+                            // A hold that began while already arranging can
+                            // be the way out: if the finger is still down and
+                            // still in place at EXIT_HOLD_MS, drop the tile
+                            // where it was and leave the mode. The hold that
+                            // OPENED the mode never counts — keeping a finger
+                            // on the tile after the wiggle starts is normal.
+                            if (wasArranging) {
+                                val serial = dragSerial
+                                val remaining = EXIT_HOLD_MS - viewConfiguration.longPressTimeoutMillis
+                                scope.launch {
+                                    delay(remaining.coerceAtLeast(0L))
+                                    val stillHeld = dragSerial == serial && dragOwner == DragOwner.LONG_PRESS
+                                    if (!stillHeld || holdMoved || !isArranging) return@launch
+                                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    // Releases the drag, so the rest of this
+                                    // gesture's movement is ignored by onDrag.
+                                    endDrag(DragOwner.LONG_PRESS)
+                                    holdExits++
+                                    stopArranging()
+                                }
+                            }
                         },
                         onDrag = { change, amount ->
                             if (dragOwner != DragOwner.LONG_PRESS) return@detectDragGesturesAfterLongPress
                             change.consume()
                             dragPosition += amount
+                            if (!holdMoved && (dragPosition - holdOrigin).getDistance() > viewConfiguration.touchSlop) {
+                                holdMoved = true
+                            }
                             settleDrag()
                         },
                         onDragEnd = { endDrag(DragOwner.LONG_PRESS) },
@@ -503,8 +555,9 @@ internal fun ModuleGrid(
                 // carry their own clickable and take their taps before this
                 // sees them.
                 .pointerInput(Unit) {
-                    detectTapGestures { local ->
-                        if (isArranging) return@detectTapGestures
+                    var exitsAtPress = 0
+                    detectTapGestures(onPress = { exitsAtPress = holdExits }) { local ->
+                        if (isArranging || holdExits != exitsAtPress) return@detectTapGestures
                         val open = openModule ?: return@detectTapGestures
                         val field = tileAt(toRoot(local)) ?: return@detectTapGestures
                         currentModules.firstOrNull { it.module == field }?.let(open)

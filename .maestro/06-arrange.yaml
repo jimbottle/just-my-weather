@@ -94,6 +94,18 @@ appId: io.raylytics.justmyweather
     id: "module_temperature"
 - assertVisible: "Refresh"
 
+# A still hold on a tile while arranging is the other way out. The hold that
+# ENTERS the mode never counts, so it takes two: one in, one out. Maestro's
+# long-press runs well past the one-second exit hold.
+- longPressOn:
+    id: "module_temperature"
+- assertVisible: "Done arranging"
+- longPressOn:
+    id: "module_temperature"
+- assertNotVisible: "Done arranging"
+- assertVisible:
+    id: "module_temperature"
+
 # The arrangement persisted: it went through the same ViewConfig/DataStore path
 # as every other customization, so it must survive the app being killed.
 - stopApp

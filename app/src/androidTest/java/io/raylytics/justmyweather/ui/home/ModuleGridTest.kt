@@ -81,6 +81,7 @@ class ModuleGridTest {
                         arranging = false,
                         spec = Density.COMFORTABLE.spec(),
                         onStartArranging = {},
+                        onStopArranging = {},
                         onResize = { field, size -> resizes += field to size },
                         onMove = { field, index -> moves += field to index },
                         onSetForecastMode = {},
