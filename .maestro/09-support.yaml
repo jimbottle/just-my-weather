@@ -1,0 +1,45 @@
+# The two ways to reach the developer, and that they are two: an idea from the
+# bottom of Customize, a bug report from App Settings. Each opens its own form
+# with its own attachment, shown in full before anything is sent.
+#
+# The email hand-off itself isn't asserted — what opens depends on the mail
+# apps installed, and the mail's contents are covered by SupportMailTest. This
+# flow proves the entry points exist and each leads to the right form.
+appId: io.raylytics.justmyweather
+---
+- launchApp:
+    clearState: true
+    permissions:
+      all: allow
+
+- extendedWaitUntil:
+    visible: "Customize"
+    timeout: 60000
+
+# The idea prompt sits at the very end of Customize, where someone who
+# scrolled for a missing option lands.
+- tapOn: "Customize"
+- scrollUntilVisible:
+    element: "Submit your idea to the developer."
+    direction: DOWN
+    timeout: 20000
+- assertVisible: "Couldn't find what you're looking for?"
+- tapOn: "Submit your idea to the developer."
+- assertVisible: "Submit an idea"
+- assertVisible: "Attached app info"
+# An idea attaches no diagnostics.
+- assertNotVisible: "Attached diagnostics"
+# Back returns to the page the form was opened from.
+- tapOn: "Done"
+- assertVisible: "Customize view"
+- tapOn: "Done"
+
+# The bug report lives in App Settings and attaches the full diagnostics.
+- tapOn: "App Settings"
+- tapOn: "Report a bug"
+- assertVisible: "Report a bug"
+- assertVisible: "Attached diagnostics"
+- assertVisible:
+    text: ".*Source screen: App Settings.*"
+- tapOn: "Done"
+- assertVisible: "App settings"

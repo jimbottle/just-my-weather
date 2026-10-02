@@ -20,10 +20,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.lifecycle.Lifecycle
@@ -33,24 +35,36 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import io.raylytics.justmyweather.alerts.AlertWorker
+import io.raylytics.justmyweather.support.SupportKind
+import io.raylytics.justmyweather.support.bugDiagnostics
+import io.raylytics.justmyweather.support.composeSupportMail
+import io.raylytics.justmyweather.support.currentAppInfo
+import io.raylytics.justmyweather.support.ideaContext
+import io.raylytics.justmyweather.support.recentLogLines
+import io.raylytics.justmyweather.support.supportMail
 import io.raylytics.justmyweather.ui.alerts.AlertsScreen
 import io.raylytics.justmyweather.ui.alerts.AlertsViewModel
 import io.raylytics.justmyweather.ui.customize.CustomizeScreen
 import io.raylytics.justmyweather.ui.customize.CustomizeViewModel
 import io.raylytics.justmyweather.ui.home.HomeScreen
+import io.raylytics.justmyweather.ui.home.HomeUiState
 import io.raylytics.justmyweather.ui.home.HomeViewModel
 import io.raylytics.justmyweather.ui.home.SUN_TICK
 import io.raylytics.justmyweather.ui.places.PlacesScreen
 import io.raylytics.justmyweather.ui.places.PlacesViewModel
+import io.raylytics.justmyweather.ui.settings.AppSettingsScreen
+import io.raylytics.justmyweather.ui.settings.AppSettingsViewModel
+import io.raylytics.justmyweather.ui.support.SupportScreen
 import io.raylytics.justmyweather.ui.theme.JustMyWeatherTheme
 import io.raylytics.justmyweather.ui.theme.ThemeViewModel
 import io.raylytics.justmyweather.ui.theme.themeResolvesToDark
 import io.raylytics.justmyweather.view.ThemeConfig
 import kotlinx.coroutines.delay
+import java.time.Instant
 
 /** The screens this app has. A plain enum + state switch is all the navigation
  * a handful of destinations need — no nav library to learn or wire. */
-private enum class Screen { HOME, CUSTOMIZE, ALERTS, PLACES }
+private enum class Screen { HOME, CUSTOMIZE, APP_SETTINGS, ALERTS, PLACES, REPORT_BUG, SUBMIT_IDEA }
 
 class MainActivity : ComponentActivity() {
     private val container by lazy { (application as JustMyWeatherApp).container }
@@ -72,11 +86,14 @@ class MainActivity : ComponentActivity() {
     private val customizeViewModel: CustomizeViewModel by viewModels {
         viewModelFactory {
             initializer {
-                CustomizeViewModel(
-                    container.viewConfigRepository,
-                    container.gadgetbridgeSettingsRepository,
-                )
+                CustomizeViewModel(container.viewConfigRepository)
             }
+        }
+    }
+
+    private val appSettingsViewModel: AppSettingsViewModel by viewModels {
+        viewModelFactory {
+            initializer { AppSettingsViewModel(container.gadgetbridgeSettingsRepository) }
         }
     }
 
@@ -175,11 +192,13 @@ class MainActivity : ComponentActivity() {
                     App(
                         homeViewModel = homeViewModel,
                         customizeViewModel = customizeViewModel,
+                        appSettingsViewModel = appSettingsViewModel,
                         alertsViewModel = alertsViewModel,
                         placesViewModel = placesViewModel,
                         themeConfig = themeConfig,
                         onThemeChange = themeViewModel::save,
                         onEnterAlerts = ::requestNotificationsIfNeeded,
+                        hasLocationPermission = container.locationProvider::hasPermission,
                     )
                 }
             }
@@ -197,11 +216,13 @@ class MainActivity : ComponentActivity() {
 private fun App(
     homeViewModel: HomeViewModel,
     customizeViewModel: CustomizeViewModel,
+    appSettingsViewModel: AppSettingsViewModel,
     alertsViewModel: AlertsViewModel,
     placesViewModel: PlacesViewModel,
     themeConfig: ThemeConfig,
     onThemeChange: (ThemeConfig) -> Unit,
     onEnterAlerts: () -> Unit,
+    hasLocationPermission: () -> Boolean,
 ) {
     var screen by rememberSaveable { mutableStateOf(Screen.HOME) }
 
@@ -234,6 +255,7 @@ private fun App(
                 onResizeModule = homeViewModel::resizeModule,
                 onPlaces = { screen = Screen.PLACES },
                 onMoveModule = homeViewModel::moveModule,
+                onAppSettings = { screen = Screen.APP_SETTINGS },
                 onCustomize = { screen = Screen.CUSTOMIZE },
                 onAlerts = {
                     onEnterAlerts()
@@ -246,7 +268,6 @@ private fun App(
             // System back returns to the glance rather than exiting the app.
             BackHandler { screen = Screen.HOME }
             val config by customizeViewModel.config.collectAsStateWithLifecycle()
-            val gadgetbridgeEnabled by customizeViewModel.gadgetbridgeEnabled.collectAsStateWithLifecycle()
             CustomizeScreen(
                 config = config,
                 onToggle = customizeViewModel::toggle,
@@ -266,9 +287,77 @@ private fun App(
                 onSetAlertBannerPosition = customizeViewModel::setAlertBannerPosition,
                 theme = themeConfig,
                 onThemeChange = onThemeChange,
-                gadgetbridgeEnabled = gadgetbridgeEnabled,
-                onSetGadgetbridgeEnabled = customizeViewModel::setGadgetbridgeEnabled,
+                onSubmitIdea = { screen = Screen.SUBMIT_IDEA },
                 onDone = { screen = Screen.HOME },
+            )
+        }
+
+        Screen.APP_SETTINGS -> {
+            BackHandler { screen = Screen.HOME }
+            val gadgetbridgeEnabled by appSettingsViewModel.gadgetbridgeEnabled.collectAsStateWithLifecycle()
+            AppSettingsScreen(
+                gadgetbridgeEnabled = gadgetbridgeEnabled,
+                onSetGadgetbridgeEnabled = appSettingsViewModel::setGadgetbridgeEnabled,
+                onReportBug = { screen = Screen.REPORT_BUG },
+                version = "${BuildConfig.VERSION_NAME} (build ${BuildConfig.VERSION_CODE})",
+                onDone = { screen = Screen.HOME },
+            )
+        }
+
+        // Each form returns to the page it was opened from.
+        Screen.REPORT_BUG -> {
+            BackHandler { screen = Screen.APP_SETTINGS }
+            val home by homeViewModel.state.collectAsStateWithLifecycle()
+            val config by customizeViewModel.config.collectAsStateWithLifecycle()
+            val gadgetbridgeEnabled by appSettingsViewModel.gadgetbridgeEnabled.collectAsStateWithLifecycle()
+            val context = LocalContext.current
+            val app = remember { currentAppInfo() }
+            // Read once per visit: the form shows exactly what will be sent,
+            // so the attachment must not change under the user while they type.
+            val attached =
+                remember {
+                    bugDiagnostics(
+                        app = app,
+                        sourceScreen = "App Settings",
+                        state =
+                            listOf(
+                                "Glance" to
+                                    when (val h = home) {
+                                        is HomeUiState.Error -> "Error: ${h.message}"
+                                        else -> h.javaClass.simpleName
+                                    },
+                                "Location permission" to hasLocationPermission().toString(),
+                                "Visible modules" to config.visible.size.toString(),
+                                "Density" to config.density.name,
+                                "Theme" to themeConfig.toString(),
+                                "Gadgetbridge" to gadgetbridgeEnabled.toString(),
+                            ),
+                        logs = recentLogLines(),
+                        timestamp = Instant.now().toString(),
+                    )
+                }
+            SupportScreen(
+                kind = SupportKind.BUG,
+                attached = attached,
+                onSend = { message ->
+                    context.composeSupportMail(supportMail(SupportKind.BUG, app, message, attached))
+                },
+                onDone = { screen = Screen.APP_SETTINGS },
+            )
+        }
+
+        Screen.SUBMIT_IDEA -> {
+            BackHandler { screen = Screen.CUSTOMIZE }
+            val context = LocalContext.current
+            val app = remember { currentAppInfo() }
+            val attached = remember { ideaContext(app, sourceScreen = "Customize") }
+            SupportScreen(
+                kind = SupportKind.IDEA,
+                attached = attached,
+                onSend = { message ->
+                    context.composeSupportMail(supportMail(SupportKind.IDEA, app, message, attached))
+                },
+                onDone = { screen = Screen.CUSTOMIZE },
             )
         }
 

@@ -469,6 +469,14 @@ readable `AppContainer` in `JustMyWeatherApp.kt` — no Hilt). Package layout un
   customization layer has obvious files to drive.
 - **`ui/home/`** — the default glance: `HomeViewModel` exposes a single sealed
   `HomeUiState`; `HomeScreen` renders it.
+- **`ui/settings/`** — App Settings: settings about the app rather than the
+  canvas (the Gadgetbridge hand-off, the bug-report entry). Customize stays
+  about what the glance shows and how it looks.
+- **`support/`** — the two mails to the developer, ported from open-frame:
+  `SupportMail.kt` builds them (pure, tested), `SupportIntents.kt` reads the
+  device and own logcat and hands off to the email app. A bug report carries
+  full diagnostics; an idea (from the bottom of Customize) carries only a
+  four-line context. `ui/support/SupportScreen` is the form for both.
 
 Data flow: `HomeViewModel` → `WeatherRepository` → `NwsClient` → `HttpTransport`.
 

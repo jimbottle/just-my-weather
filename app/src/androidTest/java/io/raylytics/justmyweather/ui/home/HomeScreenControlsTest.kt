@@ -91,6 +91,7 @@ class HomeScreenControlsTest {
                     state = crowded,
                     onRefresh = {},
                     onSetMode = {},
+                    onAppSettings = {},
                     onCustomize = {},
                     onAlerts = {},
                     onResizeModule = { _, _ -> },
@@ -107,6 +108,7 @@ class HomeScreenControlsTest {
         // situation, not a hypothetical one.
         show(400.dp)
         compose.onNodeWithText("Refresh").assertIsDisplayed()
+        compose.onNodeWithText("App Settings").assertIsDisplayed()
         compose.onNodeWithText("Customize").assertIsDisplayed()
         compose.onNodeWithText("Alerts").assertIsDisplayed()
     }
@@ -117,6 +119,7 @@ class HomeScreenControlsTest {
         // place on a roomy screen.
         show(900.dp)
         compose.onNodeWithText("Refresh").assertIsDisplayed()
+        compose.onNodeWithText("App Settings").assertIsDisplayed()
         compose.onNodeWithText("Customize").assertIsDisplayed()
         compose.onNodeWithText("Alerts").assertIsDisplayed()
     }

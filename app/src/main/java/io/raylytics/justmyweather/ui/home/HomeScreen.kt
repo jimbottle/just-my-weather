@@ -6,7 +6,9 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -84,6 +86,7 @@ fun HomeScreen(
     state: HomeUiState,
     onRefresh: () -> Unit,
     onSetMode: (ForecastMode) -> Unit,
+    onAppSettings: () -> Unit,
     onCustomize: () -> Unit,
     onAlerts: () -> Unit,
     onResizeModule: (ModuleKey, ModuleSize) -> Unit,
@@ -165,6 +168,7 @@ fun HomeScreen(
                     refreshing = state.refreshing,
                     refreshError = state.refreshError,
                     onRefresh = onRefresh,
+                    onAppSettings = onAppSettings,
                     onCustomize = onCustomize,
                     onAlerts = onAlerts,
                 )
@@ -496,11 +500,13 @@ internal fun ObservedLine(
  * full-screen error in the first place — and leaving it above the fold while
  * the button stayed pinned would have split the two apart again.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ActionBar(
     refreshing: Boolean,
     refreshError: String?,
     onRefresh: () -> Unit,
+    onAppSettings: () -> Unit,
     onCustomize: () -> Unit,
     onAlerts: () -> Unit,
 ) {
@@ -517,14 +523,20 @@ private fun ActionBar(
                 textAlign = TextAlign.Center,
             )
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        // Four labels at TextButton's default 12dp padding are just wider than
+        // a Pixel 7, so the buttons sit closer than the default; the FlowRow is
+        // the fallback for narrower phones, where a wrapped button beats one
+        // clipped off the edge.
+        val padding = PaddingValues(horizontal = 10.dp, vertical = 8.dp)
+        FlowRow(horizontalArrangement = Arrangement.Center) {
             // The button label reflects the refreshing flag, so a re-fetch is an
             // observable state change (and the flag stops being dead state).
-            TextButton(onClick = onRefresh, enabled = !refreshing) {
+            TextButton(onClick = onRefresh, enabled = !refreshing, contentPadding = padding) {
                 Text(if (refreshing) "Refreshing…" else "Refresh")
             }
-            TextButton(onClick = onCustomize) { Text("Customize") }
-            TextButton(onClick = onAlerts) { Text("Alerts") }
+            TextButton(onClick = onAppSettings, contentPadding = padding) { Text("App Settings") }
+            TextButton(onClick = onCustomize, contentPadding = padding) { Text("Customize") }
+            TextButton(onClick = onAlerts, contentPadding = padding) { Text("Alerts") }
         }
     }
 }

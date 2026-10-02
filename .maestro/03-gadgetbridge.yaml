@@ -18,16 +18,10 @@ appId: io.raylytics.justmyweather
       all: allow
 
 - extendedWaitUntil:
-    visible: "Customize"
+    visible: "App Settings"
     timeout: 60000
-- tapOn: "Customize"
-- assertVisible: "Customize view"
-
-# The control lives at the bottom of the scrolling options page.
-- scrollUntilVisible:
-    element: "Send to Gadgetbridge"
-    direction: DOWN
-    timeout: 20000
+- tapOn: "App Settings"
+- assertVisible: "App settings"
 - assertVisible: "Send to Gadgetbridge"
 
 # Off by default. The Switch carries no text, so it's targeted by testTag,
@@ -43,11 +37,7 @@ appId: io.raylytics.justmyweather
     id: "gadgetbridge-toggle"
     checked: true
 - tapOn: "Done"
-- tapOn: "Customize"
-- scrollUntilVisible:
-    element: "Send to Gadgetbridge"
-    direction: DOWN
-    timeout: 20000
+- tapOn: "App Settings"
 - assertVisible:
     id: "gadgetbridge-toggle"
     checked: true

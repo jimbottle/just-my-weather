@@ -87,8 +87,7 @@ fun CustomizeScreen(
     onSetAlertBannerPosition: (AlertBannerPosition) -> Unit,
     theme: ThemeConfig,
     onThemeChange: (ThemeConfig) -> Unit,
-    gadgetbridgeEnabled: Boolean,
-    onSetGadgetbridgeEnabled: (Boolean) -> Unit,
+    onSubmitIdea: () -> Unit,
     onDone: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -162,46 +161,30 @@ fun CustomizeScreen(
                     position = config.alertBannerPosition,
                     onSelect = onSetAlertBannerPosition,
                 )
-                GadgetbridgeToggle(enabled = gadgetbridgeEnabled, onChange = onSetGadgetbridgeEnabled)
+                IdeaPrompt(onSubmitIdea = onSubmitIdea)
             }
         }
     }
 }
 
 /**
- * Opt-in hand-off of each reading to Gadgetbridge, which relays it to a paired
- * watch. Last in the list and off by default: it sends data to another app, so
- * it stays something you go and switch on rather than something you discover
- * already running.
+ * The last thing on the page, where someone who scrolled the whole list
+ * looking for an option lands when it isn't there. Opens the idea form — not
+ * the bug report: a missing feature is a wish, and it travels without the
+ * diagnostics a bug needs.
  */
 @Composable
-private fun GadgetbridgeToggle(
-    enabled: Boolean,
-    onChange: (Boolean) -> Unit,
-) {
+private fun IdeaPrompt(onSubmitIdea: () -> Unit) {
     Column(
-        modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = Modifier.fillMaxWidth().padding(top = 24.dp, bottom = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text("Watch", style = MaterialTheme.typography.labelMedium)
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text("Send to Gadgetbridge", style = MaterialTheme.typography.bodyLarge)
-            Switch(
-                checked = enabled,
-                onCheckedChange = onChange,
-                modifier = Modifier.testTag("gadgetbridge-toggle"),
-            )
-        }
         Text(
-            text = "Hands each new reading to Gadgetbridge, which passes it to a paired watch. " +
-                "Does nothing if Gadgetbridge isn't installed.",
-            style = MaterialTheme.typography.bodySmall,
+            text = "Couldn't find what you're looking for?",
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        TextButton(onClick = onSubmitIdea) { Text("Submit your idea to the developer.") }
     }
 }
 
