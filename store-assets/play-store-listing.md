@@ -2,8 +2,8 @@
 
 Living reference for every field of the Google Play Console listing. **Update
 it here first, then copy into Play Console** in the same PR that changes the
-app. Last synced with the console: _never — the app entry has not been created
-yet_ (see docs/PLAY_STORE.md "Bootstrap").
+app. Last synced with the console: _app entry created 2026-10-02; listing and
+declarations not yet filled_ (just-my-weather-obf).
 
 Everything below is documentation except the fenced copy blocks, which are
 what gets pasted. Play Console fields do **not** accept Markdown: asterisks
@@ -121,6 +121,8 @@ Data types:
 | Type | Collected | Shared | Ephemeral | Required / optional | Purpose |
 |---|---|---|---|---|---|
 | Location → Approximate location | Yes | Yes | Yes | Optional | App functionality |
+| App info and performance → Diagnostics | Yes | No | No | Optional | App functionality |
+| Personal info → Email address | Yes | No | No | Optional | Developer communications |
 
 Notes for the form:
 
@@ -134,9 +136,20 @@ Notes for the form:
   and defensible reading.
 - "Optional" because device location can be declined and a saved place used
   instead; the place's coordinates still travel the same path.
-- Every other data type (personal info, financial, health, messages, photos,
-  audio, files, calendar, contacts, app activity, web browsing, app info and
-  performance, device IDs): **not collected**.
+- **Diagnostics** and **Email address** cover the in-app bug report and idea
+  forms (App settings → Report a bug; the foot of Customize). Nothing is sent
+  automatically: the app drafts an email to dev@raylytics.io and the user sends
+  it from their own email app, after seeing the full diagnostics block. That
+  is arguably not "collection by the app" at all, but the developer does
+  receive device model, Android version, a few settings, and up to 50 lines
+  of the app's own log, plus the sender's address — declaring them as
+  optional, not shared, not ephemeral is the conservative reading and matches
+  the privacy policy's "Bug reports and ideas you send" section. (Decided by
+  the agent 2026-10-02 as a recommendation; Evan confirms when filling the
+  form.)
+- Every other data type (financial, health, messages, photos, audio, files,
+  calendar, contacts, app activity, web browsing, crash logs, device IDs, and
+  the rest of personal info): **not collected**.
 
 ## Per-release fields
 

@@ -1,6 +1,6 @@
 # Privacy Policy — Just My Weather
 
-_Last updated: 2026-10-01_
+_Last updated: 2026-10-02_
 
 Just My Weather is a free, open-source Android weather app published by
 Raylytics, LLC. It shows the weather for a place you choose, lets you build your
@@ -11,10 +11,11 @@ Canonical URL: https://raylytics.io/justmyweather/privacy
 
 ## Summary
 
-**Just My Weather does not collect, store, sell, or share your personal
-information.** It has no accounts, no backend server of its own, no ads, no
-analytics, and no crash reporting. The developer never sees anything you do in
-the app.
+**Just My Weather does not sell or share your personal information, and
+collects none unless you choose to email the developer.** It has no accounts,
+no backend server of its own, no ads, no analytics, and no automatic crash
+reporting. The developer sees nothing about
+how you use the app unless you choose to email a bug report or an idea.
 
 Everything you set up — which modules show, how they are arranged, your theme,
 your saved places, your alert rules — stays on your phone (and in your own
@@ -22,7 +23,9 @@ Android backup, if you use it). If you turn on the Gadgetbridge hand-off, the
 current weather and that place's name can also reach your paired watch. The
 only data the app itself sends off your device is the latitude and longitude
 of the place you are viewing, or that your alerts watch, sent to public
-weather services so the app can fetch the forecast.
+weather services so the app can fetch the forecast. A bug report or idea you
+send from the app goes from your own email app, and you see every line of it
+before you send it.
 
 ## What the app accesses
 
@@ -90,12 +93,36 @@ No notification service outside your device is involved.
 
 ## Optional watch hand-off
 
-If you turn on "Send to Gadgetbridge" in Customize, the app shares the current
+If you turn on "Send to Gadgetbridge" in App settings, the app shares the current
 weather, and the name of the place it is for, with the Gadgetbridge app
 installed on the same phone, which can relay it to a paired watch. This is a
 local hand-off between two apps on your device; Gadgetbridge's own privacy
-terms cover what it does from there. The option is off by default and only
-appears when Gadgetbridge is installed.
+terms cover what it does from there. The option is off by default and does
+nothing if Gadgetbridge is not installed.
+
+## Bug reports and ideas you send
+
+App settings has "Report a bug", and the foot of Customize offers to submit an
+idea. Either one opens a form in the app. Nothing leaves your phone until you
+tap "Email bug report" or "Email idea", and even then the app only hands a
+drafted email to your own email app, addressed to dev@raylytics.io, for you to
+review and send yourself. The app never sends it on its own.
+
+- **A bug report** includes what you write, plus a diagnostics block shown on
+  the form before you send: the app version, your Android version and phone
+  model, a few app settings (whether location permission is granted, how many
+  modules are shown, density, theme, whether the Gadgetbridge hand-off is on,
+  and whether the weather loaded), and the app's own most recent log lines (up
+  to 50, including any error messages). It does not include your location,
+  saved places, or alert rules.
+- **An idea** includes what you write, the app version, your Android version
+  and phone model, and which screen you sent it from.
+
+Because it is an ordinary email, the developer also receives your email
+address and whatever your email provider adds. The developer uses these emails
+only to fix bugs, consider ideas, and reply to you; they are not shared with
+anyone or used for marketing. To have an email you sent deleted, ask at the
+same address.
 
 ## Permissions
 
@@ -112,7 +139,7 @@ appears when Gadgetbridge is installed.
 
 - No accounts or sign-in.
 - No advertising and no advertising ID.
-- No analytics, telemetry, or crash reporting.
+- No analytics, telemetry, or automatic crash reporting.
 - No selling or sharing of personal information.
 - No precise location. The only positions kept are the ones listed above; they
   leave your phone only as forecast coordinates sent to the weather services
