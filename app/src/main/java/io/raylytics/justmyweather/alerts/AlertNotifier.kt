@@ -53,7 +53,7 @@ class AlertNotifier(
         val channel = if (silent) QUIET_CHANNEL_ID else CHANNEL_ID
         val notification =
             NotificationCompat.Builder(context, channel)
-                .setSmallIcon(R.drawable.ic_launcher_foreground)
+                .setSmallIcon(R.drawable.ic_stat_notify)
                 .setContentTitle("${rule.subject.label} alert")
                 .setContentText(decision.reason)
                 .setCategory(NotificationCompat.CATEGORY_STATUS)
@@ -80,7 +80,7 @@ class AlertNotifier(
         val body = alert.headline.ifBlank { alert.event }
         val notification =
             NotificationCompat.Builder(context, SAFETY_CHANNEL_ID)
-                .setSmallIcon(R.drawable.ic_launcher_foreground)
+                .setSmallIcon(R.drawable.ic_stat_notify)
                 .setContentTitle(alert.event)
                 .setContentText(body)
                 .setStyle(NotificationCompat.BigTextStyle().bigText(body))

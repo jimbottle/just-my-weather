@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Themed-icon layer (Android 13+): the launcher mark reduced to one colour —
+     the window frame and the sun in its top pane. The clouds and rain are left
+     out because, flattened to a single tint, they fill the lower panes into a
+     blob. Same geometry and safe-area scaling as ic_launcher_foreground. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+  <group android:translateX="18" android:translateY="18" android:scaleX="0.72" android:scaleY="0.72">
+    <group>
+      <clip-path android:pathData="M18,18h64v30.8h-64z"/>
+      <path android:pathData="M39,50a11,11 0 1 0 22,0a11,11 0 1 0 -22,0z" android:fillColor="#FFFFFF"/>
+      <path android:pathData="M50 35 L50 29 M58.82 37.87 L62.34 33.01 M41.18 37.87 L37.66 33.01 M64.27 45.37 L69.97 43.51 M35.73 45.37 L30.03 43.51" android:strokeColor="#FFFFFF" android:strokeWidth="2.8" android:strokeLineCap="round"/>
+    </group>
+    <path android:pathData="M50,50v32M18,50h64" android:strokeColor="#FFFFFF" android:strokeWidth="4" android:strokeLineCap="square"/>
+    <path android:pathData="M18,18h64v64h-64z" android:strokeColor="#FFFFFF" android:strokeWidth="4" android:strokeLineCap="square"/>
+  </group>
+</vector>

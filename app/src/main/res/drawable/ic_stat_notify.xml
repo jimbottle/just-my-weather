@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Status-bar icon for alert notifications. Android draws small icons as an
+     alpha mask, so the full-colour launcher art would flatten into a blob; this
+     is the one-colour mark from ic_launcher_monochrome, cropped to the frame
+     (design units 16-84) so it fills the 24dp box. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="68" android:viewportHeight="68">
+  <group android:translateX="-16" android:translateY="-16">
+    <group>
+      <clip-path android:pathData="M18,18h64v30.8h-64z"/>
+      <path android:pathData="M39,50a11,11 0 1 0 22,0a11,11 0 1 0 -22,0z" android:fillColor="#FFFFFF"/>
+      <path android:pathData="M50 35 L50 29 M58.82 37.87 L62.34 33.01 M41.18 37.87 L37.66 33.01 M64.27 45.37 L69.97 43.51 M35.73 45.37 L30.03 43.51" android:strokeColor="#FFFFFF" android:strokeWidth="2.8" android:strokeLineCap="round"/>
+    </group>
+    <path android:pathData="M50,50v32M18,50h64" android:strokeColor="#FFFFFF" android:strokeWidth="4" android:strokeLineCap="square"/>
+    <path android:pathData="M18,18h64v64h-64z" android:strokeColor="#FFFFFF" android:strokeWidth="4" android:strokeLineCap="square"/>
+  </group>
+</vector>

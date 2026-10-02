@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   Legacy launcher icon for API 24-25, which can't render the adaptive icon in
-  mipmap-anydpi-v26. Same sun-on-dark-field, composed as a plain layer-list so
+  mipmap-anydpi-v26. Same mark on the dark field, composed as a plain layer-list so
   it resolves as an ordinary drawable on pre-26 devices. API 26+ prefers the
   adaptive icon (the more specific -v26 qualifier wins).
 -->
