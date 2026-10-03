@@ -31,6 +31,12 @@ sealed interface BillingEvent {
 
     data object Cancelled : BillingEvent
 
+    /** Play refused the sheet because the account already owns the product —
+     * the device's copy is stale (a reinstall while offline), so Play must be
+     * asked again rather than this event trusted for its contents, which Play
+     * leaves empty. */
+    data object AlreadyOwned : BillingEvent
+
     data class Failed(val message: String) : BillingEvent
 }
 

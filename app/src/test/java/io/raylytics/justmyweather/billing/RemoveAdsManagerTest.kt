@@ -127,6 +127,12 @@ class RemoveAdsManagerTest {
         runCurrent()
         assertFalse(entitlement.adsRemoved.first(), "Play answered and the purchase is gone")
         assertEquals(RemoveAdsStatus.NothingToRestore, manager.status.value)
+
+        gateway.owned = null
+        manager.restore()
+        assertEquals(RemoveAdsStatus.Restoring, manager.status.value)
+        runCurrent()
+        assertTrue(manager.status.value is RemoveAdsStatus.Failed, "unreachable on a restore is said so")
     }
 
     @Test
@@ -154,6 +160,25 @@ class RemoveAdsManagerTest {
     }
 
     @Test
+    fun `an already-owned refusal asks Play again, which is what restores a stale device`() = runTest(dispatcher) {
+        // Reinstalled offline: Play could not be asked at start, so the
+        // device thinks ads are on. Tapping Buy gets ITEM_ALREADY_OWNED with
+        // no purchase attached; by then Play is reachable and says owned.
+        val gateway = FakeGateway().apply { owned = null }
+        val (manager, _, entitlement) = harness(gateway)
+        manager.start()
+        runCurrent()
+        assertFalse(entitlement.adsRemoved.first())
+        gateway.owned = listOf(owned())
+        manager.buy(FAKE_ACTIVITY)
+        runCurrent()
+        gateway.events.emit(BillingEvent.AlreadyOwned)
+        runCurrent()
+        assertTrue(entitlement.adsRemoved.first())
+        assertEquals(RemoveAdsStatus.Idle, manager.status.value)
+    }
+
+    @Test
     fun `a pending purchase from the sheet grants nothing yet and revokes nothing`() = runTest(dispatcher) {
         val (manager, gateway, entitlement) = harness()
         entitlement.setAdsRemoved(true)
@@ -164,6 +189,7 @@ class RemoveAdsManagerTest {
         runCurrent()
         assertTrue(entitlement.adsRemoved.first())
         assertTrue(gateway.acknowledged.isEmpty(), "a pending purchase must not be acknowledged")
+        assertEquals(RemoveAdsStatus.Pending, manager.status.value, "and the buyer is told it is pending")
     }
 
     @Test

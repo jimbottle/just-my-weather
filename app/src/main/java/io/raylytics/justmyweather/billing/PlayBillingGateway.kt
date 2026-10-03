@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.coroutines.resume
 
 /**
@@ -43,23 +44,31 @@ class PlayBillingGateway(context: Context) : BillingGateway, PurchasesUpdatedLis
     private val details = mutableMapOf<String, ProductDetails>()
     private val connecting = Mutex()
 
+    /** Connects if needed. Bounded: a bind that neither finishes nor fails
+     * (Play Store killed mid-setup) must not hold the mutex forever, or
+     * every later call — and the settings row — would hang on it. */
     private suspend fun connected(): Boolean {
         if (client.isReady) return true
         return connecting.withLock {
             if (client.isReady) return true
-            suspendCancellableCoroutine { cont ->
-                client.startConnection(
-                    object : BillingClientStateListener {
-                        override fun onBillingSetupFinished(result: BillingResult) {
-                            if (cont.isActive) cont.resume(result.responseCode == BillingClient.BillingResponseCode.OK)
-                        }
+            withTimeoutOrNull(CONNECT_TIMEOUT_MS) {
+                suspendCancellableCoroutine { cont ->
+                    client.startConnection(
+                        object : BillingClientStateListener {
+                            override fun onBillingSetupFinished(result: BillingResult) {
+                                val ok = result.responseCode == BillingClient.BillingResponseCode.OK
+                                if (cont.isActive) cont.resume(ok)
+                            }
 
-                        override fun onBillingServiceDisconnected() {
-                            // The next call finds isReady false and reconnects.
-                        }
-                    },
-                )
-            }
+                            override fun onBillingServiceDisconnected() {
+                                // Before setup finished: this attempt is over.
+                                // After: the next call finds isReady false.
+                                if (cont.isActive) cont.resume(false)
+                            }
+                        },
+                    )
+                }
+            } ?: false
         }
     }
 
@@ -137,13 +146,14 @@ class PlayBillingGateway(context: Context) : BillingGateway, PurchasesUpdatedLis
                 BillingClient.BillingResponseCode.OK ->
                     BillingEvent.Purchases(purchases.orEmpty().map { it.toRecord() })
                 BillingClient.BillingResponseCode.USER_CANCELED -> BillingEvent.Cancelled
-                // Already owned: the sheet refused, but the account has it.
-                // Report it as a purchase so the manager restores from Play.
-                BillingClient.BillingResponseCode.ITEM_ALREADY_OWNED ->
-                    BillingEvent.Purchases(purchases.orEmpty().map { it.toRecord() })
+                BillingClient.BillingResponseCode.ITEM_ALREADY_OWNED -> BillingEvent.AlreadyOwned
                 else -> BillingEvent.Failed(result.debugMessage.ifBlank { "The purchase didn't go through." })
             }
         _events.tryEmit(event)
+    }
+
+    private companion object {
+        const val CONNECT_TIMEOUT_MS = 10_000L
     }
 
     private fun Purchase.toRecord() =

@@ -114,7 +114,7 @@ private fun AdsSection(
             }
             return@Column
         }
-        val busy = status == RemoveAdsStatus.Busy
+        val busy = status == RemoveAdsStatus.Busy || status == RemoveAdsStatus.Restoring
         Column(
             modifier =
                 Modifier
@@ -142,6 +142,9 @@ private fun AdsSection(
             when (status) {
                 RemoveAdsStatus.Idle -> null
                 RemoveAdsStatus.Busy -> "Opening Google Play…"
+                RemoveAdsStatus.Restoring -> "Checking with Google Play…"
+                RemoveAdsStatus.Pending ->
+                    "Your purchase is pending. The banner goes once Google Play confirms the payment."
                 is RemoveAdsStatus.Failed -> status.message
                 RemoveAdsStatus.NothingToRestore -> "No purchase found for this Google account."
             }

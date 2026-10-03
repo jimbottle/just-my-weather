@@ -22,6 +22,13 @@ sealed interface RemoveAdsStatus {
     /** Play's sheet is open, or its answer is being processed. */
     data object Busy : RemoveAdsStatus
 
+    /** Play is being asked what the account owns. */
+    data object Restoring : RemoveAdsStatus
+
+    /** Bought, but Play has not confirmed payment yet (cash at a store);
+     * ownership arrives later through the purchase listener. */
+    data object Pending : RemoveAdsStatus
+
     data class Failed(val message: String) : RemoveAdsStatus
 
     /** A restore ran and Play reported no purchase on this account. */
@@ -84,16 +91,16 @@ class RemoveAdsManager(
 
     /** Asks Play again, for a new device or a reinstall. */
     fun restore() {
-        _status.value = RemoveAdsStatus.Busy
-        scope.launch {
-            _status.value =
-                when (syncWithPlay()) {
-                    true -> RemoveAdsStatus.Idle
-                    false -> RemoveAdsStatus.NothingToRestore
-                    null -> RemoveAdsStatus.Failed("Couldn't reach Google Play. Check your connection and try again.")
-                }
-        }
+        _status.value = RemoveAdsStatus.Restoring
+        scope.launch { _status.value = restoreStatus() }
     }
+
+    private suspend fun restoreStatus(): RemoveAdsStatus =
+        when (syncWithPlay()) {
+            true -> RemoveAdsStatus.Idle
+            false -> RemoveAdsStatus.NothingToRestore
+            null -> RemoveAdsStatus.Failed("Couldn't reach Google Play. Check your connection and try again.")
+        }
 
     private suspend fun loadOffer() {
         _offer.value = runCatching { gateway.queryOffer(REMOVE_ADS_PRODUCT_ID) }.getOrNull()
@@ -124,9 +131,13 @@ class RemoveAdsManager(
                 // just bought, not what the account owns, so a pending or
                 // unrelated purchase here must not revoke anything.
                 if (ownsRemoveAds(event.purchases)) record(event.purchases)
-                _status.value = RemoveAdsStatus.Idle
+                val pending = event.purchases.any { REMOVE_ADS_PRODUCT_ID in it.products && !it.purchased }
+                _status.value = if (pending) RemoveAdsStatus.Pending else RemoveAdsStatus.Idle
             }
             BillingEvent.Cancelled -> _status.value = RemoveAdsStatus.Idle
+            // The sheet refused because the account owns it already: the
+            // device's copy is stale, and Play — not the event — says so.
+            BillingEvent.AlreadyOwned -> _status.value = restoreStatus()
             is BillingEvent.Failed -> _status.value = RemoveAdsStatus.Failed(event.message)
         }
     }

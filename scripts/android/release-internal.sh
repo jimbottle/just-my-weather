@@ -38,11 +38,28 @@ while [ $# -gt 0 ]; do
 done
 
 cd "$PROJECT_ROOT"
+# The file alone proves nothing: a copy of the example, a missing key (Gradle
+# falls back to the sample id, silently, because the file exists) or the
+# sample ids pasted in would all ship a build with no real ads.
+admob_problem=""
 if [ ! -f app/admob.properties ]; then
+  admob_problem="app/admob.properties is missing"
+else
+  for key in appId bannerUnitId; do
+    value="$(sed -nE "s/^[[:space:]]*$key[[:space:]]*=[[:space:]]*(.*)$/\1/p" app/admob.properties | head -1)"
+    case "$value" in
+      "") admob_problem="$key is missing from app/admob.properties" ;;
+      ca-app-pub-3940256099942544*) admob_problem="$key is Google's sample id" ;;
+      *XXXX*|*YYYY*|*ZZZZ*) admob_problem="$key is still the example placeholder" ;;
+    esac
+    [ -n "$admob_problem" ] && break
+  done
+fi
+if [ -n "$admob_problem" ]; then
   if [ "$sample_ads" = 1 ]; then
-    echo "!! app/admob.properties missing: this build serves Google's SAMPLE ads. Internal testing only — do NOT promote it." >&2
+    echo "!! $admob_problem: this build serves Google's SAMPLE ads. Internal testing only — do NOT promote it." >&2
   else
-    die "app/admob.properties missing, so this build would serve Google's SAMPLE ads. Add the real ids (app/admob.properties.example, just-my-weather-1zp) or pass --sample-ads for a testers-only build."
+    die "$admob_problem, so this build would serve Google's SAMPLE ads. Fix app/admob.properties (see app/admob.properties.example, just-my-weather-1zp) or pass --sample-ads for a testers-only build."
   fi
 fi
 if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
