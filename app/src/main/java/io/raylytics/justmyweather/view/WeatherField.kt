@@ -21,7 +21,10 @@ enum class WeatherField(
     TEMPERATURE("temperature", "Temperature"),
 
     /** The station's heat index or wind chill — what the air feels like,
-     * which on a humid or a windy day is the number people dress for. */
+     * which on a humid or a windy day is the number people dress for.
+     * Falls back to the air temperature when the station sends neither — it
+     * feels like the temperature then.
+     */
     FEELS_LIKE("feels_like", "Feels like"),
     CONDITIONS("conditions", "Conditions"),
     WIND("wind", "Wind"),
@@ -109,9 +112,11 @@ enum class WeatherField(
         }
 
     /**
-     * The display value for this field, or null when the snapshot lacks it.
-     * A new field adds a branch to [numericValue] / [formatValue] — both are
-     * exhaustive (no `else`), so the compiler won't let you forget to handle it.
+     * The display value for this field, or null when the snapshot lacks it —
+     * except precipitation, whose absence is the ordinary case for a station
+     * and reads "Not reported" rather than null. A new field adds a branch to
+     * [numericValue] / [formatValue] — both are exhaustive (no `else`), so the
+     * compiler won't let you forget to handle it.
      */
     fun format(snapshot: WeatherSnapshot): String? =
         when (this) {
