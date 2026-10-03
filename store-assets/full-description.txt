@@ -28,7 +28,7 @@ FREE, WITH ONE SMALL BANNER
 • Just My Weather is free. A single banner ad sits at the bottom of the screen, out of the way of your weather.
 • A one-time $0.99 purchase removes it for good, on every device signed in to your Google account.
 
-NO ACCOUNT, NO ANALYTICS
+NO ACCOUNT, YOUR DATA STAYS PUT
 
 • No sign-up and no analytics of our own. Your view, places, and alert rules stay on your phone.
 • Location is coarse and optional. The weather services receive only the coordinates of the place you are looking at.
