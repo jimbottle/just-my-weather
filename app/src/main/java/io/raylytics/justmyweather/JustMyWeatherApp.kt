@@ -3,9 +3,13 @@ package io.raylytics.justmyweather
 import android.app.Application
 import android.content.Context
 import androidx.datastore.preferences.preferencesDataStore
+import com.google.android.gms.ads.MobileAds
 import io.raylytics.justmyweather.alerts.AlertNotifier
 import io.raylytics.justmyweather.alerts.AlertScheduling
 import io.raylytics.justmyweather.alerts.AlertWorker
+import io.raylytics.justmyweather.billing.PlayBillingGateway
+import io.raylytics.justmyweather.billing.RemoveAdsManager
+import io.raylytics.justmyweather.data.AdsEntitlementRepository
 import io.raylytics.justmyweather.data.AlertRulesRepository
 import io.raylytics.justmyweather.data.AlertSettingsRepository
 import io.raylytics.justmyweather.data.DataStoreLastLocationStore
@@ -40,7 +44,7 @@ private val Context.dataStore by preferencesDataStore(name = "settings")
  * single readable container beats annotations a first-time contributor would
  * have to learn: every dependency is constructed in one place, in plain sight.
  */
-class AppContainer(context: Context) {
+class AppContainer(context: Context, scope: CoroutineScope) {
     private val nwsClient = NwsClient(transport = OkHttpTransport())
 
     private val appContext = context.applicationContext
@@ -109,6 +113,12 @@ class AppContainer(context: Context) {
             settings = gadgetbridgeSettingsRepository,
             broadcaster = GadgetbridgeBroadcaster(appContext),
         )
+
+    // The banner and the $0.99 that removes it. The entitlement is the
+    // device's copy of what Play says; the manager keeps the two in step and
+    // is the only thing that talks to Play Billing.
+    val adsEntitlementRepository = AdsEntitlementRepository(appContext.dataStore)
+    val removeAdsManager = RemoveAdsManager(PlayBillingGateway(appContext), adsEntitlementRepository, scope)
 }
 
 class JustMyWeatherApp : Application() {
@@ -119,7 +129,7 @@ class JustMyWeatherApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        container = AppContainer(this)
+        container = AppContainer(this, appScope)
         container.alertNotifier.ensureChannel()
         // Schedule the hourly check only when rules are live, so a quiet install
         // does no background work; a launch check gives any standing rule timely
@@ -131,6 +141,17 @@ class JustMyWeatherApp : Application() {
             val hasWork = AlertScheduling.hasWork(rules, settings)
             AlertWorker.sync(this@JustMyWeatherApp, hasWork, settings.pollMinutes)
             if (hasWork) AlertWorker.runOnce(this@JustMyWeatherApp)
+        }
+        appScope.launch {
+            // An owner's phone never starts the ads SDK at all — nothing to
+            // show, so nothing to initialise, and no network it would wake
+            // for. Everyone else initialises it here, off the main thread,
+            // where it costs no frame. Then Play is asked what the account
+            // owns, which is what turns a reinstall back into an owner.
+            if (!container.adsEntitlementRepository.adsRemoved.first()) {
+                MobileAds.initialize(this@JustMyWeatherApp) {}
+            }
+            container.removeAdsManager.start()
         }
     }
 }

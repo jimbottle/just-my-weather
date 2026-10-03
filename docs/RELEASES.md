@@ -45,6 +45,10 @@ just-my-weather-zi8). versionCode 2 is burned: the next upload is 3.
   cadence and quiet hours; per-rule fire limit (once, up to 99 times, or
   every time) — a rule that reaches its limit switches itself off and the
   toggle re-arms it (just-my-weather-8di).
+- Added: one AdMob banner at the foot of the glance (non-personalized) and
+  a one-time Remove Ads purchase (`remove_ads`, $0.99) in App settings, with
+  restore; the entitlement is kept on the device and re-checked against Play
+  on every start (epic just-my-weather-zi8.3).
 - Changed: the extended daily forecast comes from MET Norway (CC BY 4.0,
   commercial use allowed) instead of Open-Meteo, whose free tier is
   non-commercial and the Play build carries ads; the cap drops from fourteen

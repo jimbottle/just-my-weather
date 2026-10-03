@@ -1,0 +1,5 @@
+# AdMob ids for RELEASE builds — copy to app/admob.properties (gitignored).
+# Debug builds ignore this file and always serve Google's sample ads.
+# From https://admob.google.com → Apps → Just My Weather (just-my-weather-1zp).
+appId=ca-app-pub-XXXXXXXXXXXXXXXX~YYYYYYYYYY
+bannerUnitId=ca-app-pub-XXXXXXXXXXXXXXXX/ZZZZZZZZZZ

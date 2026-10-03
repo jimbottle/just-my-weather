@@ -463,6 +463,11 @@ readable `AppContainer` in `JustMyWeatherApp.kt` — no Hilt). Package layout un
 - **`data/`** — `WeatherRepository` is the single seam between NWS and the app
   (cache point resolution, fill labels). `WeatherSnapshot` is the one domain
   object the UI depends on — wire shapes never leak past the repository.
+- **`ads/`** + **`billing/`** — the banner and the purchase that removes it.
+  `AdBanner` is the only composable that draws an ad (one, at the foot of the
+  glance, non-personalized per `AdPolicy`); `RemoveAdsManager` keeps the
+  on-device entitlement in step with Play behind the `BillingGateway` seam.
+  See `docs/architecture.md`.
 - **`location/`** — `LocationProvider` over the platform `LocationManager`
   (coarse only, no Play Services, so it builds from source anywhere).
 - **`ui/theme/`** — the small palette + type scale, all in one place so the

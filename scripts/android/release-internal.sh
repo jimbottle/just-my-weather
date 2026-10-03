@@ -8,9 +8,12 @@
 #   5. upload-play --track internal   — live for testers in minutes, no review
 #
 # Afterwards: commit the versionCode bump and log the cut in docs/RELEASES.md.
-# Only --notes and --status are accepted; anything else (a different track,
-# an explicit AAB) contradicts the intent of this script — run upload-play.sh
-# directly. Before the app's first production release Play accepts only
+# Only --notes, --status and --sample-ads are accepted; anything else (a
+# different track, an explicit AAB) contradicts the intent of this script —
+# run upload-play.sh directly. Without app/admob.properties the release
+# build serves Google's SAMPLE ads; that is fine for a build testers will
+# look at but must never reach production, so it needs --sample-ads to say
+# so out loud (app/build.gradle.kts, store-assets/README.md). Before the app's first production release Play accepts only
 # draft releases, so until launch run this with `--status draft` and roll
 # the draft out from the console (docs/PLAY_STORE.md).
 #
@@ -22,17 +25,26 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$SCRIPT_DIR/common.sh"
 
 forwarded_args=()
+sample_ads=0
 while [ $# -gt 0 ]; do
   case "$1" in
+    --sample-ads) sample_ads=1; shift ;;
     --notes) shift; [ $# -gt 0 ] || die "--notes requires a value"; forwarded_args+=(--notes "$1"); shift ;;
     --notes=*) forwarded_args+=("$1"); shift ;;
     --status) shift; [ $# -gt 0 ] || die "--status requires draft or completed"; forwarded_args+=(--status "$1"); shift ;;
     --status=*) forwarded_args+=("$1"); shift ;;
-    *) die "release-internal.sh only accepts --notes <text> and --status draft|completed. For other tracks or AAB paths, run upload-play.sh directly." ;;
+    *) die "release-internal.sh only accepts --notes <text>, --status draft|completed and --sample-ads. For other tracks or AAB paths, run upload-play.sh directly." ;;
   esac
 done
 
 cd "$PROJECT_ROOT"
+if [ ! -f app/admob.properties ]; then
+  if [ "$sample_ads" = 1 ]; then
+    echo "!! app/admob.properties missing: this build serves Google's SAMPLE ads. Internal testing only — do NOT promote it." >&2
+  else
+    die "app/admob.properties missing, so this build would serve Google's SAMPLE ads. Add the real ids (app/admob.properties.example, just-my-weather-1zp) or pass --sample-ads for a testers-only build."
+  fi
+fi
 if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
   die "working tree has uncommitted changes; commit (or stash) first so the cut is a known commit."
 fi

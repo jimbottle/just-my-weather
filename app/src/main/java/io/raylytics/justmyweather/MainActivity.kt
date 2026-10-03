@@ -13,6 +13,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.MaterialTheme
@@ -35,6 +36,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import io.raylytics.justmyweather.ads.AdBanner
+import io.raylytics.justmyweather.ads.AdPolicy
 import io.raylytics.justmyweather.alerts.AlertWorker
 import io.raylytics.justmyweather.support.SupportKind
 import io.raylytics.justmyweather.support.bugDiagnostics
@@ -101,7 +104,7 @@ class MainActivity : ComponentActivity() {
 
     private val appSettingsViewModel: AppSettingsViewModel by viewModels {
         viewModelFactory {
-            initializer { AppSettingsViewModel(container.gadgetbridgeSettingsRepository) }
+            initializer { AppSettingsViewModel(container.gadgetbridgeSettingsRepository, container.removeAdsManager) }
         }
     }
 
@@ -167,6 +170,9 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             val themeConfig by themeViewModel.config.collectAsStateWithLifecycle()
+            // Starts true: the banner is withheld until the store's answer
+            // is read, so an owner never sees it flash in.
+            val adsRemoved by container.adsEntitlementRepository.adsRemoved.collectAsStateWithLifecycle(true)
             // The bars sit on the app-painted background, and the user can
             // force a mood against the system setting — so bar icon contrast
             // must follow the app's resolved mood, not the system default
@@ -207,6 +213,8 @@ class MainActivity : ComponentActivity() {
                         onThemeChange = themeViewModel::save,
                         onEnterAlerts = ::requestNotificationsIfNeeded,
                         loadBugReportState = ::bugReportState,
+                        adsRemoved = adsRemoved,
+                        onBuyRemoveAds = { appSettingsViewModel.buyRemoveAds(this@MainActivity) },
                     )
                 }
             }
@@ -262,6 +270,9 @@ private fun App(
     themeConfig: ThemeConfig,
     onThemeChange: (ThemeConfig) -> Unit,
     onEnterAlerts: () -> Unit,
+    adsRemoved: Boolean,
+    /** Opens Play's purchase sheet; needs the Activity, so the host supplies it. */
+    onBuyRemoveAds: () -> Unit,
     /** The app state a bug report attaches, read fresh from the stores. */
     loadBugReportState: suspend () -> List<Pair<String, String>>,
 ) {
@@ -289,20 +300,30 @@ private fun App(
     when (screen) {
         Screen.HOME -> {
             val state by homeViewModel.state.collectAsStateWithLifecycle()
-            HomeScreen(
-                state = state,
-                onRefresh = homeViewModel::refresh,
-                onSetMode = homeViewModel::setForecastMode,
-                onResizeModule = homeViewModel::resizeModule,
-                onPlaces = { screen = Screen.PLACES },
-                onMoveModule = homeViewModel::moveModule,
-                onAppSettings = { screen = Screen.APP_SETTINGS },
-                onCustomize = { screen = Screen.CUSTOMIZE },
-                onAlerts = {
-                    onEnterAlerts()
-                    screen = Screen.ALERTS
-                },
-            )
+            // The glance, and under it — only here, and only until Remove
+            // Ads is bought — the one banner. The glance keeps the height;
+            // the banner takes the few dp AdMob picks for this width and
+            // sits above the gesture inset the outer padding leaves.
+            Column(Modifier.fillMaxSize()) {
+                HomeScreen(
+                    state = state,
+                    onRefresh = homeViewModel::refresh,
+                    onSetMode = homeViewModel::setForecastMode,
+                    onResizeModule = homeViewModel::resizeModule,
+                    onPlaces = { screen = Screen.PLACES },
+                    onMoveModule = homeViewModel::moveModule,
+                    onAppSettings = { screen = Screen.APP_SETTINGS },
+                    onCustomize = { screen = Screen.CUSTOMIZE },
+                    onAlerts = {
+                        onEnterAlerts()
+                        screen = Screen.ALERTS
+                    },
+                    modifier = Modifier.weight(1f),
+                )
+                if (!adsRemoved) {
+                    AdBanner(unitId = AdPolicy.bannerUnitId(BuildConfig.DEBUG, BuildConfig.ADMOB_BANNER_UNIT_ID))
+                }
+            }
         }
 
         Screen.CUSTOMIZE -> {
@@ -336,9 +357,17 @@ private fun App(
         Screen.APP_SETTINGS -> {
             BackHandler { screen = Screen.HOME }
             val gadgetbridgeEnabled by appSettingsViewModel.gadgetbridgeEnabled.collectAsStateWithLifecycle()
+            val settingsAdsRemoved by appSettingsViewModel.adsRemoved.collectAsStateWithLifecycle()
+            val removeAdsOffer by appSettingsViewModel.removeAdsOffer.collectAsStateWithLifecycle()
+            val removeAdsStatus by appSettingsViewModel.removeAdsStatus.collectAsStateWithLifecycle()
             AppSettingsScreen(
                 gadgetbridgeEnabled = gadgetbridgeEnabled,
                 onSetGadgetbridgeEnabled = appSettingsViewModel::setGadgetbridgeEnabled,
+                adsRemoved = settingsAdsRemoved,
+                removeAdsPrice = removeAdsOffer?.formattedPrice,
+                removeAdsStatus = removeAdsStatus,
+                onBuyRemoveAds = onBuyRemoveAds,
+                onRestorePurchases = appSettingsViewModel::restorePurchases,
                 onReportBug = { screen = Screen.REPORT_BUG },
                 version = "${BuildConfig.VERSION_NAME} (build ${BuildConfig.VERSION_CODE})",
                 onDone = { screen = Screen.HOME },

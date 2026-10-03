@@ -34,6 +34,13 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.JustMyWeather">
 
+        <!-- The Google Mobile Ads SDK refuses to start without its app id.
+             Debug builds get Google's sample id, release the real one from
+             app/admob.properties (see app/build.gradle.kts). -->
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="${admobAppId}" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

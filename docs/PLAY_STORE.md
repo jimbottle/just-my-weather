@@ -64,6 +64,18 @@ touches the listing, that constant, and this line.
   uninstall first (`INSTALL_FAILED_UPDATE_INCOMPATIBLE` otherwise), and an
   uninstall takes the app's data with it.
 
+### 4b. AdMob ids
+
+- The banner's app id and ad unit come from `app/admob.properties`
+  (gitignored; `app/admob.properties.example` shows the shape). Debug builds
+  ignore it and always serve Google's sample ads; a release build without it
+  serves samples too, with a Gradle warning.
+- `scripts/android/release-internal.sh` refuses to upload without the file
+  unless told `--sample-ads` — a testers-only build that must never be
+  promoted. Production needs the real ids (just-my-weather-1zp).
+- Keep the Play Console's **Advertising ID** declaration and the Data
+  safety form in step with the SDK version (`store-assets/play-store-listing.md`).
+
 ### 5. First upload is manual — done 2026-10-02 (versionCode 2)
 
 The Play Developer API refuses bundles for an app that has never had one

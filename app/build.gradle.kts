@@ -20,6 +20,30 @@ val keystoreProperties =
         }
     }
 
+// AdMob ids. A debug build always serves Google's SAMPLE ids (labelled test
+// ads that earn nothing — clicking one's own live ads gets an AdMob account
+// suspended), so only release reads app/admob.properties (gitignored; see
+// admob.properties.example and just-my-weather-1zp). Absent, release falls
+// back to the samples with a warning so a contributor's bundleRelease still
+// assembles; scripts/android/release-internal.sh refuses to upload samples.
+val admobPropertiesFile = rootProject.file("app/admob.properties")
+val admobProperties =
+    Properties().apply {
+        if (admobPropertiesFile.exists()) {
+            load(FileInputStream(admobPropertiesFile))
+        }
+    }
+val admobSampleAppId = "ca-app-pub-3940256099942544~3347511713"
+val admobSampleBannerId = "ca-app-pub-3940256099942544/9214589741"
+val admobAppId = admobProperties.getProperty("appId") ?: admobSampleAppId
+val admobBannerId = admobProperties.getProperty("bannerUnitId") ?: admobSampleBannerId
+if (!admobPropertiesFile.exists()) {
+    logger.warn(
+        "app/admob.properties missing: release will serve AdMob SAMPLE ads " +
+            "(fine for internal testing, never for production)",
+    )
+}
+
 android {
     namespace = "io.raylytics.justmyweather"
     // Google Play has required new apps and updates to target API 36 since
@@ -43,6 +67,12 @@ android {
         // carries every locale AndroidX / Compose / Material 3 translate
         // into. Add target locales here when in-app copy is localised.
         resourceConfigurations += listOf("en")
+
+        // The Google Mobile Ads SDK reads its app id from the manifest; the
+        // banner unit reaches AdBanner through BuildConfig. Debug pins both to
+        // the samples (AdPolicy.bannerUnitId re-checks the unit at runtime).
+        manifestPlaceholders["admobAppId"] = admobSampleAppId
+        buildConfigField("String", "ADMOB_BANNER_UNIT_ID", "\"$admobSampleBannerId\"")
     }
 
     signingConfigs {
@@ -59,6 +89,8 @@ android {
             isMinifyEnabled = false
         }
         release {
+            manifestPlaceholders["admobAppId"] = admobAppId
+            buildConfigField("String", "ADMOB_BANNER_UNIT_ID", "\"$admobBannerId\"")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
@@ -74,10 +106,6 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
-    }
-
-    kotlinOptions {
-        jvmTarget = "17"
     }
 
     buildFeatures {
@@ -96,6 +124,14 @@ android {
             isIncludeAndroidResources = true
             isReturnDefaultValues = true
         }
+    }
+}
+
+// Kotlin 2.3 (bumped 2026-10-03 for the Google Mobile Ads and Play Billing
+// SDKs, whose metadata 2.1 could not read) retired the kotlinOptions DSL.
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
     }
 }
 
@@ -130,6 +166,19 @@ dependencies {
 
     // Background polling for personal alerts.
     implementation("androidx.work:work-runtime-ktx:2.10.0")
+
+    // The one banner ad and the purchase that removes it (Evan, 2026-10-03).
+    // Both are Google services the Play build cannot avoid; they stay behind
+    // ads/ and billing/ so a build without them (F-Droid, say) would drop two
+    // packages and one call site. Play requires Billing Library 8+ for new
+    // apps since 2026-08-31.
+    implementation("com.google.android.gms:play-services-ads:25.5.0")
+    implementation("com.android.billingclient:billing-ktx:9.1.0")
+    // The ads SDK pulls in a pre-1.3 androidx.fragment, and release lint
+    // (lintVitalRelease) refuses an app that registers for activity results
+    // on one (InvalidFragmentVersionForActivityResult). Pinned so the
+    // resolved version is one that calls super.onRequestPermissionsResult.
+    implementation("androidx.fragment:fragment:1.8.5")
 
     testImplementation("org.junit.jupiter:junit-jupiter-api:5.11.3")
     testImplementation("org.junit.jupiter:junit-jupiter-params:5.11.3")

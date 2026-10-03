@@ -18,6 +18,19 @@ INTERNET
   coordinates of the place being viewed. The Google Mobile Ads SDK also uses
   it for the banner. No other hosts are contacted by the app itself.
 
+com.google.android.gms.permission.AD_ID
+  Merged in by the Google Mobile Ads SDK: the banner ad (ads/AdBanner.kt)
+  uses the advertising ID. Declared on the Play "Advertising ID" form as
+  Yes. Requests are non-personalized (ads/AdPolicy.kt).
+
+android.permission.ACCESS_ADSERVICES_ATTRIBUTION / _AD_ID / _TOPICS
+  Merged in by the same SDK for Android 13+'s Privacy Sandbox APIs; the app
+  never calls them itself.
+
+com.android.vending.BILLING
+  Merged in by the Play Billing Library for the one-time "Remove ads"
+  purchase (billing/PlayBillingGateway.kt).
+
 ACCESS_NETWORK_STATE
   Required by WorkManager's NetworkType.CONNECTED constraint on the alert
   poll (AlertWorker), so the periodic check waits for connectivity instead

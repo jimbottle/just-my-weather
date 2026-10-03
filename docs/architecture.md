@@ -39,6 +39,18 @@ shapes never leak past `WeatherRepository`.
   `*Repository` classes persist config via Preferences DataStore; `PointCache`
   (in-memory default, `DataStorePointCache` durable) survives the grid lookup
   across launches. `WeatherSnapshot` / `WeatherLocation` are the domain objects.
+- **`ads/`** — the one banner. `AdPolicy` is the pure rules (non-personalized
+  `npa=1`, sample units in debug, nothing about the user in a request);
+  `AdBanner` is the single composable that draws an AdMob adaptive banner. It
+  is placed once, at the foot of the glance, and only while Remove Ads is not
+  owned.
+- **`billing/`** — the $0.99 Remove Ads purchase. `BillingGateway` is the seam
+  (plain `PurchaseRecord`/`ProductOffer` values, a `BillingEvent` flow);
+  `PlayBillingGateway` is the only file that imports Play Billing;
+  `RemoveAdsManager` is the JVM-tested decision logic that keeps
+  `data/AdsEntitlementRepository` (the device's copy of the entitlement) in step
+  with what Play says — grant on purchase, revoke when Play answers with none,
+  leave alone when Play cannot be asked.
 - **`location/`** — `LocationProvider` over the platform `LocationManager`
   (coarse only, no Play Services, so it builds from source anywhere).
   `LocationResolver` is the one answer to "where are we?": a saved place the

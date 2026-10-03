@@ -21,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import io.raylytics.justmyweather.billing.RemoveAdsStatus
 
 /**
  * Settings that are about the app, not the canvas. Customize is for what the
@@ -32,6 +33,12 @@ import androidx.compose.ui.unit.dp
 fun AppSettingsScreen(
     gadgetbridgeEnabled: Boolean,
     onSetGadgetbridgeEnabled: (Boolean) -> Unit,
+    adsRemoved: Boolean,
+    /** Play's localised price ("$0.99"), or null while Play has not answered. */
+    removeAdsPrice: String?,
+    removeAdsStatus: RemoveAdsStatus,
+    onBuyRemoveAds: () -> Unit,
+    onRestorePurchases: () -> Unit,
     onReportBug: () -> Unit,
     /** "0.2.0 (build 2)" — the line a bug reply would otherwise ask for. */
     version: String,
@@ -51,6 +58,17 @@ fun AppSettingsScreen(
                 TextButton(onClick = onDone) { Text("Done") }
             }
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                AdsSection(
+                    adsRemoved = adsRemoved,
+                    price = removeAdsPrice,
+                    status = removeAdsStatus,
+                    onBuy = onBuyRemoveAds,
+                    onRestore = onRestorePurchases,
+                )
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    modifier = Modifier.padding(top = 16.dp),
+                )
                 GadgetbridgeToggle(enabled = gadgetbridgeEnabled, onChange = onSetGadgetbridgeEnabled)
                 HorizontalDivider(
                     color = MaterialTheme.colorScheme.surfaceVariant,
@@ -63,6 +81,84 @@ fun AppSettingsScreen(
                 )
                 AboutSection(version = version)
             }
+        }
+    }
+}
+
+/**
+ * The banner and the one-time purchase that removes it. The price is Play's
+ * own, in the user's currency, never typed here; until Play answers the row
+ * says so rather than guessing. Restore is for a new phone or a reinstall.
+ */
+@Composable
+private fun AdsSection(
+    adsRemoved: Boolean,
+    price: String?,
+    status: RemoveAdsStatus,
+    onBuy: () -> Unit,
+    onRestore: () -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text("Ads", style = MaterialTheme.typography.labelMedium)
+        if (adsRemoved) {
+            Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+                Text("Ads removed", style = MaterialTheme.typography.bodyLarge)
+                Text(
+                    text = "Thank you. The banner is gone on every phone signed in to this Google account.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            return@Column
+        }
+        val busy = status == RemoveAdsStatus.Busy
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clickable(enabled = !busy, onClick = onBuy)
+                    .padding(vertical = 8.dp)
+                    .testTag("remove-ads"),
+        ) {
+            Text(
+                text = if (price != null) "Remove ads · $price" else "Remove ads",
+                style = MaterialTheme.typography.bodyLarge,
+            )
+            Text(
+                text =
+                    if (price != null) {
+                        "A one-time purchase, no subscription. Removes the banner at the foot of the glance."
+                    } else {
+                        "Waiting for Google Play to confirm the price…"
+                    },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        val note =
+            when (status) {
+                RemoveAdsStatus.Idle -> null
+                RemoveAdsStatus.Busy -> "Opening Google Play…"
+                is RemoveAdsStatus.Failed -> status.message
+                RemoveAdsStatus.NothingToRestore -> "No purchase found for this Google account."
+            }
+        if (note != null) {
+            Text(
+                text = note,
+                style = MaterialTheme.typography.bodySmall,
+                color =
+                    if (status is RemoveAdsStatus.Failed) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+            )
+        }
+        TextButton(onClick = onRestore, enabled = !busy, modifier = Modifier.testTag("restore-purchase")) {
+            Text("Already bought it? Restore purchase")
         }
     }
 }
