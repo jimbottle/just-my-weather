@@ -23,11 +23,10 @@ FORECASTS FROM THE SOURCE
 • The daily view can reach fourteen days: seven from the NWS, then Open-Meteo for the rest, clearly marked.
 • Saved places: search a bundled offline list of about 32,000 US towns and cities, or enter coordinates. No geocoding service sees what you type.
 
-PRIVATE AND OPEN SOURCE
+PRIVATE BY DESIGN
 
 • No accounts, no ads, no analytics, no tracking.
-• Location is coarse and optional. The only data that leaves your phone is the coordinates of the place you are looking at, sent to the weather services to fetch the forecast.
-• Open source under the Apache 2.0 license. Read the code, fork it, build on it.
+• Location is coarse and optional. The only data the app sends is the coordinates of the place you are looking at, to the weather services that fetch the forecast.
 • Privacy policy: https://raylytics.io/justmyweather/privacy
 
 If you have been looking for a customizable weather app that shows only what you ask for, this is it.
