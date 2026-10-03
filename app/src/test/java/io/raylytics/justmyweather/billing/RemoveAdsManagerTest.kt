@@ -176,6 +176,13 @@ class RemoveAdsManagerTest {
         runCurrent()
         assertTrue(entitlement.adsRemoved.first())
         assertEquals(RemoveAdsStatus.Idle, manager.status.value)
+
+        // The same refusal while the only purchase is still pending (Play
+        // refuses a second one) must read as pending, not "nothing found".
+        gateway.owned = listOf(owned(purchased = false))
+        gateway.events.emit(BillingEvent.AlreadyOwned)
+        runCurrent()
+        assertEquals(RemoveAdsStatus.Pending, manager.status.value)
     }
 
     @Test

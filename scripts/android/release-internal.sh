@@ -10,10 +10,12 @@
 # Afterwards: commit the versionCode bump and log the cut in docs/RELEASES.md.
 # Only --notes, --status and --sample-ads are accepted; anything else (a
 # different track, an explicit AAB) contradicts the intent of this script —
-# run upload-play.sh directly. Without app/admob.properties the release
-# build serves Google's SAMPLE ads; that is fine for a build testers will
-# look at but must never reach production, so it needs --sample-ads to say
-# so out loud (app/build.gradle.kts, store-assets/README.md). Before the app's first production release Play accepts only
+# run upload-play.sh directly. Without real AdMob ids in
+# app/admob.properties — the file missing, a key missing, a sample id or the
+# example's placeholder — the release build serves Google's SAMPLE ads; that
+# is fine for a build testers will look at but must never reach production,
+# so it needs --sample-ads to say so out loud (app/build.gradle.kts,
+# docs/PLAY_STORE.md "AdMob ids"). Before the app's first production release Play accepts only
 # draft releases, so until launch run this with `--status draft` and roll
 # the draft out from the console (docs/PLAY_STORE.md).
 #

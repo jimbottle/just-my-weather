@@ -95,12 +95,18 @@ class RemoveAdsManager(
         scope.launch { _status.value = restoreStatus() }
     }
 
-    private suspend fun restoreStatus(): RemoveAdsStatus =
-        when (syncWithPlay()) {
-            true -> RemoveAdsStatus.Idle
-            false -> RemoveAdsStatus.NothingToRestore
-            null -> RemoveAdsStatus.Failed("Couldn't reach Google Play. Check your connection and try again.")
+    /** Asks Play once and says what it found: owned (and recorded), a
+     * purchase still pending, nothing, or no answer. */
+    private suspend fun restoreStatus(): RemoveAdsStatus {
+        val purchases =
+            runCatching { gateway.ownedPurchases() }.getOrNull()
+                ?: return RemoveAdsStatus.Failed("Couldn't reach Google Play. Check your connection and try again.")
+        return when {
+            record(purchases) -> RemoveAdsStatus.Idle
+            purchases.any { REMOVE_ADS_PRODUCT_ID in it.products && !it.purchased } -> RemoveAdsStatus.Pending
+            else -> RemoveAdsStatus.NothingToRestore
         }
+    }
 
     private suspend fun loadOffer() {
         _offer.value = runCatching { gateway.queryOffer(REMOVE_ADS_PRODUCT_ID) }.getOrNull()
@@ -135,9 +141,13 @@ class RemoveAdsManager(
                 _status.value = if (pending) RemoveAdsStatus.Pending else RemoveAdsStatus.Idle
             }
             BillingEvent.Cancelled -> _status.value = RemoveAdsStatus.Idle
-            // The sheet refused because the account owns it already: the
-            // device's copy is stale, and Play — not the event — says so.
-            BillingEvent.AlreadyOwned -> _status.value = restoreStatus()
+            // The sheet refused because the account owns it already (or a
+            // purchase of it is pending): the device's copy is stale, and
+            // Play — not the event — says which.
+            BillingEvent.AlreadyOwned -> {
+                _status.value = RemoveAdsStatus.Restoring
+                _status.value = restoreStatus()
+            }
             is BillingEvent.Failed -> _status.value = RemoveAdsStatus.Failed(event.message)
         }
     }
