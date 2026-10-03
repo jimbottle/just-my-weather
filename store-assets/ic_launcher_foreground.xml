@@ -12,7 +12,7 @@
     <group>
       <clip-path android:pathData="M18,51.2h30.8v30.8h-30.8z"/>
       <path android:pathData="M39,50a11,11 0 1 0 22,0a11,11 0 1 0 -22,0z" android:fillColor="#F2B705"/>
-      <path android:pathData="M41.18 62.13 L37.66 66.99 M35.73 54.64 L30.03 56.49" android:strokeColor="#F2B705" android:strokeWidth="2.8" android:strokeLineCap="round"/>
+      <path android:pathData="M35.73 54.64 L30.03 56.49" android:strokeColor="#F2B705" android:strokeWidth="2.8" android:strokeLineCap="round"/>
       <path android:pathData="M24,69a5,5 0 1 0 10,0a5,5 0 1 0 -10,0z" android:strokeColor="#0E1726" android:strokeWidth="2.4" android:strokeLineCap="butt"/>
       <path android:pathData="M28.5,65.5a6.5,6.5 0 1 0 13,0a6.5,6.5 0 1 0 -13,0z" android:strokeColor="#0E1726" android:strokeWidth="2.4" android:strokeLineCap="butt"/>
       <path android:pathData="M36,69a5,5 0 1 0 10,0a5,5 0 1 0 -10,0z" android:strokeColor="#0E1726" android:strokeWidth="2.4" android:strokeLineCap="butt"/>
