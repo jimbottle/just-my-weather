@@ -404,6 +404,13 @@ Rules that follow from this:
 
 - **Boot per task, not per session.** A headless AVD boots in ~60s; that is
   cheaper than leaving one running for an hour. Never keep one "warm".
+- **A "fresh" emulator is not a fresh install.** `-no-snapshot-save` only
+  skips *saving*; call 1 still *loads* the AVD's quick-boot snapshot, and the
+  app's data from an earlier session comes with it (verified 2026-10-03: a
+  glance someone had rearranged passed for the shipped default and got filed
+  as a layout bug — and captured as store screenshot 08). Before any
+  first-run check or screenshot, `adb -s <serial> shell pm clear
+  io.raylytics.justmyweather`.
 - **Kill only your own AVD's emulator.** Never `xargs` a kill across every
   listed emulator and never hardcode `emulator-5554` — ports get reused, and the
   device on one may be another session's. Ownership comes from asking the

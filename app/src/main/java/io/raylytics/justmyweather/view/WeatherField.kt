@@ -88,7 +88,10 @@ enum class WeatherField(
     fun numericValue(snapshot: WeatherSnapshot): Double? =
         when (this) {
             TEMPERATURE -> snapshot.temperatureF
-            FEELS_LIKE -> snapshot.feelsLikeF
+            // NWS sends a heat index or wind chill only when one applies; the
+            // rest of the time it feels like the temperature, and a dash
+            // where a number belongs reads as a broken tile, not mild weather.
+            FEELS_LIKE -> snapshot.feelsLikeF ?: snapshot.temperatureF
             CONDITIONS -> null
             WIND -> snapshot.windMph
             PRECIPITATION -> snapshot.precipitationIn
@@ -115,6 +118,10 @@ enum class WeatherField(
             CONDITIONS -> snapshot.conditions
             // "Calm" reads better than "0 mph" on the glance.
             WIND -> snapshot.windMph?.let { if (it < 1.0) "Calm" else formatValue(it) }
+            // Many stations never report last-hour precipitation, rain or
+            // shine — a null here is "not measured", not "none", and not
+            // missing data either, so it gets words rather than a dash.
+            PRECIPITATION -> snapshot.precipitationIn?.let { formatValue(it) } ?: "Not reported"
             else -> numericValue(snapshot)?.let { formatValue(it) }
         }
 

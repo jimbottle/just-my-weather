@@ -58,7 +58,10 @@ class DetailsTest {
         val empty = WeatherSnapshot("Nowhere", null, null, null, null, null, observedAt = null)
         val detail = Details.ofModule(module(WeatherField.TEMPERATURE), empty, newYork)!!
         assertEquals("Nowhere", detail.subtitle)
-        assertEquals(setOf("—"), detail.rows.map { it.value }.toSet())
+        // Precipitation is the one row with words for its absence: a station
+        // that does not measure it is the ordinary case, not missing data.
+        assertEquals("Not reported", detail.rows.first { it.label == "Precip (last hr)" }.value)
+        assertEquals(setOf("—"), detail.rows.filterNot { it.label == "Precip (last hr)" }.map { it.value }.toSet())
     }
 
     @Test
