@@ -1,15 +1,16 @@
 package io.raylytics.justmyweather.data
 
+import io.raylytics.justmyweather.data.metno.ExtendedDay
+import io.raylytics.justmyweather.data.metno.MetNoClient
 import io.raylytics.justmyweather.data.nws.ActiveAlert
 import io.raylytics.justmyweather.data.nws.DailyPeriod
 import io.raylytics.justmyweather.data.nws.ForecastPoint
 import io.raylytics.justmyweather.data.nws.NwsClient
 import io.raylytics.justmyweather.data.nws.PointsLookup
-import io.raylytics.justmyweather.data.openmeteo.ExtendedDay
-import io.raylytics.justmyweather.data.openmeteo.OpenMeteoClient
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.time.Instant
+import java.time.ZoneId
 
 /** A place to show weather for: a coordinate plus a human label. */
 data class WeatherLocation(
@@ -43,9 +44,9 @@ class WeatherRepository(
     private val snapshotCache: SnapshotCache = InMemorySnapshotCache(),
     /** Injected so the freshness rule is testable without waiting three hours. */
     private val clock: () -> Instant = Instant::now,
-    /** Days eight to fourteen, which NWS does not forecast. Null means no
+    /** Days eight and nine, which NWS does not forecast. Null means no
      * extended source: the Daily view stops where NWS does. */
-    private val openMeteo: OpenMeteoClient? = null,
+    private val metNo: MetNoClient? = null,
 ) {
     // Serialises point resolution so two refreshes fired close together (VM
     // init + the location-permission grant) don't both hit the network for the
@@ -153,11 +154,17 @@ class WeatherRepository(
         return nws.getDailyForecast(point.gridId, point.gridX, point.gridY)
     }
 
-    /** Open-Meteo's daily forecast for [location], or empty with no extended
+    /** MET Norway's daily forecast for [location], or empty with no extended
      * source configured. The caller decides which of these days NWS already
-     * covers. */
-    suspend fun loadExtendedDaily(location: WeatherLocation): List<ExtendedDay> =
-        openMeteo?.getDailyForecast(location.latitude, location.longitude).orEmpty()
+     * covers. The days are cut in the place's calendar, which the (cached)
+     * NWS point knows; the device's zone is the fallback. */
+    suspend fun loadExtendedDaily(location: WeatherLocation): List<ExtendedDay> {
+        val client = metNo ?: return emptyList()
+        val zone =
+            resolvePoint(location).timeZone?.let { runCatching { ZoneId.of(it) }.getOrNull() }
+                ?: ZoneId.systemDefault()
+        return client.getDailyForecast(location.latitude, location.longitude, zone)
+    }
 
     /**
      * The place's timezone if we already know it, WITHOUT going to the network.

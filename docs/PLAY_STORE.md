@@ -139,7 +139,7 @@ cut bumps to 3.
   release bumps `versionName` first, then `versionCode` ticks underneath it
   per upload. v0.1.0 and v0.1.1 shipped as GitHub sideload releases; the
   first Play build carries 0.2.0 (places, the module grid, forecast tiles,
-  fourteen-day daily, alert fire limits). GitHub releases stop here: Play
+  nine-day daily, alert fire limits). GitHub releases stop here: Play
   internal testing is the test channel from 0.2.0 on.
 - Log every cut in `docs/RELEASES.md` with its versionCode, date, and track.
 

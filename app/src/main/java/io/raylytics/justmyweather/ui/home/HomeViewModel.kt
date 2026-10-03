@@ -9,11 +9,11 @@ import io.raylytics.justmyweather.data.ViewConfigRepository
 import io.raylytics.justmyweather.data.WeatherLocation
 import io.raylytics.justmyweather.data.WeatherRepository
 import io.raylytics.justmyweather.data.WeatherSnapshot
+import io.raylytics.justmyweather.data.metno.ExtendedDay
 import io.raylytics.justmyweather.data.nws.ActiveAlert
 import io.raylytics.justmyweather.data.nws.DailyPeriod
 import io.raylytics.justmyweather.data.nws.ForecastPoint
 import io.raylytics.justmyweather.data.nws.NwsHttpException
-import io.raylytics.justmyweather.data.openmeteo.ExtendedDay
 import io.raylytics.justmyweather.location.LocationResolver
 import io.raylytics.justmyweather.view.DailyDays
 import io.raylytics.justmyweather.view.ForecastMode
@@ -503,7 +503,7 @@ class HomeViewModel(
         val hourlyError: String? = null,
         val daily: List<DailyPeriod>? = null,
         val dailyError: String? = null,
-        /** Open-Meteo's days, for the Daily view past NWS's reach. Empty (not
+        /** MET Norway's days, for the Daily view past NWS's reach. Empty (not
          * null) after a failed fetch: the extended days are a bonus, their
          * failure is not shown, and it is not retried until a refresh. */
         val extended: List<ExtendedDay>? = null,

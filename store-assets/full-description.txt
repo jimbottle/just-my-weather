@@ -20,7 +20,7 @@ YOUR OWN ALERTS
 FORECASTS FROM THE SOURCE
 
 • Current conditions, hourly, and daily forecasts from the US National Weather Service. No API key, no middleman.
-• The daily view can reach fourteen days: seven from the NWS, then Open-Meteo for the rest, clearly marked.
+• The daily view can reach nine days: seven from the NWS, then two more from MET Norway, clearly marked.
 • Saved places: search a bundled offline list of about 32,000 US towns and cities, or enter coordinates. No geocoding service sees what you type.
 
 FREE, WITH ONE SMALL BANNER

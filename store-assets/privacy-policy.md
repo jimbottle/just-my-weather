@@ -61,9 +61,12 @@ To fetch the weather, the app sends the coordinates of the selected place to:
   weather alerts. As the NWS requires, each request identifies the app and
   includes the developer's contact email; it does not include anything that
   identifies you.
-- **Open-Meteo** (api.open-meteo.com), an open-source weather service, only
-  when you have set the daily forecast to show more than seven days. Days
-  eight onward come from Open-Meteo and are marked as such in the app.
+- **The Norwegian Meteorological Institute** (api.met.no, "MET Norway"), a
+  Norwegian government agency, only when you have set the daily forecast to
+  show more than seven days. Days eight and nine come from MET Norway and are
+  marked as such in the app. As MET requires, each request identifies the app
+  and includes the developer's contact email; it does not include anything
+  that identifies you.
 
 Those services' own privacy practices apply to the requests they receive. The
 app sends them coordinates and nothing else: no account, no device identifier,

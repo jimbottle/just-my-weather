@@ -17,9 +17,9 @@ import io.raylytics.justmyweather.data.ViewConfigRepository
 import io.raylytics.justmyweather.data.WeatherRepository
 import io.raylytics.justmyweather.data.gadgetbridge.GadgetbridgeBroadcaster
 import io.raylytics.justmyweather.data.gadgetbridge.GadgetbridgeExporter
+import io.raylytics.justmyweather.data.metno.MetNoClient
 import io.raylytics.justmyweather.data.nws.NwsClient
 import io.raylytics.justmyweather.data.nws.OkHttpTransport
-import io.raylytics.justmyweather.data.openmeteo.OpenMeteoClient
 import io.raylytics.justmyweather.data.places.AssetPlaceSource
 import io.raylytics.justmyweather.data.places.SavedPlacesRepository
 import io.raylytics.justmyweather.location.LocationProvider
@@ -29,6 +29,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import okhttp3.Cache
+import java.io.File
 
 /** App-wide DataStore for user settings (view config, alert rules). */
 private val Context.dataStore by preferencesDataStore(name = "settings")
@@ -41,10 +43,24 @@ private val Context.dataStore by preferencesDataStore(name = "settings")
 class AppContainer(context: Context) {
     private val nwsClient = NwsClient(transport = OkHttpTransport())
 
-    // Only for days eight to fourteen of the Daily view, which NWS does not
-    // forecast. Same transport as NWS: one HTTP client for the app.
-    private val openMeteoClient = OpenMeteoClient(transport = OkHttpTransport())
     private val appContext = context.applicationContext
+
+    // Only for days eight and nine of the Daily view, which NWS does not
+    // forecast. Its OWN OkHttp client, with a small disk cache: MET's terms
+    // ask that a client honour Expires and revalidate with If-Modified-Since,
+    // which OkHttp does by itself once it has somewhere to keep the response.
+    // NWS deliberately stays uncached — a tap on Refresh must reach the
+    // network, and NWS's cache headers would otherwise swallow it.
+    private val metNoClient =
+        MetNoClient(
+            transport =
+                OkHttpTransport(
+                    OkHttpTransport.defaultClient
+                        .newBuilder()
+                        .cache(Cache(File(appContext.cacheDir, "metno-http"), MET_NO_CACHE_BYTES))
+                        .build(),
+                ),
+        )
 
     // Both caches are persisted so a cold start has something to work with: the
     // point cache reuses the resolved grid instead of re-hitting /points +
@@ -53,7 +69,7 @@ class AppContainer(context: Context) {
     val weatherRepository =
         WeatherRepository(
             nws = nwsClient,
-            openMeteo = openMeteoClient,
+            metNo = metNoClient,
             pointCache = DataStorePointCache(appContext.dataStore),
             snapshotCache = DataStoreSnapshotCache(appContext.dataStore),
         )
@@ -118,3 +134,6 @@ class JustMyWeatherApp : Application() {
         }
     }
 }
+
+/** One megabyte: a MET response is ~40 KB and a user watches a handful of places. */
+private const val MET_NO_CACHE_BYTES = 1L shl 20

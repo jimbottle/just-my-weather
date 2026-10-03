@@ -25,11 +25,14 @@ shapes never leak past `WeatherRepository`.
   is a fun-interface seam isolating the HTTP call so the retry/parse logic is
   unit-tested with a fake (no network). `Units` holds pure conversions; `NwsWire`
   is the raw JSON DTOs, `NwsModels` the cleaned-up domain shapes.
-- **`data/openmeteo/`** — the second source, only for Daily days eight to
-  fourteen, which NWS does not forecast. `OpenMeteoClient` over the same
-  `HttpTransport` seam, `ExtendedDay` its cleaned-up day, `WmoCodes` the weather
-  codes in NWS-style words. Fetched only when the user asks for more days than
-  NWS covers.
+- **`data/metno/`** — the second source, only for Daily days eight and nine,
+  which NWS does not forecast. `MetNoClient` (MET Norway's Locationforecast,
+  CC BY 4.0, commercial use allowed) over the same `HttpTransport` seam — but
+  its own OkHttp client with a disk cache, since MET asks clients to honour
+  Expires / If-Modified-Since; it folds MET's six-hourly instants into days in
+  the place's calendar. `ExtendedDay` is its cleaned-up day, `MetNoSymbols` the
+  weather symbols in NWS-style words. Fetched only when the user asks for more
+  days than NWS covers.
 - **`data/`** — `WeatherRepository` is the single seam between NWS (and the
   extended source) and the app
   (cached point resolution, label fill, current + forecast loads). The

@@ -30,8 +30,8 @@ Pre-1.0, but the core product is in place:
 - ✅ Weather data layer over the free NWS API (no API key), ported from a
   battle-tested reference — retries, unit conversion, fully unit-tested; the
   grid resolution is cached across launches. Past the seven days NWS
-  forecasts, the Daily view can reach fourteen with days eight onward from
-  [Open-Meteo](https://open-meteo.com) (also free and keyless), marked as such
+  forecasts, the Daily view can reach nine with days eight and nine from
+  [MET Norway](https://api.met.no) (also free and keyless), marked as such
 - ✅ The default minimalist home view: location · big temperature · one line of
   conditions, with an hourly forecast beneath it — two grids, and no more
 - ✅ View customization — the glance is a modular grid: pick which data points
@@ -120,8 +120,8 @@ Licensed under the [Apache License 2.0](LICENSE) — fork it, ship it, build on
 it. See [NOTICE](NOTICE) for attribution.
 
 Weather data: the [National Weather Service](https://www.weather.gov) (public
-domain), and for extended daily forecasts past seven days,
-[Open-Meteo.com](https://open-meteo.com) under
-[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Open-Meteo's free API
-is for non-commercial use, and the Play build is ad-supported, so it needs
-their paid plan (or must drop days 8–14) — tracked as just-my-weather-t1e.
+domain), and for days eight and nine of the daily forecast, the
+[Norwegian Meteorological Institute](https://api.met.no) (MET Norway) under
+[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), which permits
+commercial use (the Play build carries ads; Open-Meteo, the previous source,
+allows only non-commercial use on its free tier).

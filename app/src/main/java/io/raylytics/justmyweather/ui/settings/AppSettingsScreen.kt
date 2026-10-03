@@ -137,7 +137,7 @@ const val SOURCE_CODE_URL = "https://github.com/jimbottle/just-my-weather"
 
 /**
  * What the app is and whose data it shows. The attribution is not a courtesy:
- * Open-Meteo's CC BY 4.0 licence asks for it wherever its data appears, and a
+ * MET Norway's CC BY 4.0 licence asks for it wherever its data appears, and a
  * store build is the place a user would look for it.
  */
 @Composable
@@ -165,7 +165,7 @@ private fun AboutSection(version: String) {
         )
         Text(
             text = "Weather data from the US National Weather Service (public domain). " +
-                "Daily forecasts past seven days from Open-Meteo.com (CC BY 4.0).",
+                "Days eight and nine of the daily forecast from MET Norway (CC BY 4.0).",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 8.dp),

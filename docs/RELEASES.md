@@ -31,7 +31,7 @@ just-my-weather-zi8). versionCode 2 is burned: the next upload is 3.
 > The first release on Google Play. Build your own glance from a grid of
 > weather modules: pick which show, size them, drag to arrange, rename, and
 > theme them. Tap a tile for details. Hourly and daily forecasts as tiles, up
-> to fourteen days out. Save places from an offline list of US towns or by
+> to nine days out. Save places from an offline list of US towns or by
 > coordinates. Personal alerts on current conditions and the forecast, quiet
 > by default. Free with one small banner ad; a one-time purchase removes it.
 > No account needed.
@@ -39,12 +39,16 @@ just-my-weather-zi8). versionCode 2 is burned: the next upload is 3.
 ### Internal
 
 - Added: modular lattice with corner-drag resize and long-press arrange;
-  forecast tiles (hourly, daily 1–7 days from NWS, 8–14 from Open-Meteo);
+  forecast tiles (hourly, daily 1–7 days from NWS, 8–9 from MET Norway);
   saved places with the bundled Census gazetteer; tap-for-details; sun
   module; Gadgetbridge hand-off; safety-alert opt-in; configurable alert
   cadence and quiet hours; per-rule fire limit (once, up to 99 times, or
   every time) — a rule that reaches its limit switches itself off and the
   toggle re-arms it (just-my-weather-8di).
+- Changed: the extended daily forecast comes from MET Norway (CC BY 4.0,
+  commercial use allowed) instead of Open-Meteo, whose free tier is
+  non-commercial and the Play build carries ads; the cap drops from fourteen
+  days to the nine MET reaches, and a saved fourteen reads back as nine.
 - Internal: targetSdk/compileSdk 36 on AGP 8.13.2 (Play requires API 36 for
   new apps since 2026-08-31); Play release tooling under `scripts/android/`,
   `store-assets/`, this file.

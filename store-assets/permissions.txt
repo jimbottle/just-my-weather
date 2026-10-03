@@ -13,9 +13,10 @@ Declared in app/src/main/AndroidManifest.xml
 
 INTERNET
   Fetch observations and forecasts from the US National Weather Service
-  (api.weather.gov) and, for daily forecasts past seven days, Open-Meteo
-  (api.open-meteo.com). The only payload is the coordinates of the place
-  being viewed. No other hosts are contacted.
+  (api.weather.gov) and, for days eight and nine of the daily forecast, the
+  Norwegian Meteorological Institute (api.met.no). The only payload is the
+  coordinates of the place being viewed. The Google Mobile Ads SDK also uses
+  it for the banner. No other hosts are contacted by the app itself.
 
 ACCESS_NETWORK_STATE
   Required by WorkManager's NetworkType.CONNECTED constraint on the alert

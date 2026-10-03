@@ -11,10 +11,10 @@ import io.raylytics.justmyweather.data.ViewConfigRepository
 import io.raylytics.justmyweather.data.WeatherLocation
 import io.raylytics.justmyweather.data.WeatherRepository
 import io.raylytics.justmyweather.data.WeatherSnapshot
+import io.raylytics.justmyweather.data.metno.MetNoClient
 import io.raylytics.justmyweather.data.nws.HttpResult
 import io.raylytics.justmyweather.data.nws.HttpTransport
 import io.raylytics.justmyweather.data.nws.NwsClient
-import io.raylytics.justmyweather.data.openmeteo.OpenMeteoClient
 import io.raylytics.justmyweather.location.LocationProvider
 import io.raylytics.justmyweather.location.LocationResolver
 import io.raylytics.justmyweather.view.Density
@@ -119,9 +119,9 @@ class HomeViewModelTest {
                     url.endsWith("/stations") -> STATIONS
                     "/points/" in url ->
                         if (westLatPrefix?.let { url.contains(it) } == true) POINTS_WEST else points
-                    "open-meteo" in url -> {
+                    "api.met.no" in url -> {
                         extendedFetches++
-                        OPEN_METEO
+                        MET_NO
                     }
                     url.endsWith("/forecast/hourly") -> {
                         hourlyFetches++
@@ -177,7 +177,7 @@ class HomeViewModelTest {
                         nws = NwsClient(transport = transport),
                         snapshotCache = snapshots,
                         clock = { NOW },
-                        openMeteo = OpenMeteoClient(transport = transport),
+                        metNo = MetNoClient(transport = transport),
                     ),
                 // No fix and nothing remembered, so this resolves to
                 // WeatherLocation.DEFAULT — which the fixtures answer for.
@@ -240,14 +240,14 @@ class HomeViewModelTest {
         advanceUntilIdle()
         assertEquals(0, week.transport.extendedFetches)
         assertNull(week.vm.ready().extendedDaily)
-        // Fourteen: Open-Meteo is fetched once and its days reach the state.
+        // Nine: MET Norway is fetched once and its days reach the state.
         val fortnight =
-            harness(config = ViewConfig.DEFAULT.setDefaultForecastMode(ForecastMode.DAILY).setDailyDays(14))
+            harness(config = ViewConfig.DEFAULT.setDefaultForecastMode(ForecastMode.DAILY).setDailyDays(9))
         advanceUntilIdle()
         assertEquals(1, fortnight.transport.extendedFetches)
         assertEquals(2, fortnight.vm.ready().extendedDaily?.size)
         // Hourly never needs it, whatever the setting.
-        val hourly = harness(config = ViewConfig.DEFAULT.setDailyDays(14))
+        val hourly = harness(config = ViewConfig.DEFAULT.setDailyDays(9))
         advanceUntilIdle()
         assertEquals(0, hourly.transport.extendedFetches)
     }
@@ -904,10 +904,17 @@ class HomeViewModelTest {
         const val HOURLY =
             """{"properties":{"periods":[{"startTime":"2026-07-31T12:00:00+00:00",
                 "temperature":72,"temperatureUnit":"F","windSpeed":"5 mph"}]}}"""
-        val OPEN_METEO =
+
+        /** Two six-hourly entries on different days (18Z is afternoon in
+         * New York, 00Z the previous evening), so the state sees two days. */
+        val MET_NO =
             """
-            {"daily":{"time":["2026-09-29","2026-09-30"],
-              "temperature_2m_max":[80.0,81.0],"temperature_2m_min":[60.0,61.0]}}
+            {"properties":{"timeseries":[
+              {"time":"2026-09-29T18:00:00Z","data":{"instant":{"details":{"air_temperature":27.0}},
+                "next_6_hours":{"summary":{"symbol_code":"clearsky_day"},"details":{"air_temperature_max":27.0,"air_temperature_min":20.0}}}},
+              {"time":"2026-10-01T00:00:00Z","data":{"instant":{"details":{"air_temperature":22.0}},
+                "next_6_hours":{"summary":{"symbol_code":"cloudy"},"details":{"air_temperature_max":22.0,"air_temperature_min":16.0}}}}
+            ]}}
             """.trimIndent()
 
         const val DAILY =

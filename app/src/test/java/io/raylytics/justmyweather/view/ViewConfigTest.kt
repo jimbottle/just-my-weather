@@ -272,11 +272,13 @@ class ViewConfigTest {
     }
 
     @Test
-    fun `daily days ship at a week and clamp to one through fourteen`() {
+    fun `daily days ship at a week and clamp to one through nine`() {
         assertEquals(7, ViewConfig.DEFAULT.dailyDays)
-        // Up to fourteen: NWS's seven, then Open-Meteo's.
-        assertEquals(14, ViewConfig.DEFAULT.setDailyDays(14).dailyDays)
-        assertEquals(14, ViewConfig.DEFAULT.setDailyDays(40).dailyDays)
+        // Up to nine: NWS's seven, then MET Norway's two. A fourteen stored
+        // before the cap came down clamps too.
+        assertEquals(9, ViewConfig.DEFAULT.setDailyDays(9).dailyDays)
+        assertEquals(9, ViewConfig.DEFAULT.setDailyDays(14).dailyDays)
+        assertEquals(9, ViewConfig.DEFAULT.setDailyDays(40).dailyDays)
         assertEquals(1, ViewConfig.DEFAULT.setDailyDays(0).dailyDays)
         val rendered = ViewConfig.DEFAULT.setDailyDays(3).render(snapshot)
         val forecast = rendered.modules.last().content as ModuleContent.Forecast

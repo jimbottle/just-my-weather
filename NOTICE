@@ -6,3 +6,9 @@ This product includes software developed at Raylytics.
 Weather data is provided by the U.S. National Weather Service API
 (https://www.weather.gov/documentation/services-web-api), a public-domain
 U.S. Government service. No API key or account is required.
+
+Days eight and nine of the daily forecast are provided by the Norwegian
+Meteorological Institute (MET Norway) Locationforecast API
+(https://api.met.no), licensed under the Creative Commons Attribution 4.0
+International licence (https://creativecommons.org/licenses/by/4.0/).
+Weather data from MET Norway.

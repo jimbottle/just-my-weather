@@ -2,9 +2,9 @@ package io.raylytics.justmyweather.view
 
 import io.raylytics.justmyweather.data.SunDay
 import io.raylytics.justmyweather.data.WeatherSnapshot
+import io.raylytics.justmyweather.data.metno.ExtendedDay
 import io.raylytics.justmyweather.data.nws.DailyPeriod
 import io.raylytics.justmyweather.data.nws.ForecastPoint
-import io.raylytics.justmyweather.data.openmeteo.ExtendedDay
 import java.time.ZoneId
 
 /**

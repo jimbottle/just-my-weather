@@ -143,7 +143,7 @@ Notes for the form:
 - "Collected" because the coordinates leave the device (Play counts any
   off-device transmission). "Ephemeral" because the developer never stores
   them; they are sent per request to fetch a forecast.
-- "Shared" because the recipients (US National Weather Service, Open-Meteo)
+- "Shared" because the recipients (US National Weather Service, MET Norway)
   are third parties, not service providers acting for the developer. This
   matches the answer Almanac Bell gave for the same NWS call. The user-
   initiated-action exception would arguably allow "No"; "Yes" is the honest
@@ -196,7 +196,7 @@ Notes for the form:
 
 ## Countries
 
-United States only for v1: the forecast backbone is the NWS. Open-Meteo would
+United States only for v1: the forecast backbone is the NWS. MET Norway would
 cover elsewhere, but the current-conditions, hourly, and alert paths would not.
 
 ## Store presence
@@ -204,9 +204,10 @@ cover elsewhere, but the current-conditions, hourly, and alert paths would not.
 - Developer name shown on the listing: Raylytics, LLC (organization account,
   owner evan@raylytics.io, `dev@` alias).
 - Pricing: free to install, with an AdMob banner and a one-time $0.99
-  `remove_ads` purchase (decided 2026-10-03). **That makes the app commercial,
-  and the Open-Meteo free tier (days 8–14) is non-commercial only** — settle
-  just-my-weather-t1e (subscribe or drop days 8–14) before production.
+  `remove_ads` purchase (decided 2026-10-03). That makes the app commercial,
+  which is why days 8–9 come from MET Norway (CC BY 4.0, commercial use
+  allowed) and not Open-Meteo, whose free tier is non-commercial
+  (just-my-weather-t1e, resolved 2026-10-03).
 - Play allows free → paid but not paid → free; the app stays Free and
   monetises through ads + the purchase.
 - app-ads.txt: raylytics.io/app-ads.txt already carries the Raylytics AdMob

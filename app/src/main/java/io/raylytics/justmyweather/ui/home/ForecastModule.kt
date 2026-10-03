@@ -360,7 +360,7 @@ private fun CombinedDayTile(
     ZonedTile(
         top = day.name,
         // Italic names the one quiet difference an extended day carries:
-        // past NWS's reach, from Open-Meteo. The detail sheet says so in
+        // past NWS's reach, from MET Norway. The detail sheet says so in
         // words.
         topItalic = day.extended != null,
         bottomLines = DAY_BOTTOM_LINES,

@@ -1,8 +1,8 @@
 package io.raylytics.justmyweather.ui.home
 
+import io.raylytics.justmyweather.data.metno.ExtendedDay
 import io.raylytics.justmyweather.data.nws.DailyPeriod
 import io.raylytics.justmyweather.data.nws.ForecastPoint
-import io.raylytics.justmyweather.data.openmeteo.ExtendedDay
 import io.raylytics.justmyweather.view.Detail
 import io.raylytics.justmyweather.view.DetailRow
 import io.raylytics.justmyweather.view.Details
@@ -35,7 +35,7 @@ data class DayForecast(
      * today — see [combineDays]. The tile shows it like any high; the detail
      * sheet says what it is. */
     val highFromHours: Boolean = false,
-    /** Set when this day is past NWS's reach and came from Open-Meteo; the
+    /** Set when this day is past NWS's reach and came from MET Norway; the
      * tile marks it quietly and the detail sheet names the source. */
     val extended: ExtendedDay? = null,
 ) {
@@ -126,7 +126,7 @@ fun visibleDays(days: List<DayForecast>, dailyDays: Int): List<DayForecast> {
 
 /**
  * [visibleDays], then — when the user asked for more days than NWS forecasts
- * — Open-Meteo's days after NWS's last date, up to [dailyDays] real days in
+ * — MET Norway's days after NWS's last date, up to [dailyDays] real days in
  * all. A leading night-only row is still today and does not count. Days NWS
  * covers are never repeated: the extended list is cut at the last NWS
  * period's date in [zone], the place's. If NWS gave no dates to align on,
@@ -215,17 +215,28 @@ fun DayForecast.detail(): Detail {
     extended?.let { ext ->
         return Detail(
             title = name,
-            // Open-Meteo's data is CC BY 4.0; this is its attribution.
-            subtitle = "Extended forecast · Open-Meteo.com",
+            // MET Norway's data is CC BY 4.0; this is its attribution.
+            subtitle = "Extended forecast · MET Norway",
             rows =
                 listOf(
                     DetailRow("High", ext.highF.degrees()),
                     DetailRow("Low", ext.lowF.degrees()),
-                    DetailRow("Chance of precipitation", ext.precipChancePercent.percent()),
+                    // MET reports an amount for most of the world and a
+                    // chance only for some regions; show whichever it gave.
+                    if (ext.precipChancePercent != null) {
+                        DetailRow("Chance of precipitation", ext.precipChancePercent.percent())
+                    } else {
+                        DetailRow(
+                            "Precipitation",
+                            ext.precipIn?.let { String.format(Locale.US, "%.2f in", it) } ?: "—",
+                        )
+                    },
                     DetailRow("Wind", Details.wind(ext.windMph, ext.windDirection)),
                     DetailRow("Conditions", ext.conditions ?: "—"),
                 ),
-            body = "Past the seven days the National Weather Service forecasts, this day comes from Open-Meteo.",
+            body =
+                "Past the seven days the National Weather Service forecasts, " +
+                    "this day comes from the Norwegian Meteorological Institute (MET Norway).",
         )
     }
     return Detail(
