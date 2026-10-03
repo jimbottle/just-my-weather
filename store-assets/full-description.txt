@@ -30,9 +30,9 @@ FREE, WITH ONE SMALL BANNER
 
 NO ACCOUNT, NO ANALYTICS
 
-• No sign-up and no analytics. Your view, places, and alert rules stay on your phone.
+• No sign-up and no analytics of our own. Your view, places, and alert rules stay on your phone.
 • Location is coarse and optional. The weather services receive only the coordinates of the place you are looking at.
-• Ads are served by Google AdMob, non-personalized. Privacy policy: https://raylytics.io/justmyweather/privacy
+• The banner is served by Google AdMob, which measures its own ads; it is requested as non-personalized. Privacy policy: https://raylytics.io/justmyweather/privacy
 
 If you have been looking for a customizable weather app that shows only what you ask for, this is it.
 

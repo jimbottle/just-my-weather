@@ -13,8 +13,9 @@ Canonical URL: https://raylytics.io/justmyweather/privacy
 
 **Just My Weather does not sell your personal information, and the developer
 collects none unless you choose to email a bug report or an idea.** It has no
-accounts, no backend server of its own, no analytics, and no automatic crash
-reporting.
+accounts and no backend server of its own, and the developer runs no
+analytics, telemetry, or automatic crash reporting (the ad library's own
+measurement is described under "Ads and purchases").
 
 The app is free and shows one banner ad, served by **Google AdMob**, at the
 bottom of the screen. AdMob receives standard advertising signals from your
@@ -28,7 +29,8 @@ current weather and that place's name can also reach your paired watch. The
 only data the app itself sends off your device is the latitude and longitude
 of the place you are viewing, or that your alerts watch, sent to public
 weather services so the app can fetch the forecast; separately, the ad
-library sends AdMob what it needs to show the banner. A bug report or idea you
+library sends AdMob what it needs to show the banner, and Google Play Billing
+handles the ad-removal purchase and its restore check. A bug report or idea you
 send from the app goes from your own email app, and you see every line of it
 before you send it.
 
@@ -176,7 +178,9 @@ same address.
 
 - No accounts or sign-in.
 - No personalized ads: the banner is requested as non-personalized.
-- No analytics, telemetry, or automatic crash reporting.
+- No analytics, telemetry, or automatic crash reporting run by the developer.
+  The AdMob SDK's own ad measurement and diagnostics are described under
+  "Ads and purchases".
 - No selling of personal information.
 - No precise location. The positions the app keeps are the ones listed above;
   they leave your phone only as forecast coordinates sent to the weather

@@ -22,7 +22,7 @@ Just My Weather
 
 ## Short description (max 80 chars)
 
-Source of truth: `store-assets/short-description.txt` (79 chars). Carries the
+Source of truth: `store-assets/short-description.txt` (78 chars). Carries the
 two target phrases, "modular weather app" and "custom".
 
 ```
@@ -132,10 +132,10 @@ Data types:
 
 | Type | Collected | Shared | Ephemeral | Required / optional | Purpose |
 |---|---|---|---|---|---|
-| Location → Approximate location | Yes | Yes | No | Optional | App functionality; Advertising or marketing (AdMob infers it from the IP address) |
-| Device or other IDs | Yes | Yes | No | Optional* | Advertising or marketing; Fraud prevention, security, and compliance |
-| App activity → App interactions | Yes | Yes | No | Optional* | Advertising or marketing; Analytics (ad impressions and clicks, reported to AdMob) |
-| App info and performance → Diagnostics | Yes | Yes | No | Optional | App functionality (bug-report email, not shared); Advertising or marketing, Fraud prevention (AdMob SDK diagnostics, shared) |
+| Location → Approximate location | Yes | Yes | No | Required | App functionality; Advertising or marketing (AdMob infers it from the IP address of every user who sees ads, so it is not optional) |
+| Device or other IDs | Yes | Yes | No | Required | Advertising or marketing; Fraud prevention, security, and compliance |
+| App activity → App interactions | Yes | Yes | No | Required | Advertising or marketing; Analytics (AdMob's own ad-impression and click measurement — the developer runs no analytics, and the policy and listing say exactly that) |
+| App info and performance → Diagnostics | Yes | Yes | No | Required | App functionality (bug-report email, not shared); Advertising or marketing, Fraud prevention (AdMob SDK diagnostics, shared) |
 | Personal info → Email address | Yes | No | No | Optional | Developer communications |
 
 Notes for the form:
@@ -166,11 +166,17 @@ Notes for the form:
   IP-derived approximate location, the advertising ID / device identifiers,
   ad interactions, and SDK diagnostics, all **shared** with Google, used for
   advertising and fraud prevention. Re-read that page whenever the SDK version
-  changes — the list moves. "Optional*": a user who buys Remove Ads stops
-  loading the SDK's ads, but the data type is not something a non-paying user
-  can decline, so answer **"Users can't choose"** if the form insists on a
-  per-type choice. Location's "Ephemeral" goes to **No** now that AdMob, not
-  just the forecast request, receives it.
+  changes — the list moves. These rows are **Required** ("Users can't
+  choose"): a non-paying user cannot decline them (buying Remove Ads stops the
+  ads, which is a purchase, not a choice the form recognises). Diagnostics is
+  Required because of the AdMob half; the bug-report half alone would be
+  optional. Location's "Ephemeral" goes to **No** now that AdMob, not just the
+  forecast request, receives it.
+- **"Analytics" as a purpose is AdMob's measurement, not ours.** Every
+  "no analytics" in the policy, description and app is scoped to the
+  developer ("no analytics of our own"); keep it that way if the wording is
+  ever revised, or the Data safety form and the policy contradict each
+  other.
 - **Financial info → Purchase history** is **not** declared: Google Play
   Billing handles the $0.99 purchase and the app only stores an "ads removed"
   flag on the device. Google's guidance treats Play Billing as Google's

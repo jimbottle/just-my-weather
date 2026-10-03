@@ -1,1 +1,1 @@
-Modular weather app with a custom view: pick what you see, set your own alerts.
+Modular weather app for a custom view: pick what you see, set your own alerts.
