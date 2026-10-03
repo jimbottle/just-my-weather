@@ -110,6 +110,36 @@ class MetNoClientTest {
     }
 
     @Test
+    fun `zones whose blocks start on the hour of noon, or on the half hour, still find it`() = runTest {
+        // Four blocks at 00/06/12/18Z. Denver in July is UTC-6 (blocks at
+        // 18:00, 00:00, 06:00, 12:00 local), Chicago in January likewise;
+        // Yangon is UTC+6:30 (06:30, 12:30, 18:30, 00:30). A test on whole
+        // hours lost every day in all three. Each case keeps the one local
+        // day with three blocks and drops the lone one.
+        fun series(day: String) =
+            """{"properties":{"timeseries":[
+            ${entry("${day}T00:00:00Z", 20.0, 1.0, 0.0, six("cloudy", 21.0, 15.0, 0.0))},
+            ${entry("${day}T06:00:00Z", 15.0, 1.0, 0.0, six("fair_day", 18.0, 14.0, 0.0))},
+            ${entry("${day}T12:00:00Z", 18.0, 1.0, 0.0, six("rain", 25.0, 17.0, 2.0))},
+            ${entry("${day}T18:00:00Z", 25.0, 1.0, 0.0, six("partlycloudy_night", 24.0, 19.0, 0.0))}
+            ]}}"""
+        // Six hours off UTC, the 18Z block starts at 12:00 local and holds
+        // noon (half-open: noon belongs to the block that starts on it); at
+        // +6:30 the 00Z block runs 06:30–12:30 and holds it.
+        val cases =
+            listOf(
+                Triple("America/Denver", "2026-07-15", "Partly Cloudy"),
+                Triple("America/Chicago", "2026-01-15", "Partly Cloudy"),
+                Triple("Asia/Yangon", "2026-07-15", "Cloudy"),
+            )
+        for ((zone, day, want) in cases) {
+            val days = client(200, series(day)).getDailyForecast(0.0, 0.0, ZoneId.of(zone))
+            assertEquals(1, days.size, zone)
+            assertEquals(want, days.single().conditions, zone)
+        }
+    }
+
+    @Test
     fun `a failed request is an error, and an empty body is no days`() = runTest {
         assertThrows<IllegalStateException> { client(500, "boom").getDailyForecast(0.0, 0.0, louisville) }
         assertEquals(emptyList<ExtendedDay>(), client(200, "{}").getDailyForecast(0.0, 0.0, louisville))

@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import java.util.TimeZone
 
 /**
  * Covers the repository's label-fallback and point-caching behaviour — the
@@ -69,6 +70,18 @@ class WeatherRepositoryTest {
 
     @Test
     fun `without a usable place zone, or a point at all, the device's calendar cuts the days`() = runTest {
+        // Pinned, so the outcome is the same on a UTC CI runner as on a desk
+        // in Kentucky; restored after, since the default is JVM-wide.
+        val before = TimeZone.getDefault()
+        TimeZone.setDefault(TimeZone.getTimeZone("America/Denver"))
+        try {
+            deviceZoneCutsTheDays()
+        } finally {
+            TimeZone.setDefault(before)
+        }
+    }
+
+    private suspend fun deviceZoneCutsTheDays() {
         // No timeZone on the point (older cache entries have none).
         val plain = RoutingTransport()
         val expected = MetNoClient(transport = plain).getDailyForecast(21.3, -157.9, ZoneId.systemDefault())

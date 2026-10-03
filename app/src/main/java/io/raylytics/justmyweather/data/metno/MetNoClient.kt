@@ -7,9 +7,9 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.ZoneId
 import java.util.Locale
-import kotlin.math.abs
 
 /*
  * The second weather source, and only for what NWS does not forecast: days
@@ -123,7 +123,7 @@ class MetNoClient(
                 val block = entry.data.nextSixHours ?: return@mapNotNull null
                 val local = at.atZone(zone)
                 if (at.atZone(UTC).hour % 6 != 0) return@mapNotNull null
-                SixHours(local.toLocalDate(), local.hour, block, entry.data.instant?.details)
+                SixHours(local.toLocalDate(), local.toLocalTime(), block, entry.data.instant?.details)
             }
             .groupBy { it.date }
             .toSortedMap()
@@ -131,10 +131,12 @@ class MetNoClient(
             .map { (date, blocks) -> fold(date, blocks) }
     }
 
-    private class SixHours(val date: LocalDate, val localHour: Int, val block: Block, val instant: Details?) {
-        /** Six-hour blocks start six hours apart, so exactly one per day has
-         * its midpoint within three hours of noon: the one noon falls in. */
-        val holdsNoon: Boolean get() = abs(localHour + 3 - 12) < 3
+    private class SixHours(val date: LocalDate, val start: LocalTime, val block: Block, val instant: Details?) {
+        /** Whether noon falls in this block's half-open [start, start + 6h).
+         * Checked at minute precision: a zone six hours off UTC starts its
+         * blocks at 06:00 and 12:00 exactly, and one at 06:30 (Myanmar)
+         * holds noon while a whole-hour test would say it doesn't. */
+        val holdsNoon: Boolean get() = !start.isAfter(LocalTime.NOON) && start.plusHours(6).isAfter(LocalTime.NOON)
     }
 
     private fun fold(date: LocalDate, blocks: List<SixHours>): ExtendedDay {
