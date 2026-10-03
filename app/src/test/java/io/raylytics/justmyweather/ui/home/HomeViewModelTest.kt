@@ -905,17 +905,17 @@ class HomeViewModelTest {
             """{"properties":{"periods":[{"startTime":"2026-07-31T12:00:00+00:00",
                 "temperature":72,"temperatureUnit":"F","windSpeed":"5 mph"}]}}"""
 
-        /** Two six-hourly entries on different days (18Z is afternoon in
-         * New York, 00Z the previous evening), so the state sees two days. */
+        /** Eight six-hour blocks, Sep 29 00Z through Sep 30 18Z. In New
+         * York (the points fixture's zone) that is a full Sep 29 and a Sep 30
+         * covered to the evening — two days — plus a lone Sep 28 block that
+         * is rightly dropped. */
         val MET_NO =
-            """
-            {"properties":{"timeseries":[
-              {"time":"2026-09-29T18:00:00Z","data":{"instant":{"details":{"air_temperature":27.0}},
-                "next_6_hours":{"summary":{"symbol_code":"clearsky_day"},"details":{"air_temperature_max":27.0,"air_temperature_min":20.0}}}},
-              {"time":"2026-10-01T00:00:00Z","data":{"instant":{"details":{"air_temperature":22.0}},
-                "next_6_hours":{"summary":{"symbol_code":"cloudy"},"details":{"air_temperature_max":22.0,"air_temperature_min":16.0}}}}
-            ]}}
-            """.trimIndent()
+            (0 until 8).joinToString(",", prefix = """{"properties":{"timeseries":[""", postfix = "]}}") { i ->
+                val time = Instant.parse("2026-09-29T00:00:00Z").plusSeconds(i * 6L * 3600)
+                """{"time":"$time","data":{"instant":{"details":{"air_temperature":20.0}},
+                  "next_6_hours":{"summary":{"symbol_code":"cloudy"},
+                  "details":{"air_temperature_max":22.0,"air_temperature_min":18.0,"precipitation_amount":0.0}}}}"""
+            }
 
         const val DAILY =
             """{"properties":{"periods":[{"name":"Today","isDaytime":true,

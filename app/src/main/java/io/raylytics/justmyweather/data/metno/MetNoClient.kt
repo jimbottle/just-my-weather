@@ -100,8 +100,10 @@ class MetNoClient(
      * carrying a `next_6_hours` block, so the day is folded from the
      * NON-overlapping six-hour blocks (those starting at 00/06/12/18 UTC) —
      * in the six-hourly tail that is every entry, and in the hourly head it
-     * is one entry in six. A day with no such block (the series' ragged end)
-     * is dropped rather than shown as a day of nothing.
+     * is one entry in six. The series starts and ends partway through a
+     * local day, so a day is kept only when it has at least three of its
+     * four blocks AND the one holding local noon — otherwise a "day 9" built
+     * from two morning blocks would show the overnight low as its high.
      */
     suspend fun getDailyForecast(latitude: Double, longitude: Double, zone: ZoneId): List<ExtendedDay> {
         val url =
@@ -125,10 +127,15 @@ class MetNoClient(
             }
             .groupBy { it.date }
             .toSortedMap()
+            .filterValues { blocks -> blocks.size >= 3 && blocks.any { it.holdsNoon } }
             .map { (date, blocks) -> fold(date, blocks) }
     }
 
-    private class SixHours(val date: LocalDate, val localHour: Int, val block: Block, val instant: Details?)
+    private class SixHours(val date: LocalDate, val localHour: Int, val block: Block, val instant: Details?) {
+        /** Six-hour blocks start six hours apart, so exactly one per day has
+         * its midpoint within three hours of noon: the one noon falls in. */
+        val holdsNoon: Boolean get() = abs(localHour + 3 - 12) < 3
+    }
 
     private fun fold(date: LocalDate, blocks: List<SixHours>): ExtendedDay {
         val highC = blocks.mapNotNull { it.block.details.maxTemperatureC ?: it.instant?.airTemperatureC }.maxOrNull()
@@ -136,9 +143,8 @@ class MetNoClient(
         val windiest =
             blocks.mapNotNull { it.instant }.filter { it.windSpeedMps != null }.maxByOrNull { it.windSpeedMps!! }
         val precipMm = blocks.mapNotNull { it.block.details.precipitationMm }.takeIf { it.isNotEmpty() }?.sum()
-        // The block around midday (its midpoint nearest noon) describes the
-        // day the way a person would.
-        val midday = blocks.minByOrNull { abs(it.localHour + 3 - 12) }
+        // The block noon falls in describes the day the way a person would.
+        val midday = blocks.firstOrNull { it.holdsNoon }
         return ExtendedDay(
             date = date,
             highF = highC?.let(Units::celsiusToFahrenheit),

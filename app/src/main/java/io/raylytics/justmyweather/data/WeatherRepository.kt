@@ -157,11 +157,14 @@ class WeatherRepository(
     /** MET Norway's daily forecast for [location], or empty with no extended
      * source configured. The caller decides which of these days NWS already
      * covers. The days are cut in the place's calendar, which the (cached)
-     * NWS point knows; the device's zone is the fallback. */
+     * NWS point knows; the device's zone is the fallback — including when
+     * resolving the point fails, so an NWS outage costs the NWS days and not
+     * MET's too. */
     suspend fun loadExtendedDaily(location: WeatherLocation): List<ExtendedDay> {
         val client = metNo ?: return emptyList()
         val zone =
-            resolvePoint(location).timeZone?.let { runCatching { ZoneId.of(it) }.getOrNull() }
+            runCatching { resolvePoint(location) }.getOrNull()?.timeZone
+                ?.let { runCatching { ZoneId.of(it) }.getOrNull() }
                 ?: ZoneId.systemDefault()
         return client.getDailyForecast(location.latitude, location.longitude, zone)
     }

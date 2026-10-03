@@ -53,10 +53,11 @@ class MetNoClientTest {
         val days = client(200, body).getDailyForecast(38.25, -85.76, louisville)
 
         // 00Z is 8 pm the previous local day, so the first block lands on
-        // Oct 9 — a day on its own, folded from one block — and Oct 11's 00Z
-        // block is Oct 10's evening. Oct 12 has no block and is dropped.
-        assertEquals(listOf("2026-10-09", "2026-10-10", "2026-10-11"), days.map { it.date.toString() })
-        val sat = days[1]
+        // Oct 9 — one block, not a day, dropped — and Oct 11's 00Z block is
+        // Oct 10's evening. Oct 11 keeps three blocks (2 am to 8 pm) and
+        // stays; Oct 12 has no block at all.
+        assertEquals(listOf("2026-10-10", "2026-10-11"), days.map { it.date.toString() })
+        val sat = days[0]
         assertEquals(LocalDate.of(2026, 10, 10), sat.date)
         assertEquals(77.0, sat.highF!!, 0.01) // 25 °C, the day's block max
         assertEquals(53.6, sat.lowF!!, 0.01) // 12 °C, from the evening block
@@ -77,14 +78,35 @@ class MetNoClientTest {
     fun `hourly entries only count once in six, so nothing overlaps`() = runTest {
         // Hourly head: 12Z and 13Z both carry a six-hour block; only 12Z's
         // block (a 00/06/12/18 start) folds in, so its 3 mm is not doubled.
+        // 18Z and the next 00Z complete the day (8 am, 2 pm, 8 pm New York).
         val body =
             """{"properties":{"timeseries":[
             ${entry("2026-10-04T12:00:00Z", 18.0, 1.0, 0.0, six("rain", 20.0, 16.0, 3.0))},
-            ${entry("2026-10-04T13:00:00Z", 18.5, 1.0, 0.0, six("rain", 20.0, 16.0, 3.0))}
+            ${entry("2026-10-04T13:00:00Z", 18.5, 1.0, 0.0, six("rain", 20.0, 16.0, 3.0))},
+            ${entry("2026-10-04T18:00:00Z", 20.0, 1.0, 0.0, six("cloudy", 20.0, 17.0, 0.0))},
+            ${entry("2026-10-05T00:00:00Z", 17.0, 1.0, 0.0, six("cloudy", 17.0, 14.0, 0.0))}
             ]}}"""
         val day = client(200, body).getDailyForecast(0.0, 0.0, louisville).single()
         assertEquals(3.0 / 25.4, day.precipIn!!, 0.0001)
         assertEquals("Rain", day.conditions)
+    }
+
+    @Test
+    fun `a day the series only half covers is dropped, one it covers to the evening is kept`() = runTest {
+        // The series' tail: 06Z and 12Z are 2 am and 8 am in New York — a
+        // high from those would be the morning's. With 18Z (2 pm) too the
+        // afternoon is in, and the day stands.
+        val head = entry("2026-10-12T06:00:00Z", 12.0, 1.0, 0.0, six("fair_day", 16.0, 11.0, 0.0)) + "," +
+            entry("2026-10-12T12:00:00Z", 16.0, 1.0, 0.0, six("clearsky_day", 27.0, 16.0, 0.0))
+        val twoBlocks = """{"properties":{"timeseries":[$head]}}"""
+        assertEquals(emptyList<ExtendedDay>(), client(200, twoBlocks).getDailyForecast(0.0, 0.0, louisville))
+        val threeBlocks =
+            """{"properties":{"timeseries":[$head,
+            ${entry("2026-10-12T18:00:00Z", 27.0, 1.0, 0.0, six("clearsky_night", 26.0, 20.0, 0.0))}
+            ]}}"""
+        val day = client(200, threeBlocks).getDailyForecast(0.0, 0.0, louisville).single()
+        assertEquals(LocalDate.of(2026, 10, 12), day.date)
+        assertEquals(80.6, day.highF!!, 0.01) // 27 °C, the afternoon's
     }
 
     @Test

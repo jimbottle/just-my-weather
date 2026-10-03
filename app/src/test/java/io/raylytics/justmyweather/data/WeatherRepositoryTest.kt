@@ -1,13 +1,17 @@
 package io.raylytics.justmyweather.data
 
+import io.raylytics.justmyweather.data.metno.MetNoClient
 import io.raylytics.justmyweather.data.nws.HttpResult
 import io.raylytics.justmyweather.data.nws.HttpTransport
 import io.raylytics.justmyweather.data.nws.NwsClient
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 
 /**
  * Covers the repository's label-fallback and point-caching behaviour — the
@@ -17,7 +21,7 @@ import java.time.Instant
 class WeatherRepositoryTest {
     /** Routes by endpoint so the same instance serves a full load and records
      * every URL, letting tests assert on cache reuse across calls. */
-    private class RoutingTransport : HttpTransport {
+    private class RoutingTransport(private val points: String = POINTS) : HttpTransport {
         val requested = mutableListOf<String>()
 
         override suspend fun get(url: String, headers: Map<String, String>): HttpResult {
@@ -26,7 +30,8 @@ class WeatherRepositoryTest {
                 when {
                     "/observations/latest" in url -> OBSERVATION
                     url.endsWith("/stations") -> STATIONS
-                    "/points/" in url -> POINTS
+                    "/points/" in url -> points
+                    "api.met.no" in url -> MET_NO
                     else -> error("unexpected url $url")
                 }
             return HttpResult(200, body, null)
@@ -35,12 +40,50 @@ class WeatherRepositoryTest {
         fun pointsLookups() = requested.count { "/points/" in it && !it.endsWith("/stations") }
     }
 
+    private val honolulu = WeatherLocation(21.3, -157.9, label = "Honolulu")
+
     private fun repo(
         transport: RoutingTransport,
         cache: PointCache = InMemoryPointCache(),
         snapshots: SnapshotCache = InMemorySnapshotCache(),
         now: Instant = Instant.parse("2026-06-24T18:05:00Z"),
-    ) = WeatherRepository(NwsClient(transport = transport), cache, snapshots, clock = { now })
+        metNo: MetNoClient? = null,
+    ) = WeatherRepository(NwsClient(transport = transport), cache, snapshots, clock = { now }, metNo = metNo)
+
+    @Test
+    fun `extended days are cut in the place's calendar, which the NWS point knows`() = runTest {
+        // Honolulu is UTC-10: the fixture's eight six-hour blocks (Oct 11 00Z
+        // to Oct 12 18Z) make one full Honolulu day, Oct 11 (2 am, 8 am,
+        // 2 pm, 8 pm); Oct 10 and Oct 12 are partial and dropped.
+        val transport =
+            RoutingTransport(points = POINTS.replace("\"gridId\"", "\"timeZone\":\"Pacific/Honolulu\",\"gridId\""))
+        val days =
+            repo(transport, metNo = MetNoClient(transport = transport))
+                .loadExtendedDaily(honolulu)
+        assertEquals(listOf(LocalDate.of(2026, 10, 11)), days.map { it.date })
+        assertEquals(
+            MetNoClient(transport = transport).getDailyForecast(21.3, -157.9, ZoneId.of("Pacific/Honolulu")),
+            days,
+        )
+    }
+
+    @Test
+    fun `without a usable place zone, or a point at all, the device's calendar cuts the days`() = runTest {
+        // No timeZone on the point (older cache entries have none).
+        val plain = RoutingTransport()
+        val expected = MetNoClient(transport = plain).getDailyForecast(21.3, -157.9, ZoneId.systemDefault())
+        assertTrue(expected.isNotEmpty())
+        assertEquals(
+            expected,
+            repo(plain, metNo = MetNoClient(transport = plain)).loadExtendedDaily(honolulu),
+        )
+        // /points fails outright: the NWS days are lost, MET's must not be.
+        val broken = RoutingTransport(points = "{}")
+        assertEquals(
+            expected,
+            repo(broken, metNo = MetNoClient(transport = broken)).loadExtendedDaily(honolulu),
+        )
+    }
 
     @Test
     fun `blank label is filled from the points relativeLocation`() = runTest {
@@ -186,6 +229,15 @@ class WeatherRepositoryTest {
             """
 
         const val STATIONS = """{"features":[{"properties":{"stationIdentifier":"KNYC"}}]}"""
+
+        /** Eight six-hour blocks, Oct 11 00Z through Oct 12 18Z. */
+        val MET_NO =
+            (0 until 8).joinToString(",", prefix = """{"properties":{"timeseries":[""", postfix = "]}}") { i ->
+                val time = Instant.parse("2026-10-11T00:00:00Z").plusSeconds(i * 6L * 3600)
+                """{"time":"$time","data":{"instant":{"details":{"air_temperature":20.0}},
+                  "next_6_hours":{"summary":{"symbol_code":"cloudy"},
+                  "details":{"air_temperature_max":22.0,"air_temperature_min":18.0,"precipitation_amount":0.0}}}}"""
+            }
 
         const val OBSERVATION =
             """
