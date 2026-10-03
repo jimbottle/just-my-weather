@@ -33,7 +33,8 @@ just-my-weather-zi8). versionCode 2 is burned: the next upload is 3.
 > theme them. Tap a tile for details. Hourly and daily forecasts as tiles, up
 > to fourteen days out. Save places from an offline list of US towns or by
 > coordinates. Personal alerts on current conditions and the forecast, quiet
-> by default. No account, no ads, no tracking.
+> by default. Free with one small banner ad; a one-time purchase removes it.
+> No account needed.
 
 ### Internal
 

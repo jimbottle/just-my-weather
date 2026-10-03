@@ -152,8 +152,11 @@ cut bumps to 3.
 - A production upload through the API lands as a **draft**; roll it out in
   the console, or promote a tested internal build with
   `scripts/android/promote-play.sh` instead of re-uploading.
-- Data safety and the Advertising ID declaration are separate forms. This app
-  uses neither ads nor the advertising ID; keep both answers "No".
+- Data safety and the Advertising ID declaration are separate forms. Since
+  2026-10-03 the app carries an AdMob banner (just-my-weather-zi8.3), so both
+  change: Advertising ID **Yes**, and Data safety gains the AdMob rows in
+  `store-assets/play-store-listing.md`. Re-check both whenever the Google
+  Mobile Ads SDK version changes.
 
 ## Store listing assets
 

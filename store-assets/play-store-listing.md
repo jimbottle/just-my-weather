@@ -26,7 +26,7 @@ Source of truth: `store-assets/short-description.txt` (79 chars). Carries the
 two target phrases, "modular weather app" and "custom".
 
 ```
-Modular weather app with a custom view: pick what you see, set your own alerts.
+Modular weather app for a custom view: pick what you see, set your own alerts.
 ```
 
 ## Full description (max 4000 chars)
@@ -50,15 +50,15 @@ checklist are in `store-assets/ASO_NOTES.md`.
 | Category | Weather |
 | Tags | Pick from Play's fixed list, up to five: Weather, Forecast, and whichever of its entries read closest to Modular / Custom / Customization (the list is only visible in the console; record the exact picks here once chosen). See `ASO_NOTES.md`. |
 | Free or paid | Free |
-| Contains ads | No |
-| In-app purchases | None |
+| Contains ads | **Yes** — one AdMob banner at the bottom of the glance (decided 2026-10-03) |
+| In-app purchases | **Yes** — `remove_ads`, one-time non-consumable, **USD 0.99** (Monetize with Play → Products → One-time products; just-my-weather-6ii) |
 
 ## Contact details
 
 | Field | Value |
 |---|---|
 | Email (public, required) | dev@raylytics.io |
-| Website | https://raylytics.io/justmyweather (not yet built; the privacy URL exists first) |
+| Website | https://raylytics.io (AdMob reads app-ads.txt from this domain's root; a /justmyweather landing page can replace it later — same domain, so app-ads.txt still resolves) |
 | Phone | — |
 
 ## Privacy policy URL
@@ -107,17 +107,17 @@ Re-capture when a listed screen changes visibly.
 | Declaration | Answer |
 |---|---|
 | Privacy policy | URL above |
-| Ads | No, the app does not contain ads |
+| Ads | **Yes**, the app contains ads (Google AdMob banner, removable with the $0.99 purchase) |
 | App access | All functionality is available without special access (no login) |
 | Content rating | IARC questionnaire → Utility / Productivity / Communication / Other; no violence, sexuality, language, controlled substances, gambling, or user interaction → **Everyone** |
-| Target audience | 13 and older (not directed at children) |
+| Target audience | 13 and older (not directed at children). With ads this matters: choosing any under-13 band pulls the app into the Families policy (certified ad SDKs, no ad ID) — keep it 13+. |
 | News app | No |
 | COVID-19 contact tracing / status | No |
 | Data safety | see below |
 | Government app | No |
 | Financial features | None |
 | Health | No health features |
-| Advertising ID | No, the app does not use the advertising ID |
+| Advertising ID | **Yes** — used by the Google Mobile Ads SDK for advertising (and fraud prevention). The SDK merges the `com.google.android.gms.permission.AD_ID` permission; leave it in. |
 
 ## Data safety form
 
@@ -132,8 +132,10 @@ Data types:
 
 | Type | Collected | Shared | Ephemeral | Required / optional | Purpose |
 |---|---|---|---|---|---|
-| Location → Approximate location | Yes | Yes | Yes | Optional | App functionality |
-| App info and performance → Diagnostics | Yes | No | No | Optional | App functionality |
+| Location → Approximate location | Yes | Yes | No | Optional | App functionality; Advertising or marketing (AdMob infers it from the IP address) |
+| Device or other IDs | Yes | Yes | No | Optional* | Advertising or marketing; Fraud prevention, security, and compliance |
+| App activity → App interactions | Yes | Yes | No | Optional* | Advertising or marketing; Analytics (ad impressions and clicks, reported to AdMob) |
+| App info and performance → Diagnostics | Yes | Yes | No | Optional | App functionality (bug-report email, not shared); Advertising or marketing, Fraud prevention (AdMob SDK diagnostics, shared) |
 | Personal info → Email address | Yes | No | No | Optional | Developer communications |
 
 Notes for the form:
@@ -159,9 +161,23 @@ Notes for the form:
   the privacy policy's "Bug reports and ideas you send" section. (Decided by
   the agent 2026-10-02 as a recommendation; Evan confirms when filling the
   form.)
+- **The AdMob rows** follow Google's own disclosure guidance for the Google
+  Mobile Ads SDK (https://developers.google.com/admob/android/privacy/play-data-disclosure):
+  IP-derived approximate location, the advertising ID / device identifiers,
+  ad interactions, and SDK diagnostics, all **shared** with Google, used for
+  advertising and fraud prevention. Re-read that page whenever the SDK version
+  changes — the list moves. "Optional*": a user who buys Remove Ads stops
+  loading the SDK's ads, but the data type is not something a non-paying user
+  can decline, so answer **"Users can't choose"** if the form insists on a
+  per-type choice. Location's "Ephemeral" goes to **No** now that AdMob, not
+  just the forecast request, receives it.
+- **Financial info → Purchase history** is **not** declared: Google Play
+  Billing handles the $0.99 purchase and the app only stores an "ads removed"
+  flag on the device. Google's guidance treats Play Billing as Google's
+  collection, not the developer's.
 - Every other data type (financial, health, messages, photos, audio, files,
-  calendar, contacts, app activity, web browsing, crash logs, device IDs, and
-  the rest of personal info): **not collected**.
+  calendar, contacts, web browsing, crash logs, and the rest of personal info):
+  **not collected**.
 
 ## Per-release fields
 
@@ -181,5 +197,12 @@ cover elsewhere, but the current-conditions, hourly, and alert paths would not.
 
 - Developer name shown on the listing: Raylytics, LLC (organization account,
   owner evan@raylytics.io, `dev@` alias).
-- Pricing: free, no in-app purchases, no ads. The Open-Meteo free tier is for
-  non-commercial use; keep the app free or move to their paid plan.
+- Pricing: free to install, with an AdMob banner and a one-time $0.99
+  `remove_ads` purchase (decided 2026-10-03). **That makes the app commercial,
+  and the Open-Meteo free tier (days 8–14) is non-commercial only** — settle
+  just-my-weather-t1e (subscribe or drop days 8–14) before production.
+- Play allows free → paid but not paid → free; the app stays Free and
+  monetises through ads + the purchase.
+- app-ads.txt: raylytics.io/app-ads.txt already carries the Raylytics AdMob
+  publisher line (publisher-level, covers every Raylytics app). The listing's
+  Website must be on raylytics.io for AdMob to find it.

@@ -155,7 +155,7 @@ private fun AboutSection(version: String) {
         )
         AboutLink(
             title = "Privacy policy",
-            detail = "No accounts, no ads, no tracking. What leaves your phone, and why.",
+            detail = "No accounts, no analytics. What leaves your phone, and why.",
             onClick = { uriHandler.openUri(PRIVACY_POLICY_URL) },
         )
         AboutLink(

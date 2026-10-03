@@ -5,7 +5,7 @@ Most weather apps decide for you: ten-day forecasts, radar, air quality, pollen,
 A MODULAR, CUSTOM WEATHER VIEW
 
 • The glance is a grid of modules. Choose which data points show: temperature, feels like, conditions, humidity, wind, pressure, dew point, visibility, sun times, hourly forecast, daily forecast, and more.
-• Set each module's width. Width is prominence: the thing you care about most gets the biggest tile.
+• Size each module, wide and tall. Size is prominence: the thing you care about most gets the biggest tile.
 • Long-press to arrange the grid in place, launcher-style. Drag a corner to resize.
 • Rename any module. Pick a density from spacious to compact. Theme it: light, dark, or system; your accent color; your typeface. Every part of the view is customizable.
 • Tap a tile for the details behind it.
@@ -23,11 +23,16 @@ FORECASTS FROM THE SOURCE
 • The daily view can reach fourteen days: seven from the NWS, then Open-Meteo for the rest, clearly marked.
 • Saved places: search a bundled offline list of about 32,000 US towns and cities, or enter coordinates. No geocoding service sees what you type.
 
-PRIVATE BY DESIGN
+FREE, WITH ONE SMALL BANNER
 
-• No accounts, no ads, no analytics, no tracking.
-• Location is coarse and optional. The only data the app sends is the coordinates of the place you are looking at, to the weather services that fetch the forecast.
-• Privacy policy: https://raylytics.io/justmyweather/privacy
+• Just My Weather is free. A single banner ad sits at the bottom of the screen, out of the way of your weather.
+• A one-time $0.99 purchase removes it for good, on every device signed in to your Google account.
+
+NO ACCOUNT, NO ANALYTICS
+
+• No sign-up and no analytics. Your view, places, and alert rules stay on your phone.
+• Location is coarse and optional. The weather services receive only the coordinates of the place you are looking at.
+• Ads are served by Google AdMob, non-personalized. Privacy policy: https://raylytics.io/justmyweather/privacy
 
 If you have been looking for a customizable weather app that shows only what you ask for, this is it.
 

@@ -1,6 +1,6 @@
 # Privacy Policy — Just My Weather
 
-_Last updated: 2026-10-02_
+_Last updated: 2026-10-03_
 
 Just My Weather is a free, open-source Android weather app published by
 Raylytics, LLC. It shows the weather for a place you choose, lets you build your
@@ -11,11 +11,15 @@ Canonical URL: https://raylytics.io/justmyweather/privacy
 
 ## Summary
 
-**Just My Weather does not sell or share your personal information, and
-collects none unless you choose to email the developer.** It has no accounts,
-no backend server of its own, no ads, no analytics, and no automatic crash
-reporting. The developer sees nothing about
-how you use the app unless you choose to email a bug report or an idea.
+**Just My Weather does not sell your personal information, and the developer
+collects none unless you choose to email a bug report or an idea.** It has no
+accounts, no backend server of its own, no analytics, and no automatic crash
+reporting.
+
+The app is free and shows one banner ad, served by **Google AdMob**, at the
+bottom of the screen. AdMob receives standard advertising signals from your
+device to serve that ad (see "Ads and purchases"). A one-time $0.99 purchase
+removes the ad.
 
 Everything you set up — which modules show, how they are arranged, your theme,
 your saved places, your alert rules — stays on your phone (and in your own
@@ -23,7 +27,8 @@ Android backup, if you use it). If you turn on the Gadgetbridge hand-off, the
 current weather and that place's name can also reach your paired watch. The
 only data the app itself sends off your device is the latitude and longitude
 of the place you are viewing, or that your alerts watch, sent to public
-weather services so the app can fetch the forecast. A bug report or idea you
+weather services so the app can fetch the forecast; separately, the ad
+library sends AdMob what it needs to show the banner. A bug report or idea you
 send from the app goes from your own email app, and you see every line of it
 before you send it.
 
@@ -62,6 +67,31 @@ Those services' own privacy practices apply to the requests they receive. The
 app sends them coordinates and nothing else: no account, no device identifier,
 no advertising ID.
 
+## Ads and purchases
+
+Unless you have bought ad removal, the app shows **one banner ad** at the
+bottom of the screen. It is served by **Google AdMob**, a Google service, and
+the app requests **non-personalized ads only**. To serve and measure that ad,
+the Google Mobile Ads SDK built into the app may collect:
+
+- your device's **advertising ID** (you can reset or delete it in your
+  device's settings) and other device identifiers;
+- your **IP address**, from which an approximate location can be inferred;
+- **ad interactions** — whether an ad loaded, was shown, or was tapped;
+- **diagnostic information** about the SDK and how ads perform.
+
+That data goes to Google, not to the developer, and Google's processing is
+governed by the [Google Privacy Policy](https://policies.google.com/privacy)
+and [how Google uses information from apps that use its services](https://policies.google.com/technologies/partner-sites).
+The ad is never given your saved places, your alert rules, or the weather
+you are looking at.
+
+**Remove ads ($0.99, one-time).** The purchase is handled by **Google Play
+Billing**; the developer never sees your payment details. The app keeps only a
+note on your device that ads are removed, and checks Google Play to restore the
+purchase on a new device signed in to the same Google account. Once ads are
+removed, the app stops requesting ads.
+
 All of the app's network traffic uses HTTPS.
 
 ## What stays on your phone
@@ -71,6 +101,7 @@ The app stores the following on your device, in its private app storage:
 - your view configuration (modules, sizes, order, labels, density, theme);
 - your saved places and the last location the app used;
 - your alert rules, whether each has fired, and your quiet-hours setting;
+- whether you have bought ad removal;
 - a short-lived cache of the most recent weather so the app opens instantly;
 - a small cache of up to 32 recently looked-up approximate areas (coordinates
   rounded to about 1 km) with the weather-station grid each one maps to, so
@@ -130,7 +161,12 @@ same address.
 - **Location (approximate)** — optional; to show the weather where you are.
 - **Notifications** — to deliver the alerts you set up (Android 13 and later
   ask you first).
-- **Internet and network state** — to fetch forecasts from the services above.
+- **Internet and network state** — to fetch forecasts from the services above,
+  and to load the banner ad.
+- **Advertising ID** — added by the Google Mobile Ads SDK, so AdMob can use
+  the advertising ID as described under "Ads and purchases".
+- **Google Play billing** — to offer and restore the one-time ad-removal
+  purchase.
 - **Run at startup, wake lock, and foreground service** — added by Android's
   WorkManager library so your alert rules keep being checked after a reboot
   and on the schedule you chose. The app never shows a foreground service
@@ -139,13 +175,14 @@ same address.
 ## What the app does NOT do
 
 - No accounts or sign-in.
-- No advertising and no advertising ID.
+- No personalized ads: the banner is requested as non-personalized.
 - No analytics, telemetry, or automatic crash reporting.
-- No selling or sharing of personal information.
-- No precise location. The only positions kept are the ones listed above; they
-  leave your phone only as forecast coordinates sent to the weather services
-  described here, or inside your own Android backup if you use it; never to
-  the developer.
+- No selling of personal information.
+- No precise location. The positions the app keeps are the ones listed above;
+  they leave your phone only as forecast coordinates sent to the weather
+  services described here, or inside your own Android backup if you use it;
+  never to the developer. (AdMob may infer an approximate location from your
+  IP address, as any website can.)
 
 ## Open source
 
@@ -154,8 +191,8 @@ verify the statements in this policy by reading the code.
 
 ## Children
 
-The app is intended for users 13 and older. It does not knowingly collect any
-data from children.
+The app is intended for users 13 and older and is not directed at children.
+It does not knowingly collect any data from children.
 
 ## Changes
 

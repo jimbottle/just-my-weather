@@ -123,4 +123,5 @@ Weather data: the [National Weather Service](https://www.weather.gov) (public
 domain), and for extended daily forecasts past seven days,
 [Open-Meteo.com](https://open-meteo.com) under
 [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Open-Meteo's free API
-is for non-commercial use; a commercial build needs its paid plan.
+is for non-commercial use, and the Play build is ad-supported, so it needs
+their paid plan (or must drop days 8–14) — tracked as just-my-weather-t1e.
