@@ -2,8 +2,7 @@
 
 _Last updated: 2026-10-03_
 
-Just My Weather is a free, open-source Android weather app published by
-Raylytics, LLC. It shows the weather for a place you choose, lets you build your
+Just My Weather is a free Android weather app published by Raylytics, LLC. It shows the weather for a place you choose, lets you build your
 own view of it, and sends you notifications for conditions you define. This
 policy explains what data the app accesses and what happens to it.
 
@@ -190,11 +189,6 @@ same address.
   services described here, or inside your own Android backup if you use it;
   never to the developer. (AdMob may infer an approximate location from your
   IP address, as any website can.)
-
-## Open source
-
-The app's source code is published under the Apache License 2.0, so anyone can
-verify the statements in this policy by reading the code.
 
 ## Children
 

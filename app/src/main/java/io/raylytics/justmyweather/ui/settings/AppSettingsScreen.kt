@@ -229,10 +229,9 @@ private fun HelpSection(onReportBug: () -> Unit) {
     }
 }
 
-/** Where the policy and the source live. The policy URL is also the one in
- * the Play listing (store-assets/play-store-listing.md); change both together. */
+/** Where the policy lives. It is also the URL in the Play listing
+ * (store-assets/play-store-listing.md); change both together. */
 const val PRIVACY_POLICY_URL = "https://raylytics.io/justmyweather/privacy"
-const val SOURCE_CODE_URL = "https://github.com/jimbottle/just-my-weather"
 
 /**
  * What the app is and whose data it shows. The attribution is not a courtesy:
@@ -256,11 +255,6 @@ private fun AboutSection(version: String) {
             title = "Privacy policy",
             detail = "No accounts. What leaves your phone, the ad included, and why.",
             onClick = { uriHandler.openUri(PRIVACY_POLICY_URL) },
-        )
-        AboutLink(
-            title = "Source code",
-            detail = "Open source under the Apache License 2.0.",
-            onClick = { uriHandler.openUri(SOURCE_CODE_URL) },
         )
         Text(
             text = "Weather data from the US National Weather Service (public domain). " +
