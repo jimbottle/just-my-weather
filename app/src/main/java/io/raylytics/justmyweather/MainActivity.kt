@@ -54,6 +54,7 @@ import io.raylytics.justmyweather.ui.home.HomeScreen
 import io.raylytics.justmyweather.ui.home.HomeUiState
 import io.raylytics.justmyweather.ui.home.HomeViewModel
 import io.raylytics.justmyweather.ui.home.SUN_TICK
+import io.raylytics.justmyweather.ui.home.describe
 import io.raylytics.justmyweather.ui.places.PlacesScreen
 import io.raylytics.justmyweather.ui.places.PlacesViewModel
 import io.raylytics.justmyweather.ui.settings.AppSettingsScreen
@@ -239,12 +240,7 @@ class MainActivity : ComponentActivity() {
                 homeViewModel.state.first { it !is HomeUiState.Loading }
             }
         return listOf(
-            "Glance" to
-                when (home) {
-                    null -> "Loading (still, after ${GLANCE_WAIT_MS}ms)"
-                    is HomeUiState.Error -> "Error: ${home.message}"
-                    else -> home.javaClass.simpleName
-                },
+            "Glance" to (home?.describe() ?: "Loading (still, after ${GLANCE_WAIT_MS}ms)"),
             "Location permission" to container.locationProvider.hasPermission().toString(),
             "Visible modules" to config.visible.size.toString(),
             "Density" to config.density.name,

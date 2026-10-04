@@ -80,3 +80,15 @@ sealed interface HomeUiState {
     /** Network or NWS failure, with a short plain-language message. */
     data class Error(val message: String) : HomeUiState
 }
+
+/**
+ * The state's name for a bug report. Spelled out rather than read off the
+ * class: R8 renames the classes in a release build, and "Glance: n0" is
+ * what a real phone's report said before this existed.
+ */
+fun HomeUiState.describe(): String =
+    when (this) {
+        is HomeUiState.Loading -> "Loading"
+        is HomeUiState.Error -> "Error: $message"
+        is HomeUiState.Ready -> if (refreshing) "Ready (refreshing)" else "Ready"
+    }
