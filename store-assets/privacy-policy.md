@@ -1,6 +1,6 @@
 # Privacy Policy — Just My Weather
 
-_Last updated: 2026-10-03_
+_Last updated: 2026-10-04_
 
 Just My Weather is a free Android weather app published by Raylytics, LLC. It shows the weather for a place you choose, lets you build your
 own view of it, and sends you notifications for conditions you define. This
