@@ -86,8 +86,11 @@ Regenerate the icon and feature graphic with
 (2.22:1), over Play's 2:1 limit — crop them with
 `store-assets/crop-screenshots.sh`.
 
-Screenshots captured 2026-10-02 from 0.2.0 on the Pixel_7_API_35 emulator
-(Louisville, KY, live NWS data; status bar in demo mode at 9:41), upload in
+Screenshots captured 2026-10-04 from the versionCode 3 release build on the
+Pixel_7_API_35 emulator after `pm clear` (Louisville, KY, live NWS data; status
+bar in demo mode at 9:41). Cropped with the TOP anchor so the banner ad, which
+sits at the foot of the glance, falls below the 2:1 cut: the screenshots are
+banner-free on purpose (an emulator can only show labelled test ads). Upload in
 filename order — the first two carry the listing:
 
 1. `01-your-glance` — a customized glance, dark look (Conditions + Wind beside
