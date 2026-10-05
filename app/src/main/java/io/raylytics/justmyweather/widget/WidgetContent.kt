@@ -350,7 +350,9 @@ private fun SunWidget(
     }
 }
 
-private val SUN_TIME_WIDTH = 78.dp
+/** A time column: "6:56 AM" at the temperature size, with air before the
+ * next column (verified in serif, the widest face). */
+private val SUN_TIME_WIDTH = 92.dp
 
 @Composable
 private fun SunHeading(text: String, palette: WidgetPalette) {

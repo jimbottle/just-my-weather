@@ -42,9 +42,8 @@ class WidgetConfigureViewModel(
 
     fun setTheme(theme: ThemeConfig) = edit { it.withTheme(theme) }
 
-    suspend fun save() {
-        editable.value?.let { repository.save(widgetId, it) }
-    }
+    /** Persist the edits; the saved config, or null if nothing had loaded. */
+    suspend fun save(): WidgetConfig? = editable.value?.also { repository.save(widgetId, it) }
 
     private fun edit(transform: (WidgetConfig) -> WidgetConfig) {
         editable.value = editable.value?.let(transform)

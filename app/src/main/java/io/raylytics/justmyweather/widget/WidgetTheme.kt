@@ -96,18 +96,20 @@ data class WidgetDensitySpec(
     val padding: Dp,
     /** Air between forecast tiles and sun rows. */
     val gap: Dp,
-    /** Height of one forecast tile, before its element lines. */
+    /** Height of one forecast tile, before its element lines: the time, the
+     * temperature and a two-line bottom, with a little air (verified on the
+     * emulator at 88dp, where the air was most of the tile). */
     val tileHeight: Dp,
 ) {
     companion object {
         fun of(density: Density): WidgetDensitySpec =
             when (density) {
                 Density.SPACIOUS ->
-                    WidgetDensitySpec(valueCeilingSp = 132f, padding = 14.dp, gap = 8.dp, tileHeight = 96.dp)
+                    WidgetDensitySpec(valueCeilingSp = 132f, padding = 14.dp, gap = 8.dp, tileHeight = 80.dp)
                 Density.COMFORTABLE ->
-                    WidgetDensitySpec(valueCeilingSp = 120f, padding = 10.dp, gap = 6.dp, tileHeight = 88.dp)
+                    WidgetDensitySpec(valueCeilingSp = 120f, padding = 10.dp, gap = 6.dp, tileHeight = 72.dp)
                 Density.COMPACT ->
-                    WidgetDensitySpec(valueCeilingSp = 96f, padding = 6.dp, gap = 4.dp, tileHeight = 80.dp)
+                    WidgetDensitySpec(valueCeilingSp = 96f, padding = 6.dp, gap = 4.dp, tileHeight = 64.dp)
             }
     }
 }

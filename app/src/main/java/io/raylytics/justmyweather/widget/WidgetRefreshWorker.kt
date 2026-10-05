@@ -1,6 +1,7 @@
 package io.raylytics.justmyweather.widget
 
 import android.content.Context
+import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.glance.appwidget.updateAll
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
@@ -38,14 +39,24 @@ class WidgetRefreshWorker(
 ) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
         val container = (applicationContext as JustMyWeatherApp).container
-        val configs = container.widgetConfigRepository.all().values
-        if (configs.isEmpty()) {
-            // Nothing to draw for. The receiver cancels this work when the
-            // last widget goes; this is the safety net for a cancel that
-            // never ran (a crash between the two, a restored backup).
+        // The launcher is the authority on which widgets exist, not the
+        // config store: a widget placed a moment ago has its id before its
+        // first draw has seeded a config (verified: the one-off refresh ran
+        // 250 ms after placement, read no configs, and would have cancelled
+        // the schedule it had just been given). Each id without a config is
+        // seeded here, as the draw would seed it.
+        val manager = GlanceAppWidgetManager(applicationContext)
+        val glanceIds = manager.getGlanceIds(WeatherWidget::class.java)
+        val ids = glanceIds.map(manager::getAppWidgetId)
+        if (ids.isEmpty()) {
+            // The receiver cancels this work when the last widget goes; this
+            // is the safety net for a cancel that never ran (a crash between
+            // the two, a restored backup).
             cancel(applicationContext)
             return Result.success()
         }
+        val stored = container.widgetConfigRepository.all()
+        val configs = ids.map { id -> stored[id] ?: container.seedWidgetConfig(id) }
 
         val repository = container.weatherRepository
         val location = container.locationResolver.resolve()
@@ -72,7 +83,7 @@ class WidgetRefreshWorker(
         val extended =
             if (needs.extended) fetchOr(previous?.extended) { repository.loadExtendedDaily(location) } else null
 
-        container.widgetDataStore.put(
+        val data =
             WidgetData(
                 location = location,
                 snapshot = snapshot,
@@ -81,8 +92,11 @@ class WidgetRefreshWorker(
                 extended = extended,
                 fetchedAt = if (reading.isSuccess) Instant.now() else previous?.fetchedAt ?: Instant.now(),
                 error = error,
-            ),
-        )
+            )
+        container.widgetDataStore.put(data)
+        // Into each widget's own state, then the draw: the composition reads
+        // the state, not the stores (WidgetState).
+        ids.forEachIndexed { index, id -> WidgetState.push(applicationContext, glanceIds[index], configs[index], data) }
         WeatherWidget().updateAll(applicationContext)
         // A transient failure retries on WorkManager's backoff; anything else
         // waits for the next tick rather than hammering a broken endpoint.

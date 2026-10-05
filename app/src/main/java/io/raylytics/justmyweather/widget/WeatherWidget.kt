@@ -2,14 +2,21 @@ package io.raylytics.justmyweather.widget
 
 import android.appwidget.AppWidgetManager
 import android.content.Context
+import androidx.datastore.preferences.core.Preferences
 import androidx.glance.GlanceId
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.provideContent
+import androidx.glance.appwidget.state.getAppWidgetState
+import androidx.glance.currentState
+import androidx.glance.state.GlanceStateDefinition
+import androidx.glance.state.PreferencesGlanceStateDefinition
 import io.raylytics.justmyweather.AppContainer
 import io.raylytics.justmyweather.JustMyWeatherApp
+import io.raylytics.justmyweather.view.ThemeConfig
+import io.raylytics.justmyweather.view.ViewConfig
 import kotlinx.coroutines.flow.first
 import java.time.Instant
 
@@ -23,22 +30,38 @@ import java.time.Instant
  * widget's real size, which is what the text fit and the forecast's column
  * count are worked out from.
  *
- * A widget with no saved config (placed without the configure step, or one
- * whose config was lost) seeds itself from the glance and saves that, so it
+ * A widget with no saved config (the launcher placed it without the
+ * configure step — the Pixel launcher does, offering a pencil instead — or
+ * its config was lost) seeds itself from the glance and saves that, so it
  * draws something true on its first frame and the configure screen later
  * opens on what it is showing.
  */
 class WeatherWidget : GlanceAppWidget() {
     override val sizeMode: SizeMode = SizeMode.Exact
 
+    override val stateDefinition: GlanceStateDefinition<Preferences> = PreferencesGlanceStateDefinition
+
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val container = (context.applicationContext as JustMyWeatherApp).container
         val widgetId = GlanceAppWidgetManager(context).getAppWidgetId(id)
-        val config = container.widgetConfigRepository.get(widgetId) ?: container.seedWidgetConfig(widgetId)
-        val data = container.widgetDataStore.get()
-        val now = Instant.now()
+        // A first draw (or one after a lost state file) mirrors the stores
+        // into the widget's state; every later change is pushed by whoever
+        // makes it. Read inside the composition, never here — see WidgetState.
+        val state = getAppWidgetState(context, PreferencesGlanceStateDefinition, id)
+        if (state[WidgetState.CONFIG] == null || state[WidgetState.DATA] == null) {
+            WidgetState.push(
+                context,
+                id,
+                config = container.widgetConfigRepository.get(widgetId) ?: container.seedWidgetConfig(widgetId),
+                data = container.widgetDataStore.get(),
+            )
+        }
         provideContent {
-            WidgetContent(config = config, data = data, now = now)
+            val prefs = currentState<Preferences>()
+            val config =
+                WidgetConfigCodec.decode(prefs[WidgetState.CONFIG])
+                    ?: WidgetConfig(ViewConfig.DEFAULT.showingOnly(WidgetConfig.DEFAULT_MODULE), ThemeConfig.DEFAULT)
+            WidgetContent(config = config, data = WidgetDataCodec.decode(prefs[WidgetState.DATA]), now = Instant.now())
         }
     }
 

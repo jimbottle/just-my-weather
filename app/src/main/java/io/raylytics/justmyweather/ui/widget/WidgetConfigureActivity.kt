@@ -27,6 +27,7 @@ import io.raylytics.justmyweather.ui.theme.JustMyWeatherTheme
 import io.raylytics.justmyweather.widget.WeatherWidget
 import io.raylytics.justmyweather.widget.WidgetConfig
 import io.raylytics.justmyweather.widget.WidgetRefreshWorker
+import io.raylytics.justmyweather.widget.WidgetState
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -100,11 +101,16 @@ class WidgetConfigureActivity : ComponentActivity() {
 
     private fun done() {
         lifecycleScope.launch {
-            viewModel.save()
+            val saved = viewModel.save() ?: return@launch finish()
             val manager = GlanceAppWidgetManager(this@WidgetConfigureActivity)
-            // Draw it now from the stored data (or its placeholder), then
-            // fetch so the first real reading lands within seconds.
-            runCatching { WeatherWidget().update(this@WidgetConfigureActivity, manager.getGlanceIdBy(widgetId)) }
+            // Push the new config into the widget's own state, draw it now
+            // from the stored data (or its placeholder), then fetch so the
+            // first real reading lands within seconds.
+            runCatching {
+                val id = manager.getGlanceIdBy(widgetId)
+                WidgetState.push(this@WidgetConfigureActivity, id, config = saved)
+                WeatherWidget().update(this@WidgetConfigureActivity, id)
+            }
             WidgetRefreshWorker.sync(this@WidgetConfigureActivity, hasWidgets = true)
             WidgetRefreshWorker.runOnce(this@WidgetConfigureActivity)
             setResult(RESULT_OK, resultIntent())
