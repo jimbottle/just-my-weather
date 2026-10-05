@@ -269,7 +269,9 @@ private fun AboutSection(version: String) {
     ) {
         Text("About", style = MaterialTheme.typography.labelMedium)
         Text(
-            text = "Just My Weather $version",
+            // The screen already says which app this is; the line names what
+            // a bug reply would ask for.
+            text = "Version $version",
             style = MaterialTheme.typography.bodyLarge,
             modifier = Modifier.padding(vertical = 8.dp).testTag("about-version"),
         )
