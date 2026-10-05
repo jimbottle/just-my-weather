@@ -31,12 +31,11 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import io.raylytics.justmyweather.ui.theme.accentColor
+import io.raylytics.justmyweather.ui.theme.onAccent
 import io.raylytics.justmyweather.view.AccentChoice
 import io.raylytics.justmyweather.view.AlertBannerPosition
 import io.raylytics.justmyweather.view.DailyDays
@@ -104,9 +103,9 @@ fun CustomizeScreen(
                 TextButton(onClick = onDone) { Text("Done") }
             }
             Text(
-                text = "Show the fields you care about, in the order you read them. Width is " +
-                    "prominence: a full-width tile is the big one. You can also long-press " +
-                    "any tile on the glance to drag and resize it in place.",
+                text = "Show the fields you care about, in the order you read them. Size is " +
+                    "prominence: the widest, tallest tile is the big one. You can also " +
+                    "long-press any tile on the glance to drag and resize it in place.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
@@ -265,11 +264,7 @@ private fun AccentChipRow(
                 colors =
                     FilterChipDefaults.filterChipColors(
                         selectedContainerColor = swatch,
-                        // 0.179 is the relative-luminance point where black and
-                        // white text have equal WCAG contrast — above it black
-                        // wins, below it white does. (0.5 would hand most of
-                        // this palette the lower-contrast label.)
-                        selectedLabelColor = if (swatch.luminance() > 0.179f) Color.Black else Color.White,
+                        selectedLabelColor = onAccent(swatch),
                     ),
             )
         }
