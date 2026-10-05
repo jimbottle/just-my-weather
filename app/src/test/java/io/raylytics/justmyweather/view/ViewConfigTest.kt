@@ -317,4 +317,15 @@ class ViewConfigTest {
         val config = ViewConfig.DEFAULT.setDensity(Density.SPACIOUS).toggle(reading(WeatherField.WIND)).moveUp(2)
         assertEquals(Density.SPACIOUS, config.density)
     }
+
+    @Test
+    fun `showingOnly leaves one module visible and keeps every other setting`() {
+        val config =
+            ViewConfig.DEFAULT.relabel(ModuleKey.Reading(WeatherField.WIND), "Breeze").setDensity(Density.COMPACT)
+        val only = config.showingOnly(ModuleKey.Sun)
+        assertEquals(listOf(ModuleKey.Sun), only.visible.map { it.module })
+        assertEquals(ModuleKey.catalog.size, only.items.size)
+        assertEquals("Breeze", only.items.first { it.module == ModuleKey.Reading(WeatherField.WIND) }.label)
+        assertEquals(Density.COMPACT, only.density)
+    }
 }

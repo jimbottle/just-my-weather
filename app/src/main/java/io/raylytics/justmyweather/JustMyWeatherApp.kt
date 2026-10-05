@@ -19,6 +19,8 @@ import io.raylytics.justmyweather.data.GadgetbridgeSettingsRepository
 import io.raylytics.justmyweather.data.ThemeConfigRepository
 import io.raylytics.justmyweather.data.ViewConfigRepository
 import io.raylytics.justmyweather.data.WeatherRepository
+import io.raylytics.justmyweather.data.WidgetConfigRepository
+import io.raylytics.justmyweather.data.WidgetDataStore
 import io.raylytics.justmyweather.data.gadgetbridge.GadgetbridgeBroadcaster
 import io.raylytics.justmyweather.data.gadgetbridge.GadgetbridgeExporter
 import io.raylytics.justmyweather.data.metno.MetNoClient
@@ -103,6 +105,12 @@ class AppContainer(context: Context, scope: CoroutineScope) {
     val alertRulesRepository = AlertRulesRepository(appContext.dataStore)
     val alertSettingsRepository = AlertSettingsRepository(appContext.dataStore)
     val alertNotifier = AlertNotifier(appContext)
+
+    // Home screen widgets: each one's settings, and the one fetched dataset
+    // they all draw from. Both are read by the launcher-driven draw and the
+    // refresh worker, which is why they live here and not in an Activity.
+    val widgetConfigRepository = WidgetConfigRepository(appContext.dataStore)
+    val widgetDataStore = WidgetDataStore(appContext.dataStore)
 
     // Optional hand-off of each reading to Gadgetbridge, which relays it to a
     // paired watch. Constructed unconditionally but inert until switched on:

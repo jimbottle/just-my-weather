@@ -117,6 +117,18 @@ data class ViewConfig(
         return copy(items = next)
     }
 
+    /**
+     * The same options with exactly one module on the grid — what a home
+     * screen widget is. Every other module is hidden, not removed, so the
+     * labels the user gave them survive a change of mind in the widget's
+     * configure screen. An unknown module (none are, today) leaves the config
+     * untouched rather than blanking it.
+     */
+    fun showingOnly(module: ModuleKey): ViewConfig {
+        if (items.none { it.module == module }) return this
+        return copy(items = items.map { it.copy(visible = it.module == module) })
+    }
+
     fun setDensity(density: Density): ViewConfig = copy(density = density)
 
     fun setDefaultForecastMode(mode: ForecastMode): ViewConfig = copy(defaultForecastMode = mode)

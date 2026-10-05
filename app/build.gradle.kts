@@ -59,7 +59,7 @@ android {
         // versionName is the release (CLAUDE.md "Versioning"). 0.2.0 is the first
         // Play build: everything since the v0.1.x sideloads.
         versionCode = 5
-        versionName = "0.2.1"
+        versionName = "0.3.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -164,8 +164,14 @@ dependencies {
     // rules. DataStore over SharedPreferences for the flow-based reads.
     implementation("androidx.datastore:datastore-preferences:1.1.1")
 
-    // Background polling for personal alerts.
+    // Background polling for personal alerts, and the widgets' refresh.
     implementation("androidx.work:work-runtime-ktx:2.10.0")
+
+    // Home screen widgets. Glance is Compose-flavoured RemoteViews: the same
+    // Row/Column/Text vocabulary, drawn by the launcher. It pulls a Compose
+    // runtime a patch ahead of the BOM's (1.7.8 over 1.7.6), which the two
+    // libraries tolerate within a minor version.
+    implementation("androidx.glance:glance-appwidget:1.2.0")
 
     // The one banner ad and the purchase that removes it (Evan, 2026-10-03).
     // Both are Google services the Play build cannot avoid; they stay behind

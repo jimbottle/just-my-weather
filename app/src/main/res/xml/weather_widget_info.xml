@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One tile of the glance on the home screen. Two cells by one is the
+     smallest honest reading ("72°" with its label); it resizes freely from
+     there, and the content fits itself to whatever it gets. updatePeriodMillis
+     is zero because WidgetRefreshWorker drives updates every 15 minutes — the
+     platform timer cannot go under 30. Placing a widget opens the configure
+     screen, pre-filled from the glance, and a long-press reopens it
+     (reconfigurable, API 28+). -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:configure="io.raylytics.justmyweather.ui.widget.WidgetConfigureActivity"
+    android:description="@string/widget_description"
+    android:initialLayout="@layout/glance_default_loading_layout"
+    android:minWidth="110dp"
+    android:minHeight="40dp"
+    android:minResizeWidth="40dp"
+    android:minResizeHeight="40dp"
+    android:previewImage="@drawable/widget_preview"
+    android:previewLayout="@layout/widget_preview"
+    android:resizeMode="horizontal|vertical"
+    android:targetCellWidth="2"
+    android:targetCellHeight="1"
+    android:updatePeriodMillis="0"
+    android:widgetCategory="home_screen"
+    android:widgetFeatures="reconfigurable" />

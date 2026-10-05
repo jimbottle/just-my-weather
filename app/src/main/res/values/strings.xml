@@ -3,4 +3,11 @@
 
     <!-- Support inbox for in-app feedback / bug reports (Raylytics standard). -->
     <string name="support_email">dev@raylytics.io</string>
+
+    <!-- Home screen widget: the picker's name and description, and the
+         Android 12+ layout preview's sample content. -->
+    <string name="widget_label">Just My Weather</string>
+    <string name="widget_description">One tile of your glance: a reading, the sun, or the forecast, set up the way you like.</string>
+    <string name="widget_preview_label">Temperature</string>
+    <string name="widget_preview_value">72°</string>
 </resources>

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The widget picker's image on Android 11 and under, where a layout
+     preview is not available: the tile's surface and the accent sun, drawn
+     as paths because a vector cannot set type. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="220dp"
+    android:height="110dp"
+    android:viewportWidth="220"
+    android:viewportHeight="110">
+    <path
+        android:fillColor="#FCFCFD"
+        android:pathData="M16,0 H204 A16,16 0 0 1 220,16 V94 A16,16 0 0 1 204,110 H16 A16,16 0 0 1 0,94 V16 A16,16 0 0 1 16,0 Z" />
+    <path
+        android:fillColor="#F2B705"
+        android:pathData="M110,37 m-18,0 a18,18 0 1,0 36,0 a18,18 0 1,0 -36,0" />
+    <path
+        android:fillColor="#1A1C1E"
+        android:pathData="M40,70 H180 V78 H40 Z" />
+    <path
+        android:fillColor="#5B5F66"
+        android:pathData="M70,88 H150 V93 H70 Z" />
+</vector>
