@@ -467,6 +467,7 @@ private fun App(
                 onSetSafetyNotifications = alertsViewModel::setSafetyNotifications,
                 onSetPollCadence = alertsViewModel::setPollCadence,
                 onDone = { screen = Screen.HOME },
+                events = alertsViewModel.events,
             )
         }
     }

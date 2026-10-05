@@ -76,6 +76,27 @@ class AlertsViewModelTest {
     }
 
     @Test
+    fun `adding a rule confirms it once the rule is saved, and nothing else does`() = runTest(dispatcher) {
+        val repository = AlertRulesRepository(FakePreferencesDataStore())
+        val vm = AlertsViewModel(repository, AlertSettingsRepository(FakePreferencesDataStore()))
+        val events = mutableListOf<AlertsEvent>()
+        val collector = launch { vm.events.collect { events += it } }
+
+        vm.add(temp, Comparison.BELOW, 40.0)
+        advanceUntilIdle()
+        assertEquals(listOf(AlertsEvent.RULE_ADDED), events)
+        assertEquals(1, repository.rules.first().size) // the confirmation never precedes the write
+
+        // Toggling and deleting are visible in place, so they stay silent.
+        val id = repository.rules.first().single().id
+        vm.toggle(id)
+        vm.delete(id)
+        advanceUntilIdle()
+        assertEquals(listOf(AlertsEvent.RULE_ADDED), events)
+        collector.cancel()
+    }
+
+    @Test
     fun `switching a spent rule back on re-arms it with a fresh count`() = runTest(dispatcher) {
         val repository = AlertRulesRepository(FakePreferencesDataStore())
         val spent =

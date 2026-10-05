@@ -61,6 +61,11 @@ appId: io.raylytics.justmyweather
 - tapOn:
     id: "addRule"
 
+# The add is acknowledged with a brief snackbar at the foot of the screen —
+# the new row lands above the form, off-screen, so this is the only immediate
+# sign the tap did anything.
+- assertVisible: "Alert created"
+
 # The new rule row renders ABOVE the form (AlertsScreen puts RuleRow before
 # AddRuleForm), so on any screen short enough for the scroll above to have
 # moved, the view is now parked below it. Scroll back up before asserting on
@@ -86,7 +91,11 @@ appId: io.raylytics.justmyweather
 
 # Quiet hours sits below the fold once a rule row exists, and CI runs a
 # different device profile than local, so scroll to it rather than assuming
-# it's on screen.
+# it's on screen. The snackbar sits over the foot of the screen for a few
+# seconds; let it clear so it cannot catch the tap meant for the switch.
+- extendedWaitUntil:
+    notVisible: "Alert created"
+    timeout: 10000
 - scrollUntilVisible:
     element:
       id: "quietHours"

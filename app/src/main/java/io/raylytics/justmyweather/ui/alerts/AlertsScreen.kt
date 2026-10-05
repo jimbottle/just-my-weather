@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -18,7 +19,10 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -48,6 +52,8 @@ import io.raylytics.justmyweather.alerts.AlertSubject
 import io.raylytics.justmyweather.alerts.AlertWindow
 import io.raylytics.justmyweather.alerts.Comparison
 import io.raylytics.justmyweather.alerts.FireLimit
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 import java.util.Locale
 
 /**
@@ -70,10 +76,35 @@ fun AlertsScreen(
     onSetPollCadence: (Int) -> Unit,
     onDone: () -> Unit,
     modifier: Modifier = Modifier,
+    /** One-shot confirmations from the view model; see [AlertsEvent]. */
+    events: Flow<AlertsEvent> = emptyFlow(),
 ) {
-    Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+    // The one piece of feedback this screen gives beyond its own state: a
+    // brief "Alert created" at the foot of the screen. The new rule row does
+    // appear in the list, but it renders ABOVE the form the user just filled
+    // in, so on any phone it lands off-screen and the tap looks like a no-op.
+    val snackbar = remember { SnackbarHostState() }
+    LaunchedEffect(events) {
+        events.collect { event ->
+            when (event) {
+                AlertsEvent.RULE_ADDED -> snackbar.showSnackbar("Alert created")
+            }
+        }
+    }
+    Scaffold(
+        modifier = modifier.fillMaxSize(),
+        containerColor = MaterialTheme.colorScheme.background,
+        // MainActivity already pads for the system bars; letting Scaffold add
+        // its own would double the gap under the status bar.
+        contentWindowInsets = WindowInsets(0),
+        snackbarHost = {
+            SnackbarHost(snackbar) { data ->
+                Snackbar(snackbarData = data, modifier = Modifier.testTag("alertCreated"))
+            }
+        },
+    ) { padding ->
         Column(
-            modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 16.dp)
+            modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 20.dp, vertical = 16.dp)
                 .verticalScroll(rememberScrollState()),
         ) {
             Row(
@@ -109,6 +140,17 @@ fun AlertsScreen(
             HorizontalDivider(
                 color = MaterialTheme.colorScheme.surfaceVariant,
                 modifier = Modifier.padding(vertical = 12.dp),
+            )
+            // Everything below applies to every alert, not the one just built.
+            // Said in words, not just a divider: with the builder directly
+            // above, quiet hours and the cadence read as more fields of the
+            // same form, and a user would reasonably expect "Add" to need them.
+            Text("For all alerts", style = MaterialTheme.typography.titleMedium)
+            Text(
+                text = "These apply to every alert above, not just the newest one.",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 2.dp, bottom = 8.dp),
             )
             QuietHoursRow(
                 settings = settings,

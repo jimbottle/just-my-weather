@@ -11,8 +11,11 @@ import io.raylytics.justmyweather.alerts.Comparison
 import io.raylytics.justmyweather.alerts.FireLimit
 import io.raylytics.justmyweather.data.AlertRulesRepository
 import io.raylytics.justmyweather.data.AlertSettingsRepository
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.util.UUID
@@ -47,6 +50,16 @@ class AlertsViewModel(
             SharingStarted.WhileSubscribed(5_000),
             AlertSettings.DEFAULT,
         )
+
+    /**
+     * One-shot confirmations for the screen to surface and forget — a snackbar,
+     * not state. Sent only after the write lands, so "Alert created" is never
+     * shown for a rule that didn't persist. A Channel rather than a StateFlow
+     * because a confirmation has no "current value": re-collecting after a
+     * rotation must not replay it.
+     */
+    private val eventChannel = Channel<AlertsEvent>(Channel.BUFFERED)
+    val events: Flow<AlertsEvent> = eventChannel.receiveAsFlow()
 
     fun setQuietHours(enabled: Boolean) {
         viewModelScope.launch { settingsRepository.save(settings.value.copy(quietHoursEnabled = enabled)) }
@@ -102,7 +115,7 @@ class AlertsViewModel(
         threshold: Double,
         window: AlertWindow = AlertWindow.NOW,
         limit: FireLimit = FireLimit.UNLIMITED,
-    ) = edit(activates = { _, _ -> true }) {
+    ) = edit(activates = { _, _ -> true }, confirmation = AlertsEvent.RULE_ADDED) {
         it + AlertRule(UUID.randomUUID().toString(), subject, comparison, threshold, window = window, limit = limit)
     }
 
@@ -137,9 +150,11 @@ class AlertsViewModel(
      * transform of the StateFlow's snapshot could silently undo its work.
      * [activates] sees the before and after lists and says whether the change
      * could make a rule newly fire, which is what warrants an immediate check.
+     * [confirmation], if given, is sent to [events] once the edit is saved.
      */
     private fun edit(
         activates: (before: List<AlertRule>, after: List<AlertRule>) -> Boolean = { _, _ -> false },
+        confirmation: AlertsEvent? = null,
         transform: (List<AlertRule>) -> List<AlertRule>,
     ) {
         viewModelScope.launch {
@@ -153,6 +168,7 @@ class AlertsViewModel(
             // last enabled rule stops it); only an activating change checks now.
             syncWork(next, settings.value)
             if (activates(before, next)) onRuleActivated()
+            confirmation?.let { eventChannel.send(it) }
         }
     }
 
@@ -163,4 +179,10 @@ class AlertsViewModel(
     private fun syncWork(rules: List<AlertRule>, settings: AlertSettings) {
         onWorkChanged(AlertScheduling.hasWork(rules, settings), settings.pollMinutes)
     }
+}
+
+/** Things the alerts screen acknowledges once and lets go of. */
+enum class AlertsEvent {
+    /** A new rule was saved. The screen says so, briefly. */
+    RULE_ADDED,
 }
