@@ -19,9 +19,10 @@ Per-version log of what shipped where. Two audiences:
 
 ---
 
-## 0.2.1 — unreleased (next upload: versionCode 5)
+## 0.2.1 — Play INTERNAL, versionCode 5 — 2026-10-05 (next upload: versionCode 6)
 
-0.2.0 is frozen in Play review; everything since goes here.
+0.2.0 is live in production; everything since goes here. versionCode 5 went
+to the internal track on 2026-10-05 via scripts/android/release-internal.sh.
 
 ### Store-facing (≤500 chars)
 
