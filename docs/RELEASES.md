@@ -19,7 +19,7 @@ Per-version log of what shipped where. Two audiences:
 
 ---
 
-## 0.2.0 — Play INTERNAL (versionCode 4, uploaded 2026-10-04 as a draft; 3 on 2026-10-03, 2 on 2026-10-02)
+## 0.2.0 — Play PRODUCTION draft, versionCode 4 (attached 2026-10-04; internal: 4 on 2026-10-04, 3 on 2026-10-03, 2 on 2026-10-02)
 
 The first Play Store build. Internal testing track, manual upload from the
 console (the Developer API needs a prior console upload). Production follows
@@ -27,8 +27,13 @@ once the privacy policy is live and the listing is complete (epic
 just-my-weather-zi8). versionCode 3 is the launch candidate: the ads build with
 the real AdMob ids, cut by scripts/android/release-internal.sh --status draft
 (the API only accepts drafts before the first production release) and rolled
-out from the console. versionCode 4 is the production candidate: versionCode 3 plus the fixes
-listed below. versionCodes 2–4 are burned: the next upload is 5.
+out from the console. versionCode 4 is the production release: versionCode 3 plus the fixes listed
+below. It was attached to the Production track as a DRAFT through the API on
+2026-10-04 (an app that has never been published only accepts drafts, on any
+track; `promote-play.sh` cannot do this step because it also requires the
+build to have been rolled out on internal first) — the "Send for review"
+click is console-only. Record the submission and go-live dates here when they
+happen. versionCodes 2–4 are burned: the next upload is 5.
 
 ### Store-facing (≤500 chars)
 
