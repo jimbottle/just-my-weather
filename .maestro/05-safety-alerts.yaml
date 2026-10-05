@@ -39,6 +39,13 @@ appId: io.raylytics.justmyweather
 - assertVisible:
     id: "safetyNotifications"
     checked: false
+# "Done" is the screen's header; the scroll to the safety switch (the last row)
+# parks the view below it on CI's profile. Scroll back before tapping, as
+# 02-alerts does — a tap that never found "Done" fails here, not quietly.
+- scrollUntilVisible:
+    element: "Done"
+    direction: UP
+    timeout: 20000
 - tapOn: "Done"
 
 # Banner position defaults to Top and can be moved to Bottom.
