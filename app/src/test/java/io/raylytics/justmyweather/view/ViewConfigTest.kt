@@ -117,6 +117,20 @@ class ViewConfigTest {
     }
 
     @Test
+    fun `sun days ship at two and clamp to one through fourteen`() {
+        assertEquals(2, ViewConfig.DEFAULT.sunDays)
+        assertEquals(14, ViewConfig.DEFAULT.setSunDays(14).sunDays)
+        assertEquals(14, ViewConfig.DEFAULT.setSunDays(40).sunDays)
+        assertEquals(1, ViewConfig.DEFAULT.setSunDays(0).sunDays)
+        // The render hands the tile only as many rows as the setting says,
+        // from however many were computed: the slider never recomputes.
+        val computed = (0 until 14).map { SunDay(LocalDate.of(2026, 6, 24).plusDays(it.toLong()), null, null) }
+        val five = ViewConfig.DEFAULT.toggle(ModuleKey.Sun).setSunDays(5).render(snapshot, computed, ZoneId.of("UTC"))
+        val sun = five.modules.first { it.module == ModuleKey.Sun }.content as ModuleContent.Sun
+        assertEquals(computed.take(5), sun.days)
+    }
+
+    @Test
     fun `the sun module carries the days rather than a formatted string`() {
         // The tile decides how much of the table it can draw at its width, so
         // the projection hands it the days themselves — flattening here is

@@ -19,6 +19,7 @@ import io.raylytics.justmyweather.view.DailyDays
 import io.raylytics.justmyweather.view.ForecastMode
 import io.raylytics.justmyweather.view.ModuleKey
 import io.raylytics.justmyweather.view.ModuleSize
+import io.raylytics.justmyweather.view.SunDays
 import io.raylytics.justmyweather.view.ViewConfig
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -30,6 +31,11 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.time.Instant
 import java.time.ZoneId
+
+/** The sun rows are computed to the setting's ceiling, not its value: the
+ * calculation is pure and cheap, and the render trims to what the user asked
+ * for, so moving the slider never asks the ViewModel for anything. */
+private const val SUN_DAYS = SunDays.MAX
 
 /**
  * Drives the default home glance. Two independent inputs flow in: the weather
@@ -45,7 +51,6 @@ import java.time.ZoneId
  * falls back to where we last knew the user to be rather than to a default
  * city on the other side of the country.
  */
-private const val SUN_DAYS = 2
 
 class HomeViewModel(
     private val repository: WeatherRepository,

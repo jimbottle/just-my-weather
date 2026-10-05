@@ -340,6 +340,7 @@ private fun App(
                 onSetDailyStyle = customizeViewModel::setDailyStyle,
                 onSetHourlyHours = customizeViewModel::setHourlyHours,
                 onSetDailyDays = customizeViewModel::setDailyDays,
+                onSetSunDays = customizeViewModel::setSunDays,
                 onToggleForecastElement = customizeViewModel::toggleForecastElement,
                 onSetForecastTileLayout = customizeViewModel::setForecastTileLayout,
                 onSetAlertBannerPosition = customizeViewModel::setAlertBannerPosition,

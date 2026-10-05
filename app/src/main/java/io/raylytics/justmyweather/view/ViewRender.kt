@@ -131,7 +131,10 @@ fun ViewConfig.render(
                     when (val module = setting.module) {
                         is ModuleKey.Reading ->
                             ModuleContent.Reading(module.field.format(snapshot) ?: "—")
-                        ModuleKey.Sun -> ModuleContent.Sun(sunDays, zone)
+                        // The rows were computed to the horizon (SunDays.MAX);
+                        // the user's setting says how many of them the tile
+                        // draws, so changing it never recomputes anything.
+                        ModuleKey.Sun -> ModuleContent.Sun(sunDays.take(this.sunDays), zone)
                         ModuleKey.Forecast ->
                             ModuleContent.Forecast(
                                 hours = forecast.hours,

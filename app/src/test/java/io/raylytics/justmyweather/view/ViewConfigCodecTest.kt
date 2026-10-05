@@ -101,6 +101,15 @@ class ViewConfigCodecTest {
     }
 
     @Test
+    fun `sun days round-trip, default to two, and clamp a stored value`() {
+        assertEquals(7, ViewConfigCodec.decode(ViewConfigCodec.encode(ViewConfig.DEFAULT.setSunDays(7))).sunDays)
+        val older = """{"items":[{"key":"sun","visible":true}]}"""
+        assertEquals(2, ViewConfigCodec.decode(older).sunDays)
+        val wild = """{"sunDays":99,"items":[{"key":"sun","visible":true}]}"""
+        assertEquals(14, ViewConfigCodec.decode(wild).sunDays)
+    }
+
+    @Test
     fun `tap-for-details round-trips, and a config from before it reads as on`() {
         val off = ViewConfigCodec.decode(ViewConfigCodec.encode(ViewConfig.DEFAULT.setTapForDetails(false)))
         assertFalse(off.tapForDetails)

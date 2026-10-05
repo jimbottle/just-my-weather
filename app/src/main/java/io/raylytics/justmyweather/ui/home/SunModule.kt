@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -32,6 +34,11 @@ import java.util.Locale
  * condense to today's pair, where "today" is unambiguous because the label
  * says so. The pair itself takes the shape of its tile: side by side in a
  * one-row tile, stacked in a taller one.
+ *
+ * The table may hold up to a fortnight of rows (SunDays) and a tile is a
+ * fixed number of cells, so past its height the rows scroll inside it — the
+ * forecast tile's rule, including the exception: while arranging, a drag on
+ * the tile must move the tile, not its rows.
  */
 
 /** Width of each sun-time column, sized for "12:00 AM" at titleMedium so the
@@ -45,6 +52,8 @@ internal fun SunModuleContent(
     size: ModuleSize,
     /** The PLACE's zone, not the device's — see ModuleContent.Sun. */
     zone: ZoneId,
+    /** Arrange mode: the rows stop scrolling so a drag moves the tile. */
+    arranging: Boolean = false,
 ) {
     if (days.isEmpty()) {
         // Honest absence, the same em-dash an empty reading gets: the module is
@@ -59,7 +68,7 @@ internal fun SunModuleContent(
     when {
         // The table needs the whole width for its three columns and two rows
         // of cells for its heading plus two days.
-        size.columns == ModuleSize.COLUMNS && size.rows >= 2 -> SunTimesTable(days, zone)
+        size.columns == ModuleSize.COLUMNS && size.rows >= 2 -> SunTimesTable(days, zone, arranging)
         // One row of cells is too short to stack two labelled times; two
         // cells wide (the module's minimum) is room for them side by side.
         size.rows == 1 -> SunPairRow(days.first(), zone)
@@ -76,7 +85,11 @@ internal fun SunModuleContent(
  * telling them apart.
  */
 @Composable
-internal fun SunTimesTable(days: List<SunDay>, zone: ZoneId = ZoneId.systemDefault()) {
+internal fun SunTimesTable(
+    days: List<SunDay>,
+    zone: ZoneId = ZoneId.systemDefault(),
+    arranging: Boolean = false,
+) {
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -100,7 +113,15 @@ internal fun SunTimesTable(days: List<SunDay>, zone: ZoneId = ZoneId.systemDefau
                 modifier = Modifier.width(SUN_COLUMN_WIDTH),
             )
         }
-        days.forEach { day -> SunDayRow(day = day, zone = zone) }
+        // The headings stay put; the days scroll beneath them when there are
+        // more than the tile is tall. Two days never need it, and the scroll
+        // is a no-op then.
+        Column(
+            modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState(), enabled = !arranging),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            days.forEach { day -> SunDayRow(day = day, zone = zone) }
+        }
     }
 }
 

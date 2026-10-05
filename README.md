@@ -39,7 +39,8 @@ Pre-1.0, but the core product is in place:
   them, choose a density (spacious ↔ compact), and theme it
   (light/dark/system · accent · typeface). Long-press a module to arrange the
   grid in place, launcher-style. Sun times are a module too — full width draws
-  a two-day table, narrower condenses to today's pair
+  a table of as many days as you choose (up to two weeks, scrolling past the
+  tile's height), narrower condenses to today's pair
 - ✅ Personal rule-based alerting — thresholds on current conditions *and* the
   forecast ("overnight low below 35°", "chance of rain above 50% within 12h"),
   quiet by default, fires once per onset, with a per-rule limit (once, up to

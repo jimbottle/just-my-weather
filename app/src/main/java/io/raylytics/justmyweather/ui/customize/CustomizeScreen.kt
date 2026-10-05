@@ -48,6 +48,7 @@ import io.raylytics.justmyweather.view.HourlyHours
 import io.raylytics.justmyweather.view.ModuleKey
 import io.raylytics.justmyweather.view.ModuleSetting
 import io.raylytics.justmyweather.view.ModuleSize
+import io.raylytics.justmyweather.view.SunDays
 import io.raylytics.justmyweather.view.ThemeConfig
 import io.raylytics.justmyweather.view.ThemeMood
 import io.raylytics.justmyweather.view.TimesIn
@@ -81,6 +82,7 @@ fun CustomizeScreen(
     onSetDailyStyle: (DailyStyle) -> Unit,
     onSetHourlyHours: (Int) -> Unit,
     onSetDailyDays: (Int) -> Unit,
+    onSetSunDays: (Int) -> Unit,
     onToggleForecastElement: (ForecastElement) -> Unit,
     onSetForecastTileLayout: (ForecastTileLayout) -> Unit,
     onSetAlertBannerPosition: (AlertBannerPosition) -> Unit,
@@ -132,6 +134,7 @@ fun CustomizeScreen(
                     tileLayout = config.forecastTileLayout,
                     onSetTileLayout = onSetForecastTileLayout,
                 )
+                SunPicker(show = config.shows(ModuleKey.Sun), sunDays = config.sunDays, onSetSunDays = onSetSunDays)
                 HorizontalDivider(
                     color = MaterialTheme.colorScheme.surfaceVariant,
                     modifier = Modifier.padding(vertical = 8.dp),
@@ -420,6 +423,40 @@ private fun TapForDetailsPicker(
             checked = enabled,
             onCheckedChange = onSet,
             modifier = Modifier.testTag("tap-for-details-toggle"),
+        )
+    }
+}
+
+/**
+ * How many days the sun module's table shows. Like the forecast's options,
+ * drawn only while the module is on — a slider for a hidden tile is a
+ * control that does nothing. The tile scrolls past two days, so the slider
+ * sets the horizon, not the tile's size.
+ */
+@Composable
+private fun SunPicker(
+    show: Boolean,
+    sunDays: Int,
+    onSetSunDays: (Int) -> Unit,
+) {
+    if (!show) return
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text("Sun times", style = MaterialTheme.typography.labelMedium)
+        Text(
+            text = if (sunDays == 1) "Sun shows 1 day" else "Sun shows $sunDays days",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+        Slider(
+            value = sunDays.toFloat(),
+            onValueChange = { onSetSunDays(Math.round(it)) },
+            valueRange = SunDays.MIN.toFloat()..SunDays.MAX.toFloat(),
+            steps = SunDays.MAX - SunDays.MIN - 1,
+            modifier = Modifier.testTag("sun-days-slider"),
         )
     }
 }

@@ -50,6 +50,8 @@ class CustomizeViewModel(
 
     fun setDailyDays(days: Int) = edit { it.setDailyDays(days) }
 
+    fun setSunDays(days: Int) = edit { it.setSunDays(days) }
+
     fun toggleForecastElement(element: ForecastElement) = edit { it.toggleForecastElement(element) }
 
     fun setForecastTileLayout(layout: ForecastTileLayout) = edit { it.setForecastTileLayout(layout) }

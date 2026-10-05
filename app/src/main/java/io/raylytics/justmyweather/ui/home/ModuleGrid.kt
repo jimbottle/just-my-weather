@@ -850,7 +850,13 @@ private fun ModuleTile(
                 // Sun times draw themselves: a table at full size, today's
                 // pair when smaller. See SunModule.kt for why that is
                 // adaptation rather than two designs.
-                is ModuleContent.Sun -> SunModuleContent(days = content.days, size = module.size, zone = content.zone)
+                is ModuleContent.Sun ->
+                    SunModuleContent(
+                        days = content.days,
+                        size = module.size,
+                        zone = content.zone,
+                        arranging = arranging,
+                    )
                 // Handled above: the forecast takes the whole shell.
                 is ModuleContent.Forecast -> Unit
             }

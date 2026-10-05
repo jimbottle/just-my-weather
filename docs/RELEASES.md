@@ -19,6 +19,31 @@ Per-version log of what shipped where. Two audiences:
 
 ---
 
+## 0.2.1 — unreleased (next upload: versionCode 5)
+
+0.2.0 is frozen in Play review; everything since goes here.
+
+### Store-facing (≤500 chars)
+
+> Sunrise and sunset can show up to two weeks of days — pick how many on
+> Customize, and the tile scrolls. Chips, sliders and switches now take the
+> accent you chose. The banner no longer nudges the glance when it loads.
+
+### Internal
+
+- Added: the sun module's day count is a setting (SunDays, 1–14, default
+  2) with a "Sun shows N days" slider under Customize → Sun times; the table
+  scrolls inside the tile past its height, except while arranging
+  (just-my-weather-eia).
+- Fixed: every accent-carrying colour role follows the chosen accent
+  (selected chips, slider tracks, switch thumbs were Material's purple);
+  Customize's intro mentions height (6lf.5).
+- Fixed: the banner reserves its height before the ad loads, so the glance
+  no longer jumps a second after launch (dm2's flake, and a visible jump).
+- Internal: Maestro flows assert bottom-sheet content rather than a tag in
+  another window, wait for destination screens, and scroll to the forecast
+  switch; 10/10 locally (dm2, p6t).
+
 ## 0.2.0 — Play PRODUCTION, versionCode 4 — SUBMITTED FOR REVIEW 2026-10-04 (internal: 4 on 2026-10-04, 3 on 2026-10-03, 2 on 2026-10-02)
 
 The first Play Store build. Internal testing track, manual upload from the
