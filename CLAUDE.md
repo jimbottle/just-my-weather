@@ -180,7 +180,11 @@ carry-forward scheme fails open as "everything is mine".
 The rules that follow:
 
 - **This project's AVD is `Pixel_7_API_35`**, and no other project's session may
-  use that name. At most one emulator can run a given AVD — the emulator refuses
+  use that name. A second one, **`Pixel_7_API_36`** (Android 16, the targetSdk
+  image, created 2026-10-04 for the pre-production pass), belongs to this
+  project too and follows every rule below unchanged — run the same three
+  calls with `AVD=Pixel_7_API_36`. Never have both up at once: the ownership
+  claim is per emulator, but the cores are not. At most one emulator can run a given AVD — the emulator refuses
   to start one already running (verified: two boot attempts, one qemu process) —
   which is why taking `ours | head -1` is complete rather than lossy.
 - **Only one session of this project holds it at a time.** Call 1 refuses to

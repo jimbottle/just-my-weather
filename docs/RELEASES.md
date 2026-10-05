@@ -48,6 +48,12 @@ out from the console. versionCodes 2 and 3 are burned: the next upload is 4.
   cadence and quiet hours; per-rule fire limit (once, up to 99 times, or
   every time) — a rule that reaches its limit switches itself off and the
   toggle re-arms it (just-my-weather-8di).
+- Fixed (after versionCode 3): the bug report named the glance state by its
+  R8-renamed class ("Glance: n0"); feels like falls back to the air
+  temperature when no heat index / wind chill applies; an unreported
+  last-hour precipitation says "Not reported" rather than "—".
+- Changed (after versionCode 3): About no longer carries a Source code row;
+  the privacy policy no longer describes the app as open source.
 - Added: one AdMob banner at the foot of the glance (non-personalized) and
   a one-time Remove Ads purchase (`remove_ads`, $0.99) in App settings, with
   restore; the entitlement is kept on the device and re-checked against Play
