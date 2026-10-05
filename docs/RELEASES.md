@@ -19,6 +19,42 @@ Per-version log of what shipped where. Two audiences:
 
 ---
 
+## 0.3.0 — unreleased (next upload: versionCode 6)
+
+Home screen widgets. Built 2026-10-05 on top of 0.2.1 (which is on the
+internal track as versionCode 5); nothing cut yet.
+
+### Store-facing (≤500 chars)
+
+> Widgets. Put a tile of your glance on the home screen — the temperature,
+> feels-like, conditions, wind, pressure, sunrise and sunset, or the forecast
+> — and set it up the way you set up the glance: label, density, light or
+> dark, accent, typeface, hourly or daily, how far ahead. Resize it like any
+> widget; it fits what it shows. New widgets start from your glance's
+> settings, and refresh every 15 minutes.
+
+### Internal
+
+- Added: `widget/` — one Glance `GlanceAppWidget` whose config is a
+  `ViewConfig` with one visible module plus a `ThemeConfig`
+  (`WidgetConfig`, per-widget in `WidgetConfigRepository`); a 15-minute
+  `WidgetRefreshWorker` (WorkManager's floor) fetches once for every widget
+  into one `WidgetData`; `WidgetContent` draws readings, the sun and the
+  forecast in Glance, reusing `ViewConfig.render` and the forecast's day
+  grouping. Config and data are mirrored into Glance's per-widget state
+  (`WidgetState`) because a live session recomposes without re-running
+  `provideGlance`. `ui/widget/WidgetConfigureActivity` is the launcher's
+  configure step and the long-press reconfigure (epic just-my-weather-aqd).
+- Changed: the Customize screen's pickers moved to `ui/customize/Pickers.kt`
+  (internal) so the widget's configure screen uses the same controls.
+- Verified on Pixel_7_API_35 (Pixel launcher): placed from the picker (the
+  launcher skips the configure step and offers a pencil; the widget seeds
+  itself from the glance), reconfigured to Forecast and to Sun/Dark/Serif,
+  resized 2×1 → 3×4; hourly grid scrolls and reflows to the width.
+- Known: the Pixel launcher places a `reconfigurable` widget without
+  opening the configure activity (it offers "Tap to change widget
+  settings"); other launchers open it on drop. Both paths are handled.
+
 ## 0.2.1 — Play INTERNAL, versionCode 5 — 2026-10-05 (next upload: versionCode 6)
 
 0.2.0 is live in production; everything since goes here. versionCode 5 went

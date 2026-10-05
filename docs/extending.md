@@ -55,6 +55,9 @@ on, and a table rather than a value.
 3. **`ui/home/`** — add a branch in `ModuleTile`'s `when` over the content, and
    put the drawing in its own file (see `SunModule.kt`). A module whose content
    changes shape with width should adapt there, not be flattened to fit.
+4. **`widget/WidgetContent.kt`** — the same `when`, in Glance: how the module
+   draws on the home screen. If it needs data the refresh worker does not
+   fetch, add it to `WidgetData` (and its codec) and to `WidgetNeeds`.
 
 Every `when` involved is exhaustive with no `else`, so the compiler lists what
 you still owe. Persistence, arranging, resizing and the accessibility actions

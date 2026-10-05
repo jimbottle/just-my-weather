@@ -488,6 +488,13 @@ readable `AppContainer` in `JustMyWeatherApp.kt` — no Hilt). Package layout un
 - **`ui/settings/`** — App Settings: settings about the app rather than the
   canvas (the Gadgetbridge hand-off, the bug-report entry). Customize stays
   about what the glance shows and how it looks.
+- **`widget/`** + **`ui/widget/`** — home screen widgets: one glance tile
+  each. `WidgetConfig` = a `ViewConfig` with one visible module + a
+  `ThemeConfig`, so the glance's render, codecs and Customize pickers are
+  reused; `WidgetRefreshWorker` (15 min, one fetch for all widgets) stores a
+  `WidgetData` the Glance composition draws from via the per-widget state
+  (`WidgetState` — never read stores in `provideGlance`, a live session won't
+  re-run it). See `docs/architecture.md`.
 - **`support/`** — the two mails to the developer, ported from open-frame:
   `SupportMail.kt` builds them (pure, tested), `SupportIntents.kt` reads the
   device and own logcat and hands off to the email app. A bug report carries

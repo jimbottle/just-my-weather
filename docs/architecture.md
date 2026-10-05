@@ -57,6 +57,16 @@ shapes never leak past `WeatherRepository`.
   user chose, else a live fix, else the last place we knew, else the built-in
   default. The alert worker shares it, so a chosen place is what background
   polling watches.
+- **`widget/`** — home screen widgets, each one tile of the glance.
+  `WidgetConfig` is a `ViewConfig` with one visible module plus a
+  `ThemeConfig`, so the glance's render, codecs and pickers drive it
+  unchanged; `WidgetRefreshWorker` fetches once for every widget every 15
+  minutes into a single `WidgetData` (own codec, `data/WidgetDataStore`);
+  `WidgetContent` draws readings, the sun and the forecast in Glance
+  (RemoteViews — `TextFit` estimates the value size the glance measures).
+  Config and data are mirrored into Glance's per-widget state (`WidgetState`)
+  because a live session recomposes without re-running `provideGlance`.
+  `ui/widget/` is the configure activity, built from `ui/customize/Pickers`.
 - **`data/places/`** — picking a place without a geocoder. `PlaceCatalog` is
   the pure parse + search over the bundled gazetteer (`assets/places.tsv`,
   built by `scripts/build-gazetteer.sh` from public-domain US Census data);
