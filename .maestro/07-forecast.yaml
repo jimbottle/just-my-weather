@@ -43,12 +43,15 @@ appId: io.raylytics.justmyweather
 - tapOn:
     text: ".*(am|pm) [0-9]+/[0-9]+"
     index: 0
+# The sheet is a ModalBottomSheet: its own window, so a testTag on it never
+# reaches the hierarchy Maestro reads (the tag is set; the assertion on it
+# failed every CI run while the screenshot showed the sheet open). Its content
+# is what proves it opened and closed.
 - assertVisible:
-    id: "detailSheet"
+    text: ".*· Forecast"
 - assertVisible: "Chance of precipitation"
 - pressKey: Back
-- assertNotVisible:
-    id: "detailSheet"
+- assertNotVisible: "Chance of precipitation"
 - assertVisible:
     id: "module_temperature"
 

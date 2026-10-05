@@ -24,6 +24,9 @@ appId: io.raylytics.justmyweather
 # Notifications for official hazards must be opt-in. A regression flipping this
 # default would silently start pushing official alerts to every install.
 - tapOn: "Alerts"
+- extendedWaitUntil:
+    visible: "Add an alert"
+    timeout: 10000
 - waitForAnimationToEnd:
     timeout: 5000
 - tapOn:
@@ -43,6 +46,9 @@ appId: io.raylytics.justmyweather
     visible: "Refresh"
     timeout: 20000
 - tapOn: "Customize"
+- extendedWaitUntil:
+    visible: "Customize view"
+    timeout: 10000
 - scrollUntilVisible:
     element:
       id: "banner_bottom"
@@ -61,6 +67,9 @@ appId: io.raylytics.justmyweather
     visible: "Refresh"
     timeout: 20000
 - tapOn: "Customize"
+- extendedWaitUntil:
+    visible: "Customize view"
+    timeout: 10000
 - scrollUntilVisible:
     element:
       id: "banner_bottom"

@@ -28,8 +28,15 @@ appId: io.raylytics.justmyweather
     element:
       id: "toggle_wind"
     direction: DOWN
+- waitForAnimationToEnd:
+    timeout: 3000
 - tapOn:
     id: "toggle_wind"
+# A missed tap on the switch fails here, by name, not two steps later on
+# the glance.
+- assertVisible:
+    id: "toggle_wind"
+    checked: true
 - tapOn: "Done"
 
 # The glance now carries a Wind module, driven by the persisted config.

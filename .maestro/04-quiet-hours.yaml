@@ -21,6 +21,9 @@ appId: io.raylytics.justmyweather
     visible: "Refresh"
     timeout: 60000
 - tapOn: "Alerts"
+- extendedWaitUntil:
+    visible: "Add an alert"
+    timeout: 10000
 
 # Entering Alerts is where the app asks for POST_NOTIFICATIONS, which
 # launchApp's blanket grant does NOT cover (see 02-alerts.yaml). Whether the
@@ -64,6 +67,9 @@ appId: io.raylytics.justmyweather
     visible: "Refresh"
     timeout: 20000
 - tapOn: "Alerts"
+- extendedWaitUntil:
+    visible: "Add an alert"
+    timeout: 10000
 - waitForAnimationToEnd:
     timeout: 5000
 - tapOn:
