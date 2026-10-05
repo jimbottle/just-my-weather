@@ -19,7 +19,7 @@ Per-version log of what shipped where. Two audiences:
 
 ---
 
-## 0.2.0 — Play INTERNAL (versionCode 3, uploaded 2026-10-03 as a draft; versionCode 2 on 2026-10-02)
+## 0.2.0 — Play INTERNAL (versionCode 4, uploaded 2026-10-04 as a draft; 3 on 2026-10-03, 2 on 2026-10-02)
 
 The first Play Store build. Internal testing track, manual upload from the
 console (the Developer API needs a prior console upload). Production follows
@@ -27,7 +27,8 @@ once the privacy policy is live and the listing is complete (epic
 just-my-weather-zi8). versionCode 3 is the launch candidate: the ads build with
 the real AdMob ids, cut by scripts/android/release-internal.sh --status draft
 (the API only accepts drafts before the first production release) and rolled
-out from the console. versionCodes 2 and 3 are burned: the next upload is 4.
+out from the console. versionCode 4 is the production candidate: versionCode 3 plus the fixes
+listed below. versionCodes 2–4 are burned: the next upload is 5.
 
 ### Store-facing (≤500 chars)
 
