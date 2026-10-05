@@ -44,7 +44,7 @@ Per-version log of what shipped where. Two audiences:
   another window, wait for destination screens, and scroll to the forecast
   switch; 10/10 locally (dm2, p6t).
 
-## 0.2.0 — Play PRODUCTION, versionCode 4 — SUBMITTED FOR REVIEW 2026-10-04 (internal: 4 on 2026-10-04, 3 on 2026-10-03, 2 on 2026-10-02)
+## 0.2.0 — Play PRODUCTION, versionCode 4 — LIVE 2026-10-05 (submitted 2026-10-04; internal: 4 on 2026-10-04, 3 on 2026-10-03, 2 on 2026-10-02)
 
 The first Play Store build. Internal testing track, manual upload from the
 console (the Developer API needs a prior console upload). Production follows
@@ -60,9 +60,10 @@ build to have been rolled out on internal first) — the "Send for review"
 click is console-only: Evan sent it for review on 2026-10-04, after rolling
 versionCode 4 out on the closed (alpha) track to retire versionCode 2 — the
 pre-ads build without AD_ID — which Play's pre-review check flagged as an
-active artifact contradicting the Advertising ID declaration. Record the
-go-live date here when Play approves. versionCodes 2–4 are burned: the next
-upload is 5.
+active artifact contradicting the Advertising ID declaration. Approved and
+live on 2026-10-05. versionCodes 2–4 are burned: the next upload is 5, and
+from here the API accepts rolled-out releases (release-internal.sh without
+--status draft; promote-play.sh for production).
 
 ### Store-facing (≤500 chars)
 

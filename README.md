@@ -2,6 +2,8 @@
 
 [![CI](https://github.com/jimbottle/just-my-weather/actions/workflows/ci.yml/badge.svg)](https://github.com/jimbottle/just-my-weather/actions/workflows/ci.yml)
 
+**[Get it on Google Play](https://play.google.com/store/apps/details?id=io.raylytics.justmyweather)** — live since 2026-10-05 (0.2.0). Free, with one banner ad; a one-time purchase removes it. US weather (NWS).
+
 A weather app that shows you exactly what you care about, arranged exactly how
 you want it, alerts you on exactly the conditions you choose, and nothing else.
 
