@@ -2,8 +2,8 @@
 
 Living reference for every field of the Google Play Console listing. **Update
 it here first, then copy into Play Console** in the same PR that changes the
-app. Last synced with the console: _app entry created 2026-10-02; listing and
-declarations not yet filled_ (just-my-weather-obf).
+app. Last synced with the console: **2026-10-04** — Evan filled the listing,
+graphics, screenshots and declarations from this sheet (just-my-weather-obf).
 
 Everything below is documentation except the fenced copy blocks, which are
 what gets pasted. Play Console fields do **not** accept Markdown: asterisks
