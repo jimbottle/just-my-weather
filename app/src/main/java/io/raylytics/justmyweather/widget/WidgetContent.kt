@@ -6,6 +6,7 @@ import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.glance.GlanceModifier
+import androidx.glance.LocalContext
 import androidx.glance.LocalSize
 import androidx.glance.action.Action
 import androidx.glance.action.actionStartActivity
@@ -95,10 +96,19 @@ private val SUN_TABLE_MIN_HEIGHT = 100.dp
  * day tile two. Sized so "7pm 9/6" over "72°" over "5% Cloudy" reads. */
 private val HOUR_CELL_WIDTH = 64.dp
 
+/** The most children a Glance Row or Column may hold — a limit of the
+ * generated RemoteViews layouts, not of this code. A forecast row stays
+ * within it by making each tile exactly one child. */
+private const val MAX_CHILDREN = 10
+
 /** One quiet element line under a forecast temperature. */
 private val ELEMENT_LINE_HEIGHT = 13.dp
 
 private val VALUE_FLOOR_SP = 14f
+
+/** A font scale can only be this small in a broken configuration; it
+ * stops a zero from turning the fit's budget into infinity. */
+private const val MIN_FONT_SCALE = 0.5f
 private val LABEL_SP = 12.sp
 private val FOOTER_SP = 11.sp
 private val HOUR_SP = 11.sp
@@ -259,11 +269,16 @@ private fun ReadingWidget(
     val footerHeight = if (showFooter) 16.dp else 0.dp
     // Prose wraps; a number never does. Conditions is the one phrase.
     val maxLines = if (value.module.field == WeatherField.CONDITIONS) 3 else 1
+    // The fit reasons in sp against a box in dp, which only agree at a font
+    // scale of 1. The launcher draws sp scaled by the user's setting, so the
+    // box is shrunk by the same factor before the fit: at 1.3× a value that
+    // fits a 100dp box is a value that fits 77dp of it (roborev 5371).
+    val fontScale = LocalContext.current.resources.configuration.fontScale.coerceAtLeast(MIN_FONT_SCALE)
     val fitted =
         TextFit.sp(
             text = text,
-            widthDp = size.width.value,
-            heightDp = (size.height - labelHeight - footerHeight).value,
+            widthDp = size.width.value / fontScale,
+            heightDp = (size.height - labelHeight - footerHeight).value / fontScale,
             ceilingSp = spec.valueCeilingSp,
             floorSp = VALUE_FLOOR_SP,
             maxLines = maxLines,
@@ -564,17 +579,19 @@ private fun <T> TileRows(
     modifier: GlanceModifier,
     tile: @Composable (T) -> Unit,
 ) {
-    val rows = items.chunked(columns)
+    // A Glance container holds at most MAX_CHILDREN children, so a row is
+    // exactly one child per column — the gap is padding on the tile, not
+    // a spacer between them — and the column count is capped to match
+    // (roborev 5371).
+    val perRow = columns.coerceIn(1, MAX_CHILDREN)
+    val rows = items.chunked(perRow)
     LazyColumn(modifier = modifier) {
         items(rows) { row ->
             Row(modifier = GlanceModifier.fillMaxWidth().padding(bottom = spec.gap).clickable(open)) {
-                row.forEachIndexed { index, item ->
-                    if (index > 0) Spacer(modifier = GlanceModifier.width(spec.gap))
-                    Box(modifier = GlanceModifier.defaultWeight()) { tile(item) }
-                }
-                repeat(columns - row.size) {
-                    Spacer(modifier = GlanceModifier.width(spec.gap))
-                    Spacer(modifier = GlanceModifier.defaultWeight())
+                for (index in 0 until perRow) {
+                    val cell = GlanceModifier.defaultWeight().padding(start = if (index > 0) spec.gap else 0.dp)
+                    val item = row.getOrNull(index)
+                    if (item != null) Box(modifier = cell) { tile(item) } else Spacer(modifier = cell)
                 }
             }
         }

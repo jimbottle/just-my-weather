@@ -112,7 +112,7 @@ class WidgetConfigureActivity : ComponentActivity() {
                 WeatherWidget().update(this@WidgetConfigureActivity, id)
             }
             WidgetRefreshWorker.sync(this@WidgetConfigureActivity, hasWidgets = true)
-            WidgetRefreshWorker.runOnce(this@WidgetConfigureActivity)
+            WidgetRefreshWorker.runOnce(this@WidgetConfigureActivity, afterCurrent = true)
             setResult(RESULT_OK, resultIntent())
             finish()
         }

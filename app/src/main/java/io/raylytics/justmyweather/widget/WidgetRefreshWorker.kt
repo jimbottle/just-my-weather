@@ -57,10 +57,19 @@ class WidgetRefreshWorker(
         }
         val stored = container.widgetConfigRepository.all()
         val configs = ids.map { id -> stored[id] ?: container.seedWidgetConfig(id) }
+        // Only a config THIS run seeded is pushed into its widget's state
+        // below. The others are the configure screen's to push: it can save
+        // a new one while this fetch is in flight, and a push of the config
+        // read before the fetch would overwrite it with the old module until
+        // the next tick (roborev 5372).
+        val seeded = ids.filter { it !in stored }.toSet()
 
         val repository = container.weatherRepository
         val location = container.locationResolver.resolve()
-        val previous = container.widgetDataStore.get()
+        // The previous data is only worth keeping if it is about THIS place:
+        // after a place change the old reading must not outlive the fetch
+        // that failed to replace it (roborev 5371).
+        val previous = container.widgetDataStore.get()?.takeIf { it.isAbout(location) }
         val needs = WidgetNeeds.of(configs)
 
         // The reading is the one fetch that can fail the whole tick. A failed
@@ -96,11 +105,16 @@ class WidgetRefreshWorker(
         container.widgetDataStore.put(data)
         // Into each widget's own state, then the draw: the composition reads
         // the state, not the stores (WidgetState).
-        ids.forEachIndexed { index, id -> WidgetState.push(applicationContext, glanceIds[index], configs[index], data) }
+        ids.forEachIndexed { index, id ->
+            val config = configs[index].takeIf { id in seeded }
+            WidgetState.push(applicationContext, glanceIds[index], config, data)
+        }
         WeatherWidget().updateAll(applicationContext)
-        // A transient failure retries on WorkManager's backoff; anything else
-        // waits for the next tick rather than hammering a broken endpoint.
-        return if (reading.exceptionOrNull() is java.io.IOException) Result.retry() else Result.success()
+        // A transient failure retries on WorkManager's backoff, a couple of
+        // times; past that — and for anything else — it waits for the next
+        // tick rather than hammering a dead network or a broken endpoint.
+        val transient = reading.exceptionOrNull() is java.io.IOException
+        return if (transient && runAttemptCount < MAX_RETRIES) Result.retry() else Result.success()
     }
 
     private suspend fun <T> fetchOr(fallback: T?, fetch: suspend () -> T): T? =
@@ -119,13 +133,23 @@ class WidgetRefreshWorker(
             if (hasWidgets) schedule(context) else cancel(context)
         }
 
-        /** KEEP, not UPDATE: the cadence is a constant, and re-enqueueing on
-         * every widget placement would reset the timer each time. */
+        /** How many times a tick retries a dropped connection before it
+         * lets the next tick have a go. */
+        private const val MAX_RETRIES = 2
+
+        /**
+         * KEEP, not UPDATE: the cadence is a constant, and re-enqueueing on
+         * every widget placement would reset the timer each time.
+         *
+         * NO network constraint. The tick is also what redraws the widgets,
+         * and the "Observed … · 12 min ago" age is read at the draw: a tick
+         * withheld for lack of network would freeze the age at the moment the
+         * phone went offline — understating staleness exactly when the data
+         * is stalest (roborev 5371). Offline, the fetch fails in a
+         * millisecond, the old data stands, and the age moves on.
+         */
         fun schedule(context: Context) {
-            val request =
-                PeriodicWorkRequestBuilder<WidgetRefreshWorker>(REFRESH_MINUTES, TimeUnit.MINUTES)
-                    .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
-                    .build()
+            val request = PeriodicWorkRequestBuilder<WidgetRefreshWorker>(REFRESH_MINUTES, TimeUnit.MINUTES).build()
             WorkManager.getInstance(context)
                 .enqueueUniquePeriodicWork(UNIQUE_NAME, ExistingPeriodicWorkPolicy.KEEP, request)
         }
@@ -134,15 +158,24 @@ class WidgetRefreshWorker(
             WorkManager.getInstance(context).cancelUniqueWork(UNIQUE_NAME)
         }
 
-        /** One immediate refresh — when a widget is placed or reconfigured,
-         * so it shows weather within seconds rather than at the next tick.
-         * Unique + KEEP coalesces a burst of placements into one fetch. */
-        fun runOnce(context: Context) {
+        /**
+         * A single immediate refresh — when a widget is placed or
+         * reconfigured, so it shows weather within seconds rather than at
+         * the next tick. Networked, because this one exists to fetch.
+         *
+         * Unique + KEEP coalesces a burst of placements into one fetch. A
+         * reconfiguration asks for [afterCurrent]: a fetch already running
+         * read the OLD configs and will not ask for what the new module
+         * needs, so its request is queued behind that run rather than
+         * dropped (roborev 5372).
+         */
+        fun runOnce(context: Context, afterCurrent: Boolean = false) {
             val request =
                 OneTimeWorkRequestBuilder<WidgetRefreshWorker>()
                     .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
                     .build()
-            WorkManager.getInstance(context).enqueueUniqueWork(ONCE_NAME, ExistingWorkPolicy.KEEP, request)
+            val policy = if (afterCurrent) ExistingWorkPolicy.APPEND_OR_REPLACE else ExistingWorkPolicy.KEEP
+            WorkManager.getInstance(context).enqueueUniqueWork(ONCE_NAME, policy, request)
         }
     }
 }

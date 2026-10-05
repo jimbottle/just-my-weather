@@ -1,5 +1,6 @@
 package io.raylytics.justmyweather.widget
 
+import io.raylytics.justmyweather.data.CachedSnapshot
 import io.raylytics.justmyweather.data.WeatherLocation
 import io.raylytics.justmyweather.data.WeatherSnapshot
 import io.raylytics.justmyweather.data.metno.ExtendedDay
@@ -9,6 +10,7 @@ import io.raylytics.justmyweather.view.DailyDays
 import io.raylytics.justmyweather.view.ForecastMode
 import io.raylytics.justmyweather.view.ModuleKey
 import java.time.Instant
+import kotlin.math.abs
 
 /**
  * What the refresh worker last fetched for the widgets, kept so a widget can
@@ -35,7 +37,20 @@ data class WidgetData(
     /** The fetch's failure, if any, in the user's words. A failed fetch keeps
      * the previous data and reports beside it, as the glance does. */
     val error: String? = null,
-)
+) {
+    /**
+     * Whether this data describes [location] — the gate on reusing it after
+     * a failed fetch. The user may have picked another place, or moved,
+     * since it was fetched, and a widget that keeps the old place's
+     * temperature while its sun times switch to the new one is lying twice.
+     * The same tolerance as the app's remembered reading
+     * ([CachedSnapshot.MAX_DEGREES_AWAY]): a fix drifts by metres between
+     * polls, and one NWS grid cell is the thing the data is drawn from.
+     */
+    fun isAbout(location: WeatherLocation): Boolean =
+        abs(location.latitude - this.location.latitude) <= CachedSnapshot.MAX_DEGREES_AWAY &&
+            abs(location.longitude - this.location.longitude) <= CachedSnapshot.MAX_DEGREES_AWAY
+}
 
 /**
  * What a set of widgets needs fetched, worked out from their configs so the
