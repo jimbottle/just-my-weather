@@ -28,9 +28,12 @@ Per-version log of what shipped where. Two audiences:
 > Sunrise and sunset can show up to two weeks of days — pick how many on
 > Customize, and the tile scrolls. Chips, sliders and switches now take the
 > accent you chose. The banner no longer nudges the glance when it loads.
+> A Rate link in App settings, for when it has earned a place on your phone.
 
 ### Internal
 
+- Added: App settings → Help → "Rate Just My Weather", opening the Play
+  listing (the Play Store app, else the web page) (just-my-weather-9uu).
 - Added: the sun module's day count is a setting (SunDays, 1–14, default
   2) with a "Sun shows N days" slider under Customize → Sun times; the table
   scrolls inside the tile past its height, except while arranging

@@ -40,6 +40,8 @@ fun AppSettingsScreen(
     onBuyRemoveAds: () -> Unit,
     onRestorePurchases: () -> Unit,
     onReportBug: () -> Unit,
+    /** Opens the Play listing, where the rating lives. */
+    onRateApp: () -> Unit,
     /** "0.2.0 (build 2)" — the line a bug reply would otherwise ask for. */
     version: String,
     onDone: () -> Unit,
@@ -74,7 +76,7 @@ fun AppSettingsScreen(
                     color = MaterialTheme.colorScheme.surfaceVariant,
                     modifier = Modifier.padding(top = 16.dp),
                 )
-                HelpSection(onReportBug = onReportBug)
+                HelpSection(onReportBug = onReportBug, onRateApp = onRateApp)
                 HorizontalDivider(
                     color = MaterialTheme.colorScheme.surfaceVariant,
                     modifier = Modifier.padding(top = 16.dp),
@@ -202,11 +204,16 @@ private fun GadgetbridgeToggle(
     }
 }
 
-/** The way to the bug-report form. Ideas are offered at the bottom of
- * Customize instead, where someone notices the option they wanted is
- * missing. */
+/** The way to the bug-report form, and the way to the store page for a
+ * rating. Ideas are offered at the bottom of Customize instead, where
+ * someone notices the option they wanted is missing. The rating row asks
+ * once and plainly, here where someone has come looking, rather than
+ * interrupting the glance with a pop-up. */
 @Composable
-private fun HelpSection(onReportBug: () -> Unit) {
+private fun HelpSection(
+    onReportBug: () -> Unit,
+    onRateApp: () -> Unit,
+) {
     Column(
         modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -222,6 +229,21 @@ private fun HelpSection(onReportBug: () -> Unit) {
             Text("Report a bug", style = MaterialTheme.typography.bodyLarge)
             Text(
                 text = "Something wrong? Email the developer, with your app version and device attached.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onRateApp)
+                    .padding(vertical = 8.dp)
+                    .testTag("rate-app"),
+        ) {
+            Text("Rate Just My Weather", style = MaterialTheme.typography.bodyLarge)
+            Text(
+                text = "If it has earned a place on your phone, a rating on Google Play helps others find it.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

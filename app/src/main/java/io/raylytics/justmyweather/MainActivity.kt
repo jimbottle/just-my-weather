@@ -44,6 +44,7 @@ import io.raylytics.justmyweather.support.bugDiagnostics
 import io.raylytics.justmyweather.support.composeSupportMail
 import io.raylytics.justmyweather.support.currentAppInfo
 import io.raylytics.justmyweather.support.ideaContext
+import io.raylytics.justmyweather.support.openStoreListing
 import io.raylytics.justmyweather.support.recentLogLines
 import io.raylytics.justmyweather.support.supportMail
 import io.raylytics.justmyweather.ui.alerts.AlertsScreen
@@ -216,6 +217,7 @@ class MainActivity : ComponentActivity() {
                         loadBugReportState = ::bugReportState,
                         adsRemoved = adsRemoved,
                         onBuyRemoveAds = { appSettingsViewModel.buyRemoveAds(this@MainActivity) },
+                        onRateApp = { openStoreListing() },
                     )
                 }
             }
@@ -269,6 +271,8 @@ private fun App(
     adsRemoved: Boolean,
     /** Opens Play's purchase sheet; needs the Activity, so the host supplies it. */
     onBuyRemoveAds: () -> Unit,
+    /** Opens the Play listing; the Activity owns the intent. */
+    onRateApp: () -> Unit,
     /** The app state a bug report attaches, read fresh from the stores. */
     loadBugReportState: suspend () -> List<Pair<String, String>>,
 ) {
@@ -366,6 +370,7 @@ private fun App(
                 onBuyRemoveAds = onBuyRemoveAds,
                 onRestorePurchases = appSettingsViewModel::restorePurchases,
                 onReportBug = { screen = Screen.REPORT_BUG },
+                onRateApp = onRateApp,
                 version = "${BuildConfig.VERSION_NAME} (build ${BuildConfig.VERSION_CODE})",
                 onDone = { screen = Screen.HOME },
             )
