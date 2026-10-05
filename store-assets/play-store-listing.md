@@ -90,8 +90,10 @@ Screenshots captured 2026-10-04 from the versionCode 3 release build on the
 Pixel_7_API_35 emulator after `pm clear` (Louisville, KY, live NWS data; status
 bar in demo mode at 9:41). Cropped with the TOP anchor so the banner ad, which
 sits at the foot of the glance, falls below the 2:1 cut: the screenshots are
-banner-free on purpose (an emulator can only show labelled test ads). Upload in
-filename order — the first two carry the listing:
+banner-free on purpose (an emulator can only show labelled test ads); the
+script defaults to that anchor, so `store-assets/crop-screenshots.sh` with no
+arguments is the whole crop step. Upload in filename order — the first two
+carry the listing:
 
 1. `01-your-glance` — a customized glance, dark look (Conditions + Wind beside
    a 2×2 temperature, Sun, Forecast)
