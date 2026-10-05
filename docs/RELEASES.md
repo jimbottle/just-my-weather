@@ -19,7 +19,7 @@ Per-version log of what shipped where. Two audiences:
 
 ---
 
-## 0.2.0 — Play PRODUCTION draft, versionCode 4 (attached 2026-10-04; internal: 4 on 2026-10-04, 3 on 2026-10-03, 2 on 2026-10-02)
+## 0.2.0 — Play PRODUCTION, versionCode 4 — SUBMITTED FOR REVIEW 2026-10-04 (internal: 4 on 2026-10-04, 3 on 2026-10-03, 2 on 2026-10-02)
 
 The first Play Store build. Internal testing track, manual upload from the
 console (the Developer API needs a prior console upload). Production follows
@@ -32,8 +32,12 @@ below. It was attached to the Production track as a DRAFT through the API on
 2026-10-04 (an app that has never been published only accepts drafts, on any
 track; `promote-play.sh` cannot do this step because it also requires the
 build to have been rolled out on internal first) — the "Send for review"
-click is console-only. Record the submission and go-live dates here when they
-happen. versionCodes 2–4 are burned: the next upload is 5.
+click is console-only: Evan sent it for review on 2026-10-04, after rolling
+versionCode 4 out on the closed (alpha) track to retire versionCode 2 — the
+pre-ads build without AD_ID — which Play's pre-review check flagged as an
+active artifact contradicting the Advertising ID declaration. Record the
+go-live date here when Play approves. versionCodes 2–4 are burned: the next
+upload is 5.
 
 ### Store-facing (≤500 chars)
 
