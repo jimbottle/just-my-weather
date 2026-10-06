@@ -54,6 +54,10 @@ data class ExtendedDay(
     val windDirection: String?,
     /** Total precipitation forecast for the day, in inches. */
     val precipIn: Double? = null,
+    /** True for a day built from only the REST of today's hours (see
+     * dailyView): its high and low are what is left of the day, and the
+     * screen says so. MET's own fold never produces one. */
+    val partial: Boolean = false,
 )
 
 class MetNoClient(

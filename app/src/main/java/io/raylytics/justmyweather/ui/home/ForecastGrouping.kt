@@ -182,7 +182,39 @@ fun dailyView(
     conventions: Conventions,
 ): List<DayForecast>? {
     if (periods == null || (periods.isEmpty() && extended == null)) return null
-    return forecastDays(combineDays(periods, hours, zone), extended, dailyDays, zone, conventions)
+    // Abroad, MET's fold keeps only days it covers to the evening, so after
+    // the early morning today is gone and Daily would open on tomorrow —
+    // where NWS would still say "Today" or "Tonight". The remaining hours
+    // stand in for it, as they do for the high of NWS's "Tonight".
+    val today = if (periods.isEmpty()) restOfToday(hours, extended, zone) else null
+    val days = today?.let { listOf(it) + extended.orEmpty() }
+    return forecastDays(combineDays(periods, hours, zone), days ?: extended, dailyDays, zone, conventions)
+}
+
+/**
+ * Today, folded from the hourly points left on today's date in [zone] —
+ * or null when MET's days already include today, or no hour is left.
+ * Pure, like everything in this file.
+ */
+internal fun restOfToday(hours: List<ForecastPoint>?, extended: List<ExtendedDay>?, zone: ZoneId): ExtendedDay? {
+    val first = hours?.firstOrNull() ?: return null
+    val today = first.startTime.atZone(zone).toLocalDate()
+    if (extended?.firstOrNull()?.date?.isAfter(today) != true) return null
+    val left = hours.takeWhile { it.startTime.atZone(zone).toLocalDate() == today }
+    val temps = left.mapNotNull { it.temperatureF }
+    if (temps.isEmpty()) return null
+    val windiest = left.filter { it.windMph != null }.maxByOrNull { it.windMph!! }
+    return ExtendedDay(
+        date = today,
+        highF = temps.max(),
+        lowF = temps.min(),
+        precipChancePercent = left.mapNotNull { it.precipProbabilityPercent }.maxOrNull(),
+        // The next hour's words: the rest of the day as it starts.
+        conditions = left.firstNotNullOfOrNull { it.shortForecast },
+        windMph = windiest?.windMph,
+        windDirection = windiest?.windDirection,
+        partial = true,
+    )
 }
 
 /** A MET day is named "Tue 10/6" ("Tue 6/10" where the day comes first): it
@@ -190,7 +222,8 @@ fun dailyView(
  * week earlier. */
 private fun ExtendedDay.toDayForecast(outsideNws: Boolean, conventions: Conventions) =
     DayForecast(
-        name = date.format(conventions.dayAndDate),
+        name = if (partial) "Today" else date.format(conventions.dayAndDate),
+        highFromHours = partial,
         highF = highF,
         lowF = lowF,
         shortForecast = conditions,
@@ -253,8 +286,8 @@ fun DayForecast.detail(conventions: Conventions): Detail {
             subtitle = if (outsideNws) "Forecast · MET Norway" else "Extended forecast · MET Norway",
             rows =
                 listOf(
-                    DetailRow("High", conventions.degrees(ext.highF)),
-                    DetailRow("Low", conventions.degrees(ext.lowF)),
+                    DetailRow(if (ext.partial) "High (rest of today)" else "High", conventions.degrees(ext.highF)),
+                    DetailRow(if (ext.partial) "Low (rest of today)" else "Low", conventions.degrees(ext.lowF)),
                     // MET reports an amount for most of the world and a
                     // chance only for some regions; show whichever it gave.
                     if (ext.precipChancePercent != null) {

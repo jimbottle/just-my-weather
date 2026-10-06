@@ -226,4 +226,30 @@ class ForecastGroupingTest {
         val periods = listOf(dated(day("Monday", 70.0), "2026-09-28T10:00:00-04:00"))
         assertEquals(1, dailyView(periods, null, null, 7, ZoneId.of("America/New_York"), Conventions.US)!!.size)
     }
+
+    @Test
+    fun `abroad after the morning, the rest of today's hours become a Today tile`() {
+        val zone = ZoneId.of("Europe/London")
+        // 4 pm and 6 pm on Oct 6 left; MET's whole days start Oct 7.
+        val hours =
+            listOf(
+                ForecastPoint(Instant.parse("2026-10-06T15:00:00Z"), 64.0, 9.0, 20.0, "Cloudy", "SW"),
+                ForecastPoint(Instant.parse("2026-10-06T17:00:00Z"), 58.0, 12.0, 40.0, "Rain", "W"),
+            )
+        val met = listOf(ext("2026-10-07", 60.0), ext("2026-10-08", 62.0))
+        val days = dailyView(emptyList(), hours, met, 3, zone, Conventions.US)!!
+        assertEquals(listOf("Today", "Wed 10/7", "Thu 10/8"), days.map { it.name })
+        val today = days.first()
+        assertEquals(64.0, today.highF)
+        assertEquals(58.0, today.lowF)
+        assertEquals(40.0, today.precipChance)
+        assertEquals("Cloudy", today.shortForecast)
+        assertTrue(today.highFromHours)
+        assertEquals("High (rest of today)", today.detail(Conventions.US).rows.first().label)
+        // When MET's fold already holds today (a morning), nothing is added.
+        val morning = listOf(ext("2026-10-06", 61.0)) + met
+        assertEquals("Tue 10/6", dailyView(emptyList(), hours, morning, 3, zone, Conventions.US)!!.first().name)
+        // And at home NWS names today itself.
+        assertEquals(null, restOfToday(null, met, zone))
+    }
 }
