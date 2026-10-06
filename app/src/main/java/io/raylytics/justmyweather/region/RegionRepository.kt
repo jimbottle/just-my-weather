@@ -77,7 +77,12 @@ class RegionRepository(
      * effort: a failure keeps the clues already remembered. */
     suspend fun refresh(place: WeatherLocation?) {
         val gathered = runCatching { gather(signals, place) }.getOrNull() ?: return
-        runCatching { dataStore.edit { it[CLUES] = RegionCodec.encodeClues(gathered) } }
+        runCatching {
+            dataStore.edit { prefs ->
+                val stored = RegionCodec.decodeClues(prefs[CLUES])
+                if (shouldReplace(stored, gathered)) prefs[CLUES] = RegionCodec.encodeClues(gathered)
+            }
+        }
     }
 
     suspend fun update(transform: (RegionSettings) -> RegionSettings) {
@@ -87,6 +92,22 @@ class RegionRepository(
     }
 
     companion object {
+        /**
+         * Whether freshly [gathered] clues may replace the [stored] ones. Not
+         * when the new answer rests on the phone's language settings alone
+         * while the stored one came from something physical — the network,
+         * a location fix, or the place shown. A refresh that couldn't see
+         * those (no SIM, no fix, no place passed) knows LESS, and letting it
+         * win would move a Wi-Fi tablet in Berlin set to US English from DE
+         * to US — units, and whether ads may start (roborev 5421).
+         */
+        internal fun shouldReplace(stored: RegionClues?, gathered: RegionClues): Boolean {
+            val weakOnly = gathered.phoneNetwork == null && gathered.phoneLocation == null && gathered.place == null
+            val storedStrong =
+                stored != null && (stored.phoneNetwork != null || stored.phoneLocation != null || stored.place != null)
+            return !(weakOnly && storedStrong)
+        }
+
         private val SETTINGS = stringPreferencesKey("region_settings")
         private val CLUES = stringPreferencesKey("region_clues")
 

@@ -182,11 +182,13 @@ class JustMyWeatherApp : Application() {
             // SDK there can reach Google before any consent, even with no
             // banner ever requested (roborev 5416). The clues are re-read
             // first — on a first launch none are remembered yet, and the
-            // device language alone could say "US" in Berlin. Everyone else
+            // device language alone could say "US" in Berlin — with the
+            // place the app will show, as the glance does, so a place-only
+            // region is seen here too (roborev 5421). Everyone else
             // initialises it here, off the main thread, where it costs no
             // frame. Then Play is asked what the account owns, which is
             // what turns a reinstall back into an owner.
-            runCatching { container.regionRepository.refresh(null) }
+            runCatching { container.regionRepository.refresh(container.locationResolver.resolve()) }
             val consent = runCatching { container.regionRepository.adConsent.first() }.getOrNull()
             if (!container.adsEntitlementRepository.adsRemoved.first() && consent == AdConsent.NOT_REQUIRED) {
                 MobileAds.initialize(this@JustMyWeatherApp) {}

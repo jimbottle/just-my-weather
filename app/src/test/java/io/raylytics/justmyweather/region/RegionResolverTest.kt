@@ -101,4 +101,17 @@ class RegionResolverTest {
         // And the reverse: a Briton in Ohio who picks the UK still gets the banner.
         assertEquals(AdConsent.NOT_REQUIRED, RegionResolver.adConsent(RegionClues(phoneNetwork = "US")))
     }
+
+    @Test
+    fun `a refresh that only knows the language never overwrites a physical clue`() {
+        val language = RegionClues(deviceSettings = "US")
+        // The Berlin tablet: its region came from the place it shows.
+        assertEquals(false, RegionRepository.shouldReplace(RegionClues(place = "DE"), language))
+        assertEquals(false, RegionRepository.shouldReplace(RegionClues(phoneNetwork = "GB"), language))
+        // Physical clues always win, even over physical ones: the phone moved.
+        assertEquals(true, RegionRepository.shouldReplace(RegionClues(place = "DE"), RegionClues(phoneNetwork = "FR")))
+        // With nothing stronger stored, the language is the best there is.
+        assertEquals(true, RegionRepository.shouldReplace(null, language))
+        assertEquals(true, RegionRepository.shouldReplace(RegionClues(deviceSettings = "GB"), language))
+    }
 }
