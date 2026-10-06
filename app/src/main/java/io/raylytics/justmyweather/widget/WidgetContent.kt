@@ -273,12 +273,15 @@ private fun ReadingWidget(
     // scale of 1. The launcher draws sp scaled by the user's setting, so the
     // box is shrunk by the same factor before the fit: at 1.3× a value that
     // fits a 100dp box is a value that fits 77dp of it (roborev 5371).
+    // The label and footer are sp text too, so their reservations grow with
+    // the scale before they come off the budget.
     val fontScale = LocalContext.current.resources.configuration.fontScale.coerceAtLeast(MIN_FONT_SCALE)
+    val reserved = (labelHeight + footerHeight).value * fontScale
     val fitted =
         TextFit.sp(
             text = text,
             widthDp = size.width.value / fontScale,
-            heightDp = (size.height - labelHeight - footerHeight).value / fontScale,
+            heightDp = (size.height.value - reserved) / fontScale,
             ceilingSp = spec.valueCeilingSp,
             floorSp = VALUE_FLOOR_SP,
             maxLines = maxLines,
@@ -589,7 +592,16 @@ private fun <T> TileRows(
         items(rows) { row ->
             Row(modifier = GlanceModifier.fillMaxWidth().padding(bottom = spec.gap).clickable(open)) {
                 for (index in 0 until perRow) {
-                    val cell = GlanceModifier.defaultWeight().padding(start = if (index > 0) spec.gap else 0.dp)
+                    // The gap is shared out so every cell gives up the same
+                    // width to it — a start-only inset left the first tile
+                    // a gap wider than its row-mates. Cell i takes i/n of a
+                    // gap at its start and (n-1-i)/n at its end: neighbours
+                    // sum to one gap, the row's edges to none.
+                    val cell =
+                        GlanceModifier.defaultWeight().padding(
+                            start = spec.gap * index / perRow,
+                            end = spec.gap * (perRow - 1 - index) / perRow,
+                        )
                     val item = row.getOrNull(index)
                     if (item != null) Box(modifier = cell) { tile(item) } else Spacer(modifier = cell)
                 }

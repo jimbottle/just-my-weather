@@ -87,10 +87,27 @@ class WidgetRefreshWorker(
         // The forecasts are best-effort, each independently: a failed hourly
         // fetch leaves the previous hours in place and does not cost the
         // reading. Fetched only when some widget needs them.
-        val hours = if (needs.hours) fetchOr(previous?.hours) { repository.loadForecast(location) } else null
-        val periods = if (needs.periods) fetchOr(previous?.periods) { repository.loadDailyForecast(location) } else null
+        //
+        // A framing nobody needs is CARRIED, not dropped: this tick's needs
+        // were read before its fetch, and a widget reconfigured meanwhile
+        // may have just had its hours fetched by the one-off refresh that
+        // reconfiguration asks for. Writing null here would erase them until
+        // the next tick (roborev 5376). The carried data is the same place's
+        // — `previous` is gated on that above.
+        val hours =
+            if (needs.hours) fetchOr(previous?.hours) { repository.loadForecast(location) } else previous?.hours
+        val periods =
+            if (needs.periods) {
+                fetchOr(previous?.periods) { repository.loadDailyForecast(location) }
+            } else {
+                previous?.periods
+            }
         val extended =
-            if (needs.extended) fetchOr(previous?.extended) { repository.loadExtendedDaily(location) } else null
+            if (needs.extended) {
+                fetchOr(previous?.extended) { repository.loadExtendedDaily(location) }
+            } else {
+                previous?.extended
+            }
 
         val data =
             WidgetData(
