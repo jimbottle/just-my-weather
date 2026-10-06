@@ -1,5 +1,7 @@
 package io.raylytics.justmyweather.data.metno
 
+import io.raylytics.justmyweather.data.nws.CurrentObservation
+import io.raylytics.justmyweather.data.nws.ForecastPoint
 import io.raylytics.justmyweather.data.nws.HttpTransport
 import io.raylytics.justmyweather.data.nws.Units
 import kotlinx.serialization.SerialName
@@ -12,9 +14,12 @@ import java.time.ZoneId
 import java.util.Locale
 
 /*
- * The second weather source, and only for what NWS does not forecast: days
- * eight and nine. NWS's daily forecast ends after seven days (fourteen
- * half-day periods; its raw gridpoint data stops at the same place). MET
+ * The second weather source, for what NWS does not forecast. In NWS territory
+ * that is days eight and nine: NWS's daily forecast ends after seven days
+ * (fourteen half-day periods; its raw gridpoint data stops at the same place).
+ * Everywhere else it is everything — the "now" reading, the hourly and the
+ * daily — routed here by WeatherRepository when NWS says a point is not its
+ * own. MET
  * Norway's Locationforecast — the API behind Yr — reaches nine days for the
  * whole world, is keyless, and its data is CC BY 4.0 with commercial use
  * allowed, which is why it replaced Open-Meteo (whose free tier is
@@ -70,6 +75,7 @@ class MetNoClient(
     @Serializable
     private data class Data(
         val instant: Block? = null,
+        @SerialName("next_1_hours") val nextHour: Block? = null,
         @SerialName("next_6_hours") val nextSixHours: Block? = null,
     )
 
@@ -90,6 +96,10 @@ class MetNoClient(
         @SerialName("probability_of_precipitation") val precipitationChance: Double? = null,
         @SerialName("wind_speed") val windSpeedMps: Double? = null,
         @SerialName("wind_from_direction") val windFromDegrees: Double? = null,
+        @SerialName("relative_humidity") val relativeHumidityPercent: Double? = null,
+        @SerialName("dew_point_temperature") val dewPointC: Double? = null,
+        @SerialName("air_pressure_at_sea_level") val seaLevelPressureHpa: Double? = null,
+        @SerialName("apparent_air_temperature") val apparentTemperatureC: Double? = null,
     )
 
     private val json = Json { ignoreUnknownKeys = true }
@@ -106,20 +116,10 @@ class MetNoClient(
      * from two morning blocks would show the overnight low as its high.
      */
     suspend fun getDailyForecast(latitude: Double, longitude: Double, zone: ZoneId): List<ExtendedDay> {
-        val url =
-            String.format(
-                Locale.US,
-                "%s/weatherapi/locationforecast/2.0/complete?lat=%.4f&lon=%.4f",
-                baseUrl,
-                latitude,
-                longitude,
-            )
-        val result = transport.get(url, mapOf("User-Agent" to userAgent, "Accept" to "application/json"))
-        check(result.status == 200) { "met.no returned ${result.status}" }
-        val entries = json.decodeFromString<Response>(result.body).properties?.timeseries ?: return emptyList()
+        val entries = timeseries(latitude, longitude)
         return entries
             .mapNotNull { entry ->
-                val at = runCatching { Instant.parse(entry.time) }.getOrNull() ?: return@mapNotNull null
+                val at = entry.at() ?: return@mapNotNull null
                 val block = entry.data.nextSixHours ?: return@mapNotNull null
                 val local = at.atZone(zone)
                 if (at.atZone(UTC).hour % 6 != 0) return@mapNotNull null
@@ -130,6 +130,96 @@ class MetNoClient(
             .filterValues { blocks -> blocks.size >= 3 && blocks.any { it.holdsNoon } }
             .map { (date, blocks) -> fold(date, blocks) }
     }
+
+    /**
+     * A "now" reading for a place NWS does not cover: MET's forecast for the
+     * current hour, since MET has no station observations to offer. It is the
+     * entry whose hour has begun most recently; the series starts at the top
+     * of the current or the coming hour, so that is nearly always the first.
+     *
+     * [CurrentObservation.observedAt] is that hour's start — what the reading
+     * is FOR, not when anyone measured it — and the caller marks the snapshot
+     * as a forecast so the glance doesn't call it observed.
+     */
+    suspend fun getNow(latitude: Double, longitude: Double, now: Instant): CurrentObservation {
+        val entries = timeseries(latitude, longitude).mapNotNull { entry -> entry.at()?.let { it to entry.data } }
+        val (at, data) =
+            entries.lastOrNull { (at, _) -> !at.isAfter(now) }
+                ?: entries.firstOrNull()
+                ?: error("met.no returned no forecast for $latitude,$longitude")
+        val details = data.instant?.details ?: Details()
+        val airC = details.airTemperatureC
+        // MET's apparent temperature is the same air temperature whenever no
+        // heat or wind adjustment applies. The snapshot's contract is "null
+        // when it feels like the temperature", which NWS meets by sending no
+        // heat index or wind chill; meet it here the same way, at the
+        // precision the glance shows (whole degrees).
+        val feelsLikeC =
+            details.apparentTemperatureC?.takeIf { apparent ->
+                airC == null || Math.round(Units.celsiusToFahrenheit(apparent)) !=
+                    Math.round(Units.celsiusToFahrenheit(airC))
+            }
+        val hour = data.nextHour ?: data.nextSixHours
+        return CurrentObservation(
+            observedAt = at,
+            temperatureF = airC?.let(Units::celsiusToFahrenheit),
+            precipitationIn = Units.toInches(data.nextHour?.details?.precipitationMm, "mm"),
+            windMph = Units.toMph(details.windSpeedMps, "m/s"),
+            pressureInHg = Units.toInchesOfMercury(details.seaLevelPressureHpa, "hPa"),
+            conditions = hour?.summary?.symbolCode?.let(MetNoSymbols::describe),
+            relativeHumidityPercent = details.relativeHumidityPercent,
+            windDirectionDegrees = details.windFromDegrees,
+            feelsLikeF = feelsLikeC?.let(Units::celsiusToFahrenheit),
+        )
+    }
+
+    /**
+     * The hourly forecast for a place NWS does not cover, in the same shape
+     * NWS's hourly takes. Only the hourly head of MET's series is used —
+     * about the next two and a half days. Past that MET steps every six
+     * hours, and a six-hour step drawn as one more "hour" tile would read as
+     * an hour it isn't; the Daily view is where those days belong.
+     */
+    suspend fun getHourlyForecast(latitude: Double, longitude: Double): List<ForecastPoint> =
+        timeseries(latitude, longitude).mapNotNull { entry ->
+            val at = entry.at() ?: return@mapNotNull null
+            val hour = entry.data.nextHour ?: return@mapNotNull null
+            val details = entry.data.instant?.details ?: Details()
+            ForecastPoint(
+                startTime = at,
+                temperatureF = details.airTemperatureC?.let(Units::celsiusToFahrenheit),
+                windMph = Units.toMph(details.windSpeedMps, "m/s"),
+                // Only reported for some regions (the Nordics); null elsewhere,
+                // and the tile then shows no chance line — as for a NWS hour
+                // without one.
+                precipProbabilityPercent = hour.details.precipitationChance,
+                shortForecast = hour.summary?.symbolCode?.let(MetNoSymbols::describe),
+                windDirection = Units.compassPoint(details.windFromDegrees),
+                relativeHumidityPercent = details.relativeHumidityPercent,
+                dewpointF = details.dewPointC?.let(Units::celsiusToFahrenheit),
+            )
+        }
+
+    /** The whole series for a coordinate. Every read goes through here, so
+     * the request — and MET's terms that ride on it — has one definition. A
+     * glance, an hourly and a daily asked for together cost one download:
+     * the HTTP cache the transport carries answers the second and third from
+     * disk until MET's Expires header says the forecast has moved on. */
+    private suspend fun timeseries(latitude: Double, longitude: Double): List<Entry> {
+        val url =
+            String.format(
+                Locale.US,
+                "%s/weatherapi/locationforecast/2.0/complete?lat=%.4f&lon=%.4f",
+                baseUrl,
+                latitude,
+                longitude,
+            )
+        val result = transport.get(url, mapOf("User-Agent" to userAgent, "Accept" to "application/json"))
+        check(result.status == 200) { "met.no returned ${result.status}" }
+        return json.decodeFromString<Response>(result.body).properties?.timeseries.orEmpty()
+    }
+
+    private fun Entry.at(): Instant? = runCatching { Instant.parse(time) }.getOrNull()
 
     private class SixHours(val date: LocalDate, val start: LocalTime, val block: Block, val instant: Details?) {
         /** Whether noon falls in this block's half-open [start, start + 6h).

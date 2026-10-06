@@ -45,6 +45,7 @@ import io.raylytics.justmyweather.view.ForecastData
 import io.raylytics.justmyweather.view.ForecastMode
 import io.raylytics.justmyweather.view.ModuleKey
 import io.raylytics.justmyweather.view.ModuleSize
+import io.raylytics.justmyweather.view.ReadingHeading
 import io.raylytics.justmyweather.view.RenderedView
 import io.raylytics.justmyweather.view.TimesIn
 import io.raylytics.justmyweather.view.ViewConfig
@@ -470,7 +471,8 @@ internal fun ObservedLine(
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     LaunchedEffect(observedAt, lifecycle) {
         // Nothing to age when the station omitted its timestamp — don't tick.
-        if (observedAt == null) return@LaunchedEffect
+        // Nor for a forecast hour: it has a time it is FOR, not an age.
+        if (observedAt == null || snapshot.fromForecast) return@LaunchedEffect
         lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
             while (true) {
                 now = clock()
@@ -478,15 +480,16 @@ internal fun ObservedLine(
             }
         }
     }
-    val time = observedLabel(snapshot, zone)
-    val age = observedAt?.let { ObservationAge.label(it, now) }
+    val heading = ReadingHeading.of(snapshot.fromForecast, observedLabel(snapshot, zone))
+    // A forecast hour names its source where an observation shows its age.
+    val trailer =
+        if (snapshot.fromForecast) {
+            ReadingHeading.FORECAST_SOURCE
+        } else {
+            observedAt?.let { ObservationAge.label(it, now) }
+        }
     Text(
-        text =
-            when {
-                time == null -> "Observed"
-                age == null -> "Observed $time"
-                else -> "Observed $time · $age"
-            },
+        text = listOfNotNull(heading, trailer).joinToString(" · "),
         style = MaterialTheme.typography.labelMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )

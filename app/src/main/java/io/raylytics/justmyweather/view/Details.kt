@@ -58,10 +58,12 @@ object Details {
     private fun ofObservation(module: ModuleValue, snapshot: WeatherSnapshot, zone: ZoneId): Detail {
         val tapped = module.module.field
         val fields = WeatherField.entries.sortedBy { if (it == tapped) 0 else 1 }
-        val observed = snapshot.observedAt?.let { "Observed ${it.clock(zone)}" }
+        val observed =
+            snapshot.observedAt?.let { ReadingHeading.of(snapshot.fromForecast, it.clock(zone)) }
+        val source = ReadingHeading.FORECAST_SOURCE.takeIf { snapshot.fromForecast }
         return Detail(
             title = module.label,
-            subtitle = listOfNotNull(observed, snapshot.locationLabel).joinToString(" · "),
+            subtitle = listOfNotNull(observed, source, snapshot.locationLabel).joinToString(" · "),
             rows =
                 buildList {
                     fields.forEach { field ->

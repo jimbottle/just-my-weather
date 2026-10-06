@@ -1,7 +1,9 @@
 package io.raylytics.justmyweather.data
 
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import java.time.Instant
 
@@ -41,6 +43,13 @@ class SnapshotCodecTest {
         assertEquals(101.5, SnapshotCodec.decode(SnapshotCodec.encode(hot))!!.snapshot.feelsLikeF)
         val older = SnapshotCodec.encode(hot).replace(",\"feelsLikeF\":101.5", "")
         assertNull(SnapshotCodec.decode(older)!!.snapshot.feelsLikeF)
+    }
+
+    @Test
+    fun `a forecast reading stays one across a cold start, and an older entry is an observation`() {
+        val abroad = entry.copy(snapshot = entry.snapshot.copy(fromForecast = true))
+        assertTrue(SnapshotCodec.decode(SnapshotCodec.encode(abroad))!!.snapshot.fromForecast)
+        assertFalse(SnapshotCodec.decode(SnapshotCodec.encode(entry))!!.snapshot.fromForecast)
     }
 
     @Test

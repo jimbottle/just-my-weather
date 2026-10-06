@@ -4,7 +4,6 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
-import io.raylytics.justmyweather.data.nws.PointsLookup
 import kotlinx.coroutines.flow.first
 
 /**
@@ -18,15 +17,15 @@ import kotlinx.coroutines.flow.first
 class DataStorePointCache(
     private val dataStore: DataStore<Preferences>,
 ) : PointCache {
-    private val memo = mutableMapOf<String, PointsLookup>()
+    private val memo = mutableMapOf<String, ResolvedPoint>()
     private var loaded = false
 
-    override suspend fun get(key: String): PointsLookup? {
+    override suspend fun get(key: String): ResolvedPoint? {
         seed()
         return memo[key]
     }
 
-    override suspend fun put(key: String, point: PointsLookup) {
+    override suspend fun put(key: String, point: ResolvedPoint) {
         // Seed before writing too. The repository always reads before it
         // writes, so this is belt and braces — but the memo is what gets
         // encoded, and a put on an unseeded instance would persist only its

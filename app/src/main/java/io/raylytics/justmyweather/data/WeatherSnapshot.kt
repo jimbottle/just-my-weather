@@ -43,6 +43,13 @@ data class WeatherSnapshot(
      * what the app always did.
      */
     val timeZone: String? = null,
+    /**
+     * True when no station reported this: outside NWS territory the reading
+     * is MET Norway's forecast for the current hour, and [observedAt] is that
+     * hour's start. The glance words its age differently so a forecast never
+     * passes for a measurement.
+     */
+    val fromForecast: Boolean = false,
 ) {
     /**
      * The place's zone, or null if unknown or unparseable.

@@ -35,7 +35,9 @@ class DataStorePointCacheTest {
     }
 
     private val point =
-        PointsLookup("OKX", 33, 35, "NYZ072", "KNYC", relativeLocation = RelativeLocation("Brooklyn", "NY"))
+        ResolvedPoint.Nws(
+            PointsLookup("OKX", 33, 35, "NYZ072", "KNYC", relativeLocation = RelativeLocation("Brooklyn", "NY")),
+        )
 
     @Test
     fun `a put survives into a fresh instance via the store`() = runTest {
@@ -45,6 +47,13 @@ class DataStorePointCacheTest {
         // decode the persisted point — not rely on in-process state.
         val reread = DataStorePointCache(store).get("40.71,-74.01")
         assertEquals(point, reread)
+    }
+
+    @Test
+    fun `a place outside NWS territory survives too, so it is not asked about again`() = runTest {
+        val store = FakePreferencesDataStore()
+        DataStorePointCache(store).put("51.51,-0.13", ResolvedPoint.OutsideNws)
+        assertEquals(ResolvedPoint.OutsideNws, DataStorePointCache(store).get("51.51,-0.13"))
     }
 
     @Test

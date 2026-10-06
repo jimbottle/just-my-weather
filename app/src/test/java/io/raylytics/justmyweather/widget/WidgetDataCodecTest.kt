@@ -85,6 +85,12 @@ class WidgetDataCodecTest {
     }
 
     @Test
+    fun `a forecast reading stays a forecast, so the widget never calls it observed`() {
+        val abroad = full.copy(snapshot = snapshot.copy(fromForecast = true))
+        assertEquals(abroad, WidgetDataCodec.decode(WidgetDataCodec.encode(abroad)))
+    }
+
+    @Test
     fun `round-trips the sparse case - a failed first fetch with nothing but an error`() {
         val sparse = WidgetData(location, snapshot = null, fetchedAt = Instant.EPOCH, error = "Couldn't reach it.")
         assertEquals(sparse, WidgetDataCodec.decode(WidgetDataCodec.encode(sparse)))

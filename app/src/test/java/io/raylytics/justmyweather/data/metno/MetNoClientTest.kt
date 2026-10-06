@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
+import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 
@@ -152,5 +153,85 @@ class MetNoClientTest {
         assertEquals("Thunderstorms", MetNoSymbols.describe("heavyrainshowersandthunder_night"))
         assertEquals("Snow Showers", MetNoSymbols.describe("lightsnowshowers_day"))
         assertNull(MetNoSymbols.describe("plague_of_frogs"))
+    }
+
+    /** One entry of the hourly head: an instant and its own next hour. */
+    private fun hour(
+        time: String,
+        tempC: Double,
+        symbol: String,
+        apparentC: Double? = null,
+        chance: Double? = null,
+        mm: Double = 0.0,
+    ) = """{"time":"$time","data":{"instant":{"details":{"air_temperature":$tempC,""" +
+        (apparentC?.let { """"apparent_air_temperature":$it,""" } ?: "") +
+        """"wind_speed":4.0,"wind_from_direction":270.0,"relative_humidity":80.0,""" +
+        """"dew_point_temperature":10.0,"air_pressure_at_sea_level":1013.25}},""" +
+        """"next_1_hours":{"summary":{"symbol_code":"$symbol"},"details":{"precipitation_amount":$mm""" +
+        (chance?.let { ""","probability_of_precipitation":$it""" } ?: "") + "}}}}"
+
+    private fun series(vararg entries: String) = """{"properties":{"timeseries":[${entries.joinToString(",")}]}}"""
+
+    @Test
+    fun `now is the hour that has begun, in American units, with no feels-like when it feels the same`() = runTest {
+        val body =
+            series(
+                hour("2026-10-06T20:00:00Z", 17.4, "partlycloudy_night", apparentC = 17.4, mm = 0.3),
+                hour("2026-10-06T21:00:00Z", 2.0, "snow", apparentC = -3.0),
+            )
+        val now = client(200, body).getNow(51.5, -0.13, Instant.parse("2026-10-06T20:59:00Z"))
+        assertEquals(Instant.parse("2026-10-06T20:00:00Z"), now.observedAt)
+        assertEquals(63.32, now.temperatureF!!, 0.01)
+        assertEquals("Partly Cloudy", now.conditions)
+        assertEquals(8.95, now.windMph!!, 0.01) // 4 m/s
+        assertEquals(270.0, now.windDirectionDegrees)
+        assertEquals(80.0, now.relativeHumidityPercent)
+        assertEquals(29.92, now.pressureInHg!!, 0.01) // 1013.25 hPa
+        assertEquals(0.3 / 25.4, now.precipitationIn!!, 0.0001)
+        // Apparent equals air: "null when it feels like the temperature",
+        // the contract NWS meets by sending no heat index or wind chill.
+        assertNull(now.feelsLikeF)
+
+        // An hour later the cold, windy hour is current, and it does feel
+        // different: -3 °C apparent against 2 °C air.
+        val later = client(200, body).getNow(51.5, -0.13, Instant.parse("2026-10-06T21:05:00Z"))
+        assertEquals(26.6, later.feelsLikeF!!, 0.01)
+        assertEquals("Snow", later.conditions)
+    }
+
+    @Test
+    fun `before the series starts, now is its first hour rather than a failure`() = runTest {
+        // MET's series can start at the coming hour; a clock a minute behind
+        // it must still get a reading.
+        val body = series(hour("2026-10-06T21:00:00Z", 16.9, "cloudy"))
+        val now = client(200, body).getNow(51.5, -0.13, Instant.parse("2026-10-06T20:59:00Z"))
+        assertEquals(Instant.parse("2026-10-06T21:00:00Z"), now.observedAt)
+        assertThrows<IllegalStateException> {
+            client(200, series()).getNow(51.5, -0.13, Instant.parse("2026-10-06T20:59:00Z"))
+        }
+    }
+
+    @Test
+    fun `hourly is MET's hourly head, and stops where MET steps to six hours`() = runTest {
+        val sixHourly =
+            entry("2026-10-09T18:00:00Z", 14.0, 3.0, 180.0, six("cloudy", 15.0, 12.0, 0.0))
+        val body =
+            series(
+                hour("2026-10-06T20:00:00Z", 17.4, "fair_night", chance = 12.0),
+                hour("2026-10-06T21:00:00Z", 16.9, "lightrain"),
+                sixHourly,
+            )
+        val hours = client(200, body).getHourlyForecast(51.5, -0.13)
+        assertEquals(2, hours.size, "the six-hourly tail is not drawn as hours")
+        val first = hours.first()
+        assertEquals(Instant.parse("2026-10-06T20:00:00Z"), first.startTime)
+        assertEquals(63.32, first.temperatureF!!, 0.01)
+        assertEquals("Mostly Clear", first.shortForecast)
+        assertEquals("W", first.windDirection)
+        assertEquals(12.0, first.precipProbabilityPercent)
+        assertEquals(50.0, first.dewpointF!!, 0.01)
+        // MET gives a chance only in some regions; elsewhere none, not zero.
+        assertNull(hours[1].precipProbabilityPercent)
+        assertEquals("Light Rain", hours[1].shortForecast)
     }
 }

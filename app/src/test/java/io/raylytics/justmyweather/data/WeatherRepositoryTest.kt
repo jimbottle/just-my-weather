@@ -22,17 +22,25 @@ import java.util.TimeZone
 class WeatherRepositoryTest {
     /** Routes by endpoint so the same instance serves a full load and records
      * every URL, letting tests assert on cache reuse across calls. */
-    private class RoutingTransport(private val points: String = POINTS) : HttpTransport {
+    private class RoutingTransport(
+        private val points: String = POINTS,
+        /** What /points answers with; 404 + [NOT_NWS] is a place abroad. */
+        private val pointsStatus: Int = 200,
+        private val metNo: String = MET_NO,
+    ) : HttpTransport {
         val requested = mutableListOf<String>()
 
         override suspend fun get(url: String, headers: Map<String, String>): HttpResult {
             requested += url
+            if ("/points/" in url && !url.endsWith("/stations") && pointsStatus != 200) {
+                return HttpResult(pointsStatus, points, null)
+            }
             val body =
                 when {
                     "/observations/latest" in url -> OBSERVATION
                     url.endsWith("/stations") -> STATIONS
                     "/points/" in url -> points
-                    "api.met.no" in url -> MET_NO
+                    "api.met.no" in url -> metNo
                     else -> error("unexpected url $url")
                 }
             return HttpResult(200, body, null)
@@ -96,6 +104,57 @@ class WeatherRepositoryTest {
             expected,
             repo(broken, metNo = MetNoClient(transport = broken)).loadExtendedDaily(honolulu),
         )
+    }
+
+    private val london = WeatherLocation(51.51, -0.13, label = "London")
+
+    private fun abroad() = RoutingTransport(points = NOT_NWS, pointsStatus = 404, metNo = MET_NO_HOURLY)
+
+    @Test
+    fun `a place NWS does not cover is read from MET, and its reading says it is a forecast`() = runTest {
+        val transport = abroad()
+        val repository = repo(transport, now = Instant.parse("2026-10-06T20:20:00Z"), metNo = MetNoClient(transport))
+
+        val now = repository.load(london)
+        assertEquals("London", now.locationLabel)
+        assertTrue(now.fromForecast, "a forecast hour, not a station's observation")
+        // The hour that has begun (20Z, 17.4 °C), not the one coming (21Z).
+        assertEquals(63.32, now.temperatureF!!, 0.01)
+        assertEquals(Instant.parse("2026-10-06T20:00:00Z"), now.observedAt)
+        assertEquals("Partly Cloudy", now.conditions)
+
+        assertEquals(2, repository.loadForecast(london).size)
+        // MET has no half-day periods: the Daily view takes MET's whole days.
+        assertEquals(emptyList<Any>(), repository.loadDailyForecast(london))
+        // No official alerts abroad, and NWS is not even asked (it answers a
+        // foreign point with a 400).
+        assertEquals(emptyList<Any>(), repository.loadActiveAlerts(london))
+        assertTrue(transport.requested.none { "/alerts/" in it || "/stations" in it || "/gridpoints/" in it })
+        // NWS said no once, and the verdict is cached like a grid point.
+        assertEquals(1, transport.pointsLookups())
+    }
+
+    @Test
+    fun `a GPS fix abroad has no NWS city to borrow, so it is the current location`() = runTest {
+        val transport = abroad()
+        val snapshot = repo(transport, metNo = MetNoClient(transport)).load(london.copy(label = ""))
+        assertEquals("Current location", snapshot.locationLabel)
+    }
+
+    @Test
+    fun `only NWS's explicit no counts as abroad, and any other failure is asked again`() = runTest {
+        // A 500 (or a 404 of some other kind) could be a passing outage at a US
+        // point; caching it as "abroad" would pin that place to MET forever.
+        val transport = RoutingTransport(points = """{"status":500}""", pointsStatus = 500)
+        val repository = repo(transport, metNo = MetNoClient(transport))
+        repeat(2) { assertTrue(runCatching { repository.load(london) }.isFailure) }
+        assertEquals(2, transport.pointsLookups(), "not cached: asked again")
+        assertTrue(transport.requested.none { "api.met.no" in it }, "and not routed to MET")
+    }
+
+    @Test
+    fun `abroad with no second source configured, a load fails rather than showing nothing`() = runTest {
+        assertTrue(runCatching { repo(abroad()).load(london) }.isFailure)
     }
 
     @Test
@@ -240,6 +299,22 @@ class WeatherRepositoryTest {
               "relativeLocation":{"properties":{"city":"Brooklyn","state":"NY"}}
             }}
             """
+
+        /** NWS's answer for a point outside its territory, as the live API
+         * gives it for London (2026-10-06). */
+        const val NOT_NWS =
+            """{"title":"Data Unavailable For Requested Point",
+            "type":"https://api.weather.gov/problems/InvalidPoint","status":404}"""
+
+        /** MET's hourly head for London: two hours, each with its own block. */
+        const val MET_NO_HOURLY =
+            """{"properties":{"timeseries":[
+            {"time":"2026-10-06T20:00:00Z","data":{"instant":{"details":{"air_temperature":17.4,
+              "apparent_air_temperature":17.4,"wind_speed":2.1,"wind_from_direction":87.2}},
+              "next_1_hours":{"summary":{"symbol_code":"partlycloudy_night"},"details":{"precipitation_amount":0.0}}}},
+            {"time":"2026-10-06T21:00:00Z","data":{"instant":{"details":{"air_temperature":16.9}},
+              "next_1_hours":{"summary":{"symbol_code":"cloudy"},"details":{"precipitation_amount":0.2}}}}
+            ]}}"""
 
         const val STATIONS = """{"features":[{"properties":{"stationIdentifier":"KNYC"}}]}"""
 

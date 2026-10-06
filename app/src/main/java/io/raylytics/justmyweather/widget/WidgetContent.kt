@@ -55,6 +55,7 @@ import io.raylytics.justmyweather.view.ForecastTileLayout
 import io.raylytics.justmyweather.view.ModuleContent
 import io.raylytics.justmyweather.view.ModuleSize
 import io.raylytics.justmyweather.view.ModuleValue
+import io.raylytics.justmyweather.view.ReadingHeading
 import io.raylytics.justmyweather.view.SunDays
 import io.raylytics.justmyweather.view.TimesIn
 import io.raylytics.justmyweather.view.WeatherField
@@ -321,7 +322,12 @@ private fun ReadingWidget(
  * staleness on a surface that cannot say "refreshing".
  */
 private fun observedLine(snapshot: WeatherSnapshot, zone: ZoneId, now: Instant, wide: Boolean): String {
-    val observedAt = snapshot.observedAt ?: return "Observed"
+    val observedAt = snapshot.observedAt
+    // A forecast hour (outside NWS territory) has no age to carry staleness;
+    // its clock time says which hour it is, and the next tick replaces it.
+    if (snapshot.fromForecast || observedAt == null) {
+        return ReadingHeading.of(snapshot.fromForecast, observedAt?.atZone(zone)?.format(timeFormat))
+    }
     val time = observedAt.atZone(zone).format(timeFormat)
     val age = ObservationAge.label(observedAt, now)
     return when {

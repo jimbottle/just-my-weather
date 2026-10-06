@@ -31,6 +31,7 @@ object SnapshotCodec {
         val relativeHumidityPercent: Double? = null,
         val windDirectionDegrees: Double? = null,
         val feelsLikeF: Double? = null,
+        val fromForecast: Boolean = false,
     )
 
     private val json = Json { ignoreUnknownKeys = true }
@@ -52,6 +53,7 @@ object SnapshotCodec {
                 relativeHumidityPercent = s.relativeHumidityPercent,
                 windDirectionDegrees = s.windDirectionDegrees,
                 feelsLikeF = s.feelsLikeF,
+                fromForecast = s.fromForecast,
             ),
         )
     }
@@ -72,6 +74,7 @@ object SnapshotCodec {
                     relativeHumidityPercent = stored.relativeHumidityPercent,
                     windDirectionDegrees = stored.windDirectionDegrees,
                     feelsLikeF = stored.feelsLikeF,
+                    fromForecast = stored.fromForecast,
                 ),
             latitude = stored.latitude,
             longitude = stored.longitude,

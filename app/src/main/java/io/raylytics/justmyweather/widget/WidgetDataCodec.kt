@@ -38,6 +38,7 @@ object WidgetDataCodec {
         val windDirectionDegrees: Double? = null,
         val feelsLikeF: Double? = null,
         val timeZone: String? = null,
+        val fromForecast: Boolean = false,
     )
 
     @Serializable
@@ -150,6 +151,7 @@ object WidgetDataCodec {
             windDirectionDegrees = windDirectionDegrees,
             feelsLikeF = feelsLikeF,
             timeZone = timeZone,
+            fromForecast = fromForecast,
         )
 
     private fun StoredSnapshot.restored() =
@@ -165,6 +167,7 @@ object WidgetDataCodec {
             windDirectionDegrees = windDirectionDegrees,
             feelsLikeF = feelsLikeF,
             timeZone = timeZone,
+            fromForecast = fromForecast,
         )
 
     private fun ForecastPoint.stored() =
