@@ -257,7 +257,9 @@ private fun CoordinateEntry(onSave: (WeatherLocation) -> Unit) {
         }
         val parsed = parseCoordinates(name, lat, lon)
         Text(
-            text = "NWS covers the United States and its territories, so a point outside it has no forecast.",
+            text =
+                "In the United States the forecast comes from NWS; anywhere else, from MET Norway, " +
+                    "with no station reading or official alerts.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 8.dp),
