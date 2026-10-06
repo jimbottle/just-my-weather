@@ -85,47 +85,37 @@ class WidgetRefreshWorker(
                 ?: runCatching { repository.lastReading(location) }.getOrNull()
         val error = reading.exceptionOrNull()?.let(::weatherErrorMessage)
 
-        // The forecasts are best-effort, each independently: a failed hourly
-        // fetch leaves the previous hours in place and does not cost the
-        // reading. Fetched only when some widget needs them.
-        //
-        // A framing nobody needs is CARRIED while it is fresh, not dropped:
-        // this tick's needs were read before its fetch, and a widget
-        // reconfigured meanwhile may have just had its hours fetched by the
-        // one-off refresh that reconfiguration asks for. Writing null would
-        // erase them until the next tick (roborev 5376). The carry is bounded
-        // by CARRY_WINDOW: that race is over within a tick or two, and an
-        // unbounded carry would hand a widget switched back to Hourly a
-        // week-old forecast as current (roborev 5377). Same place as this
-        // tick, too — `previous` is gated on that above.
+        // The forecasts are best-effort, each independently, and fetched
+        // only when some widget needs them. What each list becomes — the new
+        // fetch, the previous list standing in for a failed one, an unneeded
+        // list carried while fresh, or nothing — is `settle`'s rule, pure and
+        // tested; each list keeps its own fetch time. `previous` is the same
+        // place's, gated above.
         val now = Instant.now()
-        val carried = previous?.takeIf { it.isForecastFresh(now, CARRY_WINDOW) }
         val hours =
-            if (needs.hours) fetchOr(previous?.hours) { repository.loadForecast(location) } else carried?.hours
+            settle(
+                needs.hours,
+                fetched(needs.hours) { repository.loadForecast(location) },
+                previous?.hours,
+                now,
+                CARRY_WINDOW,
+            )
         val periods =
-            if (needs.periods) {
-                fetchOr(previous?.periods) { repository.loadDailyForecast(location) }
-            } else {
-                carried?.periods
-            }
+            settle(
+                needs.periods,
+                fetched(needs.periods) { repository.loadDailyForecast(location) },
+                previous?.periods,
+                now,
+                CARRY_WINDOW,
+            )
         val extended =
-            if (needs.extended) {
-                fetchOr(previous?.extended) { repository.loadExtendedDaily(location) }
-            } else {
-                carried?.extended
-            }
-        // The forecast's own clock moves only on a fetch that landed; carried
-        // or fallen-back lists keep the time they were really fetched at.
-        val fetchedForecast =
-            (needs.hours && hours !== previous?.hours) ||
-                (needs.periods && periods !== previous?.periods) ||
-                (needs.extended && extended !== previous?.extended)
-        val forecastFetchedAt =
-            when {
-                fetchedForecast -> now
-                hours != null || periods != null || extended != null -> previous?.forecastFetchedAt
-                else -> null
-            }
+            settle(
+                needs.extended,
+                fetched(needs.extended) { repository.loadExtendedDaily(location) },
+                previous?.extended,
+                now,
+                CARRY_WINDOW,
+            )
 
         val data =
             WidgetData(
@@ -136,7 +126,6 @@ class WidgetRefreshWorker(
                 extended = extended,
                 fetchedAt = if (reading.isSuccess) now else previous?.fetchedAt ?: now,
                 error = error,
-                forecastFetchedAt = forecastFetchedAt,
             )
         container.widgetDataStore.put(data)
         // Into each widget's own state, then the draw: the composition reads
@@ -153,8 +142,10 @@ class WidgetRefreshWorker(
         return if (transient && runAttemptCount < MAX_RETRIES) Result.retry() else Result.success()
     }
 
-    private suspend fun <T> fetchOr(fallback: T?, fetch: suspend () -> T): T? =
-        runCatching { fetch() }.getOrNull() ?: fallback
+    /** The list, when [needed] and the fetch lands; null when not needed
+     * or when it fails — `settle` tells those apart by [needed]. */
+    private suspend fun <T> fetched(needed: Boolean, fetch: suspend () -> List<T>): List<T>? =
+        if (needed) runCatching { fetch() }.getOrNull() else null
 
     companion object {
         /** The cadence, in minutes. WorkManager refuses anything shorter. */

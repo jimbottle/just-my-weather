@@ -88,7 +88,11 @@ object WidgetDataCodec {
         val extended: List<StoredExtendedDay>? = null,
         val fetchedAtEpochMillis: Long,
         val error: String? = null,
-        val forecastFetchedAtEpochMillis: Long? = null,
+        // Each list's own fetch time; null means the list was never fetched
+        // (or predates the clock, and then it is treated as stale).
+        val hoursFetchedAtEpochMillis: Long? = null,
+        val periodsFetchedAtEpochMillis: Long? = null,
+        val extendedFetchedAtEpochMillis: Long? = null,
     )
 
     private val json = Json { ignoreUnknownKeys = true }
@@ -100,12 +104,14 @@ object WidgetDataCodec {
                 longitude = data.location.longitude,
                 label = data.location.label,
                 snapshot = data.snapshot?.stored(),
-                hours = data.hours?.map { it.stored() },
-                periods = data.periods?.map { it.stored() },
-                extended = data.extended?.map { it.stored() },
+                hours = data.hours?.items?.map { it.stored() },
+                periods = data.periods?.items?.map { it.stored() },
+                extended = data.extended?.items?.map { it.stored() },
                 fetchedAtEpochMillis = data.fetchedAt.toEpochMilli(),
                 error = data.error,
-                forecastFetchedAtEpochMillis = data.forecastFetchedAt?.toEpochMilli(),
+                hoursFetchedAtEpochMillis = data.hours?.at?.toEpochMilli(),
+                periodsFetchedAtEpochMillis = data.periods?.at?.toEpochMilli(),
+                extendedFetchedAtEpochMillis = data.extended?.at?.toEpochMilli(),
             ),
         )
 
@@ -114,18 +120,22 @@ object WidgetDataCodec {
         val s = runCatching { json.decodeFromString<StoredData>(raw) }.getOrNull() ?: return null
         // A date this JVM cannot parse drops its day rather than the whole
         // blob: the rest of the data is still good.
-        val extended = s.extended?.mapNotNull { it.restored() }
         return WidgetData(
             location = WeatherLocation(s.latitude, s.longitude, s.label),
             snapshot = s.snapshot?.restored(),
-            hours = s.hours?.map { it.restored() },
-            periods = s.periods?.map { it.restored() },
-            extended = extended,
+            hours = fetched(s.hours?.map { it.restored() }, s.hoursFetchedAtEpochMillis),
+            periods = fetched(s.periods?.map { it.restored() }, s.periodsFetchedAtEpochMillis),
+            extended = fetched(s.extended?.mapNotNull { it.restored() }, s.extendedFetchedAtEpochMillis),
             fetchedAt = Instant.ofEpochMilli(s.fetchedAtEpochMillis),
             error = s.error,
-            forecastFetchedAt = s.forecastFetchedAtEpochMillis?.let(Instant::ofEpochMilli),
         )
     }
+
+    /** A stored list with its time, or null for an absent list. A list with
+     * no time (written before lists had one) is dated to the epoch: kept,
+     * but stale to any freshness check. */
+    private fun <T> fetched(items: List<T>?, atEpochMillis: Long?): Fetched<T>? =
+        items?.let { Fetched(it, Instant.ofEpochMilli(atEpochMillis ?: 0L)) }
 
     private fun WeatherSnapshot.stored() =
         StoredSnapshot(

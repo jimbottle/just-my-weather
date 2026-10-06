@@ -185,11 +185,11 @@ private fun WidgetConfig.moduleValue(data: WidgetData, now: Instant): ModuleValu
     val forecast =
         ForecastData(
             mode = view.defaultForecastMode,
-            hours = data.hours,
-            periods = data.periods,
+            hours = data.hours?.items,
+            periods = data.periods?.items,
             error = data.error,
             placeZone = placeZone,
-            extended = data.extended,
+            extended = data.extended?.items,
         )
     return view.render(snapshot, sunDays, displayZone, forecast).modules.firstOrNull()
 }

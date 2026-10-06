@@ -29,53 +29,54 @@ class WidgetDataCodecTest {
             timeZone = "America/New_York",
         )
 
+    private val hour =
+        ForecastPoint(
+            startTime = Instant.parse("2026-10-05T15:00:00Z"),
+            temperatureF = 74.0,
+            windMph = 9.0,
+            precipProbabilityPercent = 20.0,
+            shortForecast = "Mostly Sunny",
+            windDirection = "SW",
+            relativeHumidityPercent = 50.0,
+            dewpointF = 54.0,
+        )
+
+    private val period =
+        DailyPeriod(
+            name = "Tonight",
+            startTime = Instant.parse("2026-10-05T22:00:00Z"),
+            isDaytime = false,
+            temperatureF = 58.0,
+            shortForecast = "Clear",
+            precipProbabilityPercent = null,
+            windMph = 5.0,
+            windDirection = "S",
+            detailedForecast = "Clear, with a low around 58.",
+        )
+
+    private val extendedDay =
+        ExtendedDay(
+            date = LocalDate.of(2026, 10, 13),
+            highF = 70.0,
+            lowF = 50.0,
+            precipChancePercent = 10.0,
+            conditions = "Fair",
+            windMph = 4.0,
+            windDirection = "N",
+            precipIn = 0.0,
+        )
+
+    // Three different fetch times, so a round trip that collapsed them to
+    // one shared clock would fail.
     private val full =
         WidgetData(
             location = location,
             snapshot = snapshot,
-            hours =
-                listOf(
-                    ForecastPoint(
-                        startTime = Instant.parse("2026-10-05T15:00:00Z"),
-                        temperatureF = 74.0,
-                        windMph = 9.0,
-                        precipProbabilityPercent = 20.0,
-                        shortForecast = "Mostly Sunny",
-                        windDirection = "SW",
-                        relativeHumidityPercent = 50.0,
-                        dewpointF = 54.0,
-                    ),
-                ),
-            periods =
-                listOf(
-                    DailyPeriod(
-                        name = "Tonight",
-                        startTime = Instant.parse("2026-10-05T22:00:00Z"),
-                        isDaytime = false,
-                        temperatureF = 58.0,
-                        shortForecast = "Clear",
-                        precipProbabilityPercent = null,
-                        windMph = 5.0,
-                        windDirection = "S",
-                        detailedForecast = "Clear, with a low around 58.",
-                    ),
-                ),
-            extended =
-                listOf(
-                    ExtendedDay(
-                        date = LocalDate.of(2026, 10, 13),
-                        highF = 70.0,
-                        lowF = 50.0,
-                        precipChancePercent = 10.0,
-                        conditions = "Fair",
-                        windMph = 4.0,
-                        windDirection = "N",
-                        precipIn = 0.0,
-                    ),
-                ),
+            hours = Fetched(listOf(hour), Instant.parse("2026-10-05T14:10:00Z")),
+            periods = Fetched(listOf(period), Instant.parse("2026-10-05T13:10:00Z")),
+            extended = Fetched(listOf(extendedDay), Instant.parse("2026-10-05T12:10:00Z")),
             fetchedAt = Instant.parse("2026-10-05T14:10:00Z"),
             error = null,
-            forecastFetchedAt = Instant.parse("2026-10-05T14:10:00Z"),
         )
 
     @Test
@@ -101,7 +102,7 @@ class WidgetDataCodecTest {
     fun `an unparseable extended date drops that day, not the data`() {
         val encoded = WidgetDataCodec.encode(full).replace("2026-10-13", "someday")
         val decoded = WidgetDataCodec.decode(encoded)
-        assertEquals(emptyList<ExtendedDay>(), decoded?.extended)
+        assertEquals(emptyList<ExtendedDay>(), decoded?.extended?.items)
         assertEquals(full.hours, decoded?.hours)
     }
 }

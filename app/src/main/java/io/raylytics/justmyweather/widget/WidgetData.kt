@@ -31,36 +31,14 @@ import kotlin.math.abs
 data class WidgetData(
     val location: WeatherLocation,
     val snapshot: WeatherSnapshot?,
-    val hours: List<ForecastPoint>? = null,
-    val periods: List<DailyPeriod>? = null,
-    val extended: List<ExtendedDay>? = null,
+    val hours: Fetched<ForecastPoint>? = null,
+    val periods: Fetched<DailyPeriod>? = null,
+    val extended: Fetched<ExtendedDay>? = null,
     val fetchedAt: Instant,
     /** The fetch's failure, if any, in the user's words. A failed fetch keeps
      * the previous data and reports beside it, as the glance does. */
     val error: String? = null,
-    /**
-     * When the forecast lists were last fetched from the network, or null
-     * when none has been. Its own clock, not [fetchedAt]: a tick that
-     * carries an unneeded framing forward refreshes the reading and moves
-     * [fetchedAt] on, so an age taken from it would never expire the
-     * forecast it carried ([isForecastFresh]).
-     */
-    val forecastFetchedAt: Instant? = null,
 ) {
-    /**
-     * Whether the forecast lists are recent enough to carry through a tick
-     * that does not need them. The carry exists for one case — a widget
-     * reconfigured during a tick whose one-off refresh just fetched them —
-     * and that case is over within a tick or two; past [maxAge] the lists
-     * are dropped, so a framing nobody has needed for a week cannot come
-     * back as the current forecast (roborev 5377).
-     */
-    fun isForecastFresh(now: Instant, maxAge: Duration): Boolean {
-        val at = forecastFetchedAt ?: return false
-        val age = Duration.between(at, now)
-        return !age.isNegative && age <= maxAge
-    }
-
     /**
      * Whether this data describes [location] — the gate on reusing it after
      * a failed fetch. The user may have picked another place, or moved,
@@ -74,6 +52,56 @@ data class WidgetData(
         abs(location.latitude - this.location.latitude) <= CachedSnapshot.MAX_DEGREES_AWAY &&
             abs(location.longitude - this.location.longitude) <= CachedSnapshot.MAX_DEGREES_AWAY
 }
+
+/**
+ * A forecast list with the moment it was fetched. Each list carries its
+ * own clock because each ages on its own: a phone with an hourly widget
+ * fetches hours every tick while its periods, which nothing needs, sit
+ * still — and one shared clock, reset by the hours, would have kept those
+ * periods "fresh" for a week (roborev 5378).
+ */
+data class Fetched<T>(
+    val items: List<T>,
+    val at: Instant,
+) {
+    /** Whether this list is at most [maxAge] old at [now]. A clock that
+     * went backwards reads as stale: its age cannot be known. */
+    fun isFresh(now: Instant, maxAge: Duration): Boolean {
+        val age = Duration.between(at, now)
+        return !age.isNegative && age <= maxAge
+    }
+}
+
+/**
+ * What a tick stores for one forecast framing — the pure rule, so it tests
+ * on the JVM:
+ *
+ *  - needed and [fetched] landed: the new list, stamped [now];
+ *  - needed and the fetch failed ([fetched] null): the [previous] list
+ *    stands, with the time it was really fetched at, as the glance keeps
+ *    its last forecast beside a failed refresh;
+ *  - not needed: the [previous] list is CARRIED while it is within
+ *    [maxAge], else dropped. The carry exists for one case — a widget
+ *    reconfigured during a tick, whose one-off refresh just fetched the
+ *    list this tick did not know to ask for (roborev 5376) — and that case
+ *    is over within a tick or two. Past the window the list goes, so a
+ *    framing nobody has needed for a week cannot come back as the current
+ *    forecast (roborev 5377).
+ *
+ * [previous] must already be the same place's; the worker gates on that.
+ */
+internal fun <T> settle(
+    needed: Boolean,
+    fetched: List<T>?,
+    previous: Fetched<T>?,
+    now: Instant,
+    maxAge: Duration,
+): Fetched<T>? =
+    when {
+        needed && fetched != null -> Fetched(fetched, now)
+        needed -> previous
+        else -> previous?.takeIf { it.isFresh(now, maxAge) }
+    }
 
 /**
  * What a set of widgets needs fetched, worked out from their configs so the
