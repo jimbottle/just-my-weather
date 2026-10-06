@@ -30,7 +30,8 @@ current weather and that place's name can also reach your paired watch. The
 only data the app itself sends off your device is the latitude and longitude
 of the place you are viewing, or that your alerts watch, sent to public
 weather services so the app can fetch the forecast; separately, the ad
-library sends AdMob what it needs to show the banner, and Google Play Billing
+library sends AdMob what it needs to show the banner (where one is shown), and
+Google Play Billing
 handles the ad-removal purchase and its restore check. A bug report or idea you
 send from the app goes from your own email app, and you see every line of it
 before you send it.
@@ -59,7 +60,8 @@ out which country you are in. It reads the country of the mobile network
 your phone is connected to (which needs no permission), or the country of
 your approximate location or of the place you are viewing, matched against
 the bundled place list, or your phone's language settings. All of this
-happens on your phone, and the country is not sent anywhere. You can set
+happens on your phone, and the country is not sent to the developer or to any
+weather or ad service. You can set
 your region yourself in App settings.
 
 ## Where your data goes
@@ -120,6 +122,7 @@ The app stores the following on your device, in its private app storage:
 - your saved places and the last location the app used;
 - your alert rules, whether each has fired, and your quiet-hours setting;
 - whether you have bought ad removal;
+- your region and unit settings, and the country the app last worked out;
 - a short-lived cache of the most recent weather so the app opens instantly;
 - a small cache of up to 32 recently looked-up approximate areas (coordinates
   rounded to about 1 km) with the weather-station grid each one maps to, so
@@ -128,8 +131,8 @@ The app stores the following on your device, in its private app storage:
 
 Clearing the app's data in Android settings, or uninstalling the app, deletes
 all of it. If you use Android's device backup, Android may include all of the
-app's stored data — your settings, saved places, last position, and the area
-cache — in your Google account backup, under your control; the developer has
+app's stored data — your settings (including your region), saved places, last position, the
+country the app last worked out, and the area cache — in your Google account backup, under your control; the developer has
 no access to that backup.
 
 ## Notifications
@@ -180,7 +183,7 @@ same address.
 - **Notifications** — to deliver the alerts you set up (Android 13 and later
   ask you first).
 - **Internet and network state** — to fetch forecasts from the services above,
-  and to load the banner ad.
+  and to load the banner ad where one is shown.
 - **Advertising ID** — added by the Google Mobile Ads SDK, so AdMob can use
   the advertising ID as described under "Ads and purchases".
 - **Google Play billing** — to offer and restore the one-time ad-removal
