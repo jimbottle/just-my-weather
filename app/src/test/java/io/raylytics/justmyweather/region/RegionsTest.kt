@@ -72,4 +72,27 @@ class RegionsTest {
         }
         assertEquals(Regions.prepared.size, Regions.prepared.map { it.code }.toSet().size, "no duplicates")
     }
+
+    @Test
+    fun `wave two regions read metric, each with its own date order and clock`() {
+        val expected =
+            mapOf(
+                "IN" to (DateOrder.DAY_FIRST to false),
+                "PK" to (DateOrder.DAY_FIRST to false),
+                "NG" to (DateOrder.DAY_FIRST to true),
+                "PH" to (DateOrder.MONTH_FIRST to false),
+                "ZA" to (DateOrder.MONTH_FIRST to true),
+                "KE" to (DateOrder.DAY_FIRST to true),
+                "GH" to (DateOrder.DAY_FIRST to false),
+                "MY" to (DateOrder.DAY_FIRST to false),
+                "SG" to (DateOrder.DAY_FIRST to false),
+            )
+        for ((code, dates) in expected) {
+            val region = Regions.of(code)
+            assertEquals(UnitPrefs.METRIC, region.conventions.units, code)
+            assertEquals(dates.first, region.conventions.dateOrder, code)
+            assertEquals(dates.second, region.conventions.clock24, code)
+            assertEquals(AdConsent.NOT_REQUIRED, region.adConsent, code)
+        }
+    }
 }

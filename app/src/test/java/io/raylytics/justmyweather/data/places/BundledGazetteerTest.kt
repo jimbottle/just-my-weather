@@ -23,7 +23,7 @@ class BundledGazetteerTest {
     }
 
     @Test
-    fun `the first regions' cities are there, with their zones`() {
+    fun `the prepared regions' cities are there, with their zones`() {
         val expected =
             mapOf(
                 "Toronto, CA" to "America/Toronto",
@@ -31,6 +31,15 @@ class BundledGazetteerTest {
                 "Dublin, IE" to "Europe/Dublin",
                 "Sydney, AU" to "Australia/Sydney",
                 "Auckland, NZ" to "Pacific/Auckland",
+                "Mumbai, IN" to "Asia/Kolkata",
+                "Karachi, PK" to "Asia/Karachi",
+                "Lagos, NG" to "Africa/Lagos",
+                "Manila, PH" to "Asia/Manila",
+                "Johannesburg, ZA" to "Africa/Johannesburg",
+                "Nairobi, KE" to "Africa/Nairobi",
+                "Accra, GH" to "Africa/Accra",
+                "Kuala Lumpur, MY" to "Asia/Kuala_Lumpur",
+                "Singapore, SG" to "Asia/Singapore",
             )
         for ((query, zone) in expected) {
             val place = catalog.search(query).first()

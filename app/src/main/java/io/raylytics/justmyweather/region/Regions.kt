@@ -44,21 +44,22 @@ object Regions {
             Prepared("GB", PlayStatus.READY, DefaultPlace("London, United Kingdom", 51.51, -0.13, "Europe/London")),
             Prepared("IE", PlayStatus.READY, DefaultPlace("Dublin, Ireland", 53.33, -6.25, "Europe/Dublin")),
             // Wave 2 — English official or dominant, very large populations.
-            Prepared("IN", PlayStatus.PLANNED, DefaultPlace("New Delhi, India", 28.64, 77.22, "Asia/Kolkata")),
-            Prepared("PH", PlayStatus.PLANNED, DefaultPlace("Manila, Philippines", 14.60, 120.98, "Asia/Manila")),
-            Prepared("NG", PlayStatus.PLANNED, DefaultPlace("Lagos, Nigeria", 6.45, 3.39, "Africa/Lagos")),
+            // READY: gate passed 2026-10-06, evidence in localization/wave-2.md.
+            Prepared("IN", PlayStatus.READY, DefaultPlace("New Delhi, India", 28.64, 77.22, "Asia/Kolkata")),
+            Prepared("PH", PlayStatus.READY, DefaultPlace("Manila, Philippines", 14.60, 120.98, "Asia/Manila")),
+            Prepared("NG", PlayStatus.READY, DefaultPlace("Lagos, Nigeria", 6.45, 3.39, "Africa/Lagos")),
             Prepared(
                 "ZA",
-                PlayStatus.PLANNED,
+                PlayStatus.READY,
                 DefaultPlace("Johannesburg, South Africa", -26.20, 28.04, "Africa/Johannesburg"),
             ),
-            Prepared("PK", PlayStatus.PLANNED, DefaultPlace("Karachi, Pakistan", 24.86, 67.01, "Asia/Karachi")),
-            Prepared("KE", PlayStatus.PLANNED, DefaultPlace("Nairobi, Kenya", -1.28, 36.82, "Africa/Nairobi")),
-            Prepared("GH", PlayStatus.PLANNED, DefaultPlace("Accra, Ghana", 5.56, -0.20, "Africa/Accra")),
-            Prepared("SG", PlayStatus.PLANNED, DefaultPlace("Singapore, Singapore", 1.29, 103.85, "Asia/Singapore")),
+            Prepared("PK", PlayStatus.READY, DefaultPlace("Karachi, Pakistan", 24.86, 67.01, "Asia/Karachi")),
+            Prepared("KE", PlayStatus.READY, DefaultPlace("Nairobi, Kenya", -1.28, 36.82, "Africa/Nairobi")),
+            Prepared("GH", PlayStatus.READY, DefaultPlace("Accra, Ghana", 5.56, -0.20, "Africa/Accra")),
+            Prepared("SG", PlayStatus.READY, DefaultPlace("Singapore, Singapore", 1.29, 103.85, "Asia/Singapore")),
             Prepared(
                 "MY",
-                PlayStatus.PLANNED,
+                PlayStatus.READY,
                 DefaultPlace("Kuala Lumpur, Malaysia", 3.14, 101.69, "Asia/Kuala_Lumpur"),
             ),
         )
