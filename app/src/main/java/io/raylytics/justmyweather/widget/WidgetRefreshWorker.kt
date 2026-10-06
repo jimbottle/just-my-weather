@@ -14,6 +14,7 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import io.raylytics.justmyweather.JustMyWeatherApp
 import io.raylytics.justmyweather.ui.home.weatherErrorMessage
+import java.time.Duration
 import java.time.Instant
 import java.util.concurrent.TimeUnit
 
@@ -88,25 +89,42 @@ class WidgetRefreshWorker(
         // fetch leaves the previous hours in place and does not cost the
         // reading. Fetched only when some widget needs them.
         //
-        // A framing nobody needs is CARRIED, not dropped: this tick's needs
-        // were read before its fetch, and a widget reconfigured meanwhile
-        // may have just had its hours fetched by the one-off refresh that
-        // reconfiguration asks for. Writing null here would erase them until
-        // the next tick (roborev 5376). The carried data is the same place's
-        // — `previous` is gated on that above.
+        // A framing nobody needs is CARRIED while it is fresh, not dropped:
+        // this tick's needs were read before its fetch, and a widget
+        // reconfigured meanwhile may have just had its hours fetched by the
+        // one-off refresh that reconfiguration asks for. Writing null would
+        // erase them until the next tick (roborev 5376). The carry is bounded
+        // by CARRY_WINDOW: that race is over within a tick or two, and an
+        // unbounded carry would hand a widget switched back to Hourly a
+        // week-old forecast as current (roborev 5377). Same place as this
+        // tick, too — `previous` is gated on that above.
+        val now = Instant.now()
+        val carried = previous?.takeIf { it.isForecastFresh(now, CARRY_WINDOW) }
         val hours =
-            if (needs.hours) fetchOr(previous?.hours) { repository.loadForecast(location) } else previous?.hours
+            if (needs.hours) fetchOr(previous?.hours) { repository.loadForecast(location) } else carried?.hours
         val periods =
             if (needs.periods) {
                 fetchOr(previous?.periods) { repository.loadDailyForecast(location) }
             } else {
-                previous?.periods
+                carried?.periods
             }
         val extended =
             if (needs.extended) {
                 fetchOr(previous?.extended) { repository.loadExtendedDaily(location) }
             } else {
-                previous?.extended
+                carried?.extended
+            }
+        // The forecast's own clock moves only on a fetch that landed; carried
+        // or fallen-back lists keep the time they were really fetched at.
+        val fetchedForecast =
+            (needs.hours && hours !== previous?.hours) ||
+                (needs.periods && periods !== previous?.periods) ||
+                (needs.extended && extended !== previous?.extended)
+        val forecastFetchedAt =
+            when {
+                fetchedForecast -> now
+                hours != null || periods != null || extended != null -> previous?.forecastFetchedAt
+                else -> null
             }
 
         val data =
@@ -116,8 +134,9 @@ class WidgetRefreshWorker(
                 hours = hours,
                 periods = periods,
                 extended = extended,
-                fetchedAt = if (reading.isSuccess) Instant.now() else previous?.fetchedAt ?: Instant.now(),
+                fetchedAt = if (reading.isSuccess) now else previous?.fetchedAt ?: now,
                 error = error,
+                forecastFetchedAt = forecastFetchedAt,
             )
         container.widgetDataStore.put(data)
         // Into each widget's own state, then the draw: the composition reads
@@ -153,6 +172,10 @@ class WidgetRefreshWorker(
         /** How many times a tick retries a dropped connection before it
          * lets the next tick have a go. */
         private const val MAX_RETRIES = 2
+
+        /** How long an unneeded forecast is carried before it is dropped:
+         * two ticks, which outlasts the reconfiguration race it is kept for. */
+        private val CARRY_WINDOW: Duration = Duration.ofMinutes(REFRESH_MINUTES * 2)
 
         /**
          * KEEP, not UPDATE: the cadence is a constant, and re-enqueueing on

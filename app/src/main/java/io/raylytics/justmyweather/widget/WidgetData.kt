@@ -9,6 +9,7 @@ import io.raylytics.justmyweather.data.nws.ForecastPoint
 import io.raylytics.justmyweather.view.DailyDays
 import io.raylytics.justmyweather.view.ForecastMode
 import io.raylytics.justmyweather.view.ModuleKey
+import java.time.Duration
 import java.time.Instant
 import kotlin.math.abs
 
@@ -37,7 +38,29 @@ data class WidgetData(
     /** The fetch's failure, if any, in the user's words. A failed fetch keeps
      * the previous data and reports beside it, as the glance does. */
     val error: String? = null,
+    /**
+     * When the forecast lists were last fetched from the network, or null
+     * when none has been. Its own clock, not [fetchedAt]: a tick that
+     * carries an unneeded framing forward refreshes the reading and moves
+     * [fetchedAt] on, so an age taken from it would never expire the
+     * forecast it carried ([isForecastFresh]).
+     */
+    val forecastFetchedAt: Instant? = null,
 ) {
+    /**
+     * Whether the forecast lists are recent enough to carry through a tick
+     * that does not need them. The carry exists for one case — a widget
+     * reconfigured during a tick whose one-off refresh just fetched them —
+     * and that case is over within a tick or two; past [maxAge] the lists
+     * are dropped, so a framing nobody has needed for a week cannot come
+     * back as the current forecast (roborev 5377).
+     */
+    fun isForecastFresh(now: Instant, maxAge: Duration): Boolean {
+        val at = forecastFetchedAt ?: return false
+        val age = Duration.between(at, now)
+        return !age.isNegative && age <= maxAge
+    }
+
     /**
      * Whether this data describes [location] — the gate on reusing it after
      * a failed fetch. The user may have picked another place, or moved,

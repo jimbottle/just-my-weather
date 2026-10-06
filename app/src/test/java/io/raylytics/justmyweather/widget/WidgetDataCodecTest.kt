@@ -75,6 +75,7 @@ class WidgetDataCodecTest {
                 ),
             fetchedAt = Instant.parse("2026-10-05T14:10:00Z"),
             error = null,
+            forecastFetchedAt = Instant.parse("2026-10-05T14:10:00Z"),
         )
 
     @Test

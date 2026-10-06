@@ -88,6 +88,7 @@ object WidgetDataCodec {
         val extended: List<StoredExtendedDay>? = null,
         val fetchedAtEpochMillis: Long,
         val error: String? = null,
+        val forecastFetchedAtEpochMillis: Long? = null,
     )
 
     private val json = Json { ignoreUnknownKeys = true }
@@ -104,6 +105,7 @@ object WidgetDataCodec {
                 extended = data.extended?.map { it.stored() },
                 fetchedAtEpochMillis = data.fetchedAt.toEpochMilli(),
                 error = data.error,
+                forecastFetchedAtEpochMillis = data.forecastFetchedAt?.toEpochMilli(),
             ),
         )
 
@@ -121,6 +123,7 @@ object WidgetDataCodec {
             extended = extended,
             fetchedAt = Instant.ofEpochMilli(s.fetchedAtEpochMillis),
             error = s.error,
+            forecastFetchedAt = s.forecastFetchedAtEpochMillis?.let(Instant::ofEpochMilli),
         )
     }
 
