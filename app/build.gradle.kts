@@ -66,7 +66,9 @@ android {
         // Ship only the English resources we wrote. Without this, the AAB
         // carries every locale AndroidX / Compose / Material 3 translate
         // into. Add target locales here when in-app copy is localised.
-        resourceConfigurations += listOf("en")
+        // en-rUS carries only the widget picker's Fahrenheit sample
+        // (values-en-rUS); without it listed, "en" alone strips it.
+        resourceConfigurations += listOf("en", "en-rUS")
 
         // The Google Mobile Ads SDK reads its app id from the manifest; the
         // banner unit reaches AdBanner through BuildConfig. Debug pins both to

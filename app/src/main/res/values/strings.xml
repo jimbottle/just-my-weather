@@ -9,5 +9,9 @@
     <string name="widget_label">Just My Weather</string>
     <string name="widget_description">One tile of your glance: a reading, the sun, or the forecast, set up the way you like.</string>
     <string name="widget_preview_label">Temperature</string>
-    <string name="widget_preview_value">72°</string>
+    <!-- The picker preview is inflated in the launcher's process, where the
+         app's region can't be read, so the device locale stands in for it:
+         22° reads as an ordinary day in Celsius; US locales override to the
+         Fahrenheit equivalent (values-en-rUS). -->
+    <string name="widget_preview_value">22°</string>
 </resources>
