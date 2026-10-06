@@ -186,7 +186,6 @@ class PlaceCatalog(val places: List<Place>) {
                         ?: state.takeIf { it in Place.TERRITORIES }
                         ?: Place.US
                 val zone = parts.getOrNull(5)?.trim()?.takeIf { it.isNotEmpty() }
-                // A US place needs its state; a foreign one its zone.
                 // A Census place needs its state; a GeoNames one its zone.
                 val census = parts.size < 6
                 if (name.isEmpty() || (census && state.isEmpty())) return@mapNotNull null

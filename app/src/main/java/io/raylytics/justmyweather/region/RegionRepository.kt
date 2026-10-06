@@ -59,6 +59,10 @@ class RegionRepository(
     /** What "automatic" would choose — shown beside the manual picker. */
     val automatic: Flow<ResolvedRegion> = clues.map { RegionResolver.resolve(RegionSettings.AUTOMATIC, it) }
 
+    /** Whether the banner may be shown here — from the clues alone, never
+     * the manual region (RegionResolver.adConsent). */
+    val adConsent: Flow<AdConsent> = clues.map(RegionResolver::adConsent).distinctUntilChanged()
+
     /** How everything reads right now: the region's conventions with the
      * user's unit choices applied. What every screen formats through. */
     val conventions: Flow<Conventions> =

@@ -147,7 +147,11 @@ fun forecastDays(
     // Outside NWS territory there are no NWS days at all: MET's are the
     // forecast, from its first whole day.
     if (nwsDays.isEmpty()) {
-        return extended.orEmpty().take(dailyDays).map { it.toDayForecast(outsideNws = true, conventions) }
+        // A leading partial day is the rest of TODAY, like NWS's "Tonight",
+        // and doesn't count as one of the days asked for (roborev 5402).
+        val days = extended.orEmpty()
+        val count = if (days.firstOrNull()?.partial == true) dailyDays + 1 else dailyDays
+        return days.take(count).map { it.toDayForecast(outsideNws = true, conventions) }
     }
     val shown = visibleDays(nwsDays, dailyDays)
     val leadingNight = shown.firstOrNull()?.let { it.day == null && it.night != null } == true
@@ -185,7 +189,8 @@ fun dailyView(
     // Abroad, MET's fold keeps only days it covers to the evening, so after
     // the early morning today is gone and Daily would open on tomorrow —
     // where NWS would still say "Today" or "Tonight". The remaining hours
-    // stand in for it, as they do for the high of NWS's "Tonight".
+    // stand in for it, as they do for the high of NWS's "Tonight", and like
+    // "Tonight" it is not counted as one of the days asked for.
     val today = if (periods.isEmpty()) restOfToday(hours, extended, zone) else null
     val days = today?.let { listOf(it) + extended.orEmpty() }
     return forecastDays(combineDays(periods, hours, zone), days ?: extended, dailyDays, zone, conventions)
@@ -219,10 +224,13 @@ internal fun restOfToday(hours: List<ForecastPoint>?, extended: List<ExtendedDay
 
 /** A MET day is named "Tue 10/6" ("Tue 6/10" where the day comes first): it
  * has no NWS name, and a bare weekday would repeat one already on screen a
- * week earlier. */
+ * week earlier. A partial day is named by its date too, never "Today": a
+ * widget carrying old data through failed fetches would otherwise call
+ * yesterday's leftover hours today (roborev 5402). Its sheet says it is the
+ * rest of the day. */
 private fun ExtendedDay.toDayForecast(outsideNws: Boolean, conventions: Conventions) =
     DayForecast(
-        name = if (partial) "Today" else date.format(conventions.dayAndDate),
+        name = date.format(conventions.dayAndDate),
         highFromHours = partial,
         highF = highF,
         lowF = lowF,
@@ -286,8 +294,8 @@ fun DayForecast.detail(conventions: Conventions): Detail {
             subtitle = if (outsideNws) "Forecast · MET Norway" else "Extended forecast · MET Norway",
             rows =
                 listOf(
-                    DetailRow(if (ext.partial) "High (rest of today)" else "High", conventions.degrees(ext.highF)),
-                    DetailRow(if (ext.partial) "Low (rest of today)" else "Low", conventions.degrees(ext.lowF)),
+                    DetailRow(if (ext.partial) "High (rest of the day)" else "High", conventions.degrees(ext.highF)),
+                    DetailRow(if (ext.partial) "Low (rest of the day)" else "Low", conventions.degrees(ext.lowF)),
                     // MET reports an amount for most of the world and a
                     // chance only for some regions; show whichever it gave.
                     if (ext.precipChancePercent != null) {

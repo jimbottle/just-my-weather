@@ -56,21 +56,23 @@ sealed class AlertSubject(
 
     /**
      * A reading and the threshold it crossed, worded so the notification can
-     * never say "is 2°, below your 2°": when rounding makes them read the
-     * same, both gain a decimal until they don't (up to three). The rule
-     * compares canonical values exactly; this only keeps the words honest.
+     * never put the reading on the wrong side ("is 2°, below your 1.7°") or
+     * on the line ("is 2°, below your 2°"). Both are written at the SAME
+     * precision — at equal precision rounding keeps their order, so text
+     * that differs is text on the right side — starting at the threshold's
+     * own and gaining a decimal while they read the same (up to three
+     * more). The rule compares canonical values exactly; this keeps the
+     * words honest (roborev 5408).
      */
     fun formatPair(value: Double, threshold: Double, conventions: Conventions): Pair<String, String> {
-        var valueDecimals = decimals(conventions)
-        var thresholdDecimals = thresholdDecimals(threshold, conventions)
+        var shared = thresholdDecimals(threshold, conventions)
         repeat(MAX_EXTRA_DECIMALS) {
-            val actual = formatAt(value, conventions, valueDecimals)
-            val limit = formatAt(threshold, conventions, thresholdDecimals)
+            val actual = formatAt(value, conventions, shared)
+            val limit = formatAt(threshold, conventions, shared)
             if (actual != limit) return actual to limit
-            valueDecimals = maxOf(valueDecimals, thresholdDecimals) + 1
-            thresholdDecimals = valueDecimals
+            shared++
         }
-        return formatAt(value, conventions, valueDecimals) to formatAt(threshold, conventions, thresholdDecimals)
+        return formatAt(value, conventions, shared) to formatAt(threshold, conventions, shared)
     }
 
     private fun thresholdDecimals(threshold: Double, conventions: Conventions): Int {

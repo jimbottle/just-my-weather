@@ -237,15 +237,18 @@ class ForecastGroupingTest {
                 ForecastPoint(Instant.parse("2026-10-06T17:00:00Z"), 58.0, 12.0, 40.0, "Rain", "W"),
             )
         val met = listOf(ext("2026-10-07", 60.0), ext("2026-10-08", 62.0))
-        val days = dailyView(emptyList(), hours, met, 3, zone, Conventions.US)!!
-        assertEquals(listOf("Today", "Wed 10/7", "Thu 10/8"), days.map { it.name })
+        val days = dailyView(emptyList(), hours, met, 2, zone, Conventions.US)!!
+        // Named by its date, and not counted: 3 days asked, 3 whole days shown after it.
+        assertEquals(listOf("Tue 10/6", "Wed 10/7", "Thu 10/8"), days.map { it.name })
         val today = days.first()
         assertEquals(64.0, today.highF)
         assertEquals(58.0, today.lowF)
         assertEquals(40.0, today.precipChance)
         assertEquals("Cloudy", today.shortForecast)
         assertTrue(today.highFromHours)
-        assertEquals("High (rest of today)", today.detail(Conventions.US).rows.first().label)
+        assertEquals("High (rest of the day)", today.detail(Conventions.US).rows.first().label)
+        // One day asked: the leftover hours plus tomorrow, never the leftovers alone.
+        assertEquals(2, dailyView(emptyList(), hours, met, 1, zone, Conventions.US)!!.size)
         // When MET's fold already holds today (a morning), nothing is added.
         val morning = listOf(ext("2026-10-06", 61.0)) + met
         assertEquals("Tue 10/6", dailyView(emptyList(), hours, morning, 3, zone, Conventions.US)!!.first().name)

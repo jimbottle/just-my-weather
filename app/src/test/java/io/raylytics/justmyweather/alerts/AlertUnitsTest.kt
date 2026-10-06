@@ -80,11 +80,23 @@ class AlertUnitsTest {
     }
 
     @Test
+    fun `a rule set in other units never reads on the wrong side of its threshold`() {
+        // 35 °F is 1.67 °C; 34.9 °F (1.61 °C) fires BELOW. "is 2°, below
+        // your 1.7°" was the bug (roborev 5408).
+        val rule = AlertRule("r", temperature, Comparison.BELOW, 35.0)
+        val snapshot = WeatherSnapshot("London", 34.9, null, null, null, null, null)
+        val reason = AlertEvaluator.evaluate(rule, WeatherContext(snapshot, Instant.EPOCH, conventions = uk)).reason
+        assertEquals("Temperature is 1.6°, below your 1.7°", reason)
+    }
+
+    @Test
     fun `a fired notification's numbers always sit on the firing side of each other`() {
-        val c = uk
-        for (subject in AlertSubject.current) {
-            for (threshold in listOf(0.0, 1.0, 2.0, 10.0, 30.0, 1013.0)) {
-                val stored = subject.toCanonical(threshold, c)
+        // Every pairing of the unit a rule was SET in with the unit it is
+        // READ in — the cross-unit case is where a threshold gains a decimal.
+        val all = Regions.prepared.map { it.conventions }.toSet() + Conventions.US
+        for (setIn in all) for (c in all) for (subject in AlertSubject.current) {
+            for (threshold in listOf(0.0, 1.0, 2.0, 10.0, 30.0, 35.0, 1013.0)) {
+                val stored = subject.toCanonical(threshold, setIn)
                 // Readings a hair either side, in canonical units.
                 for (delta in listOf(-0.5, -0.06, -0.004, 0.004, 0.06, 0.5)) {
                     val reading = stored + delta
@@ -94,7 +106,7 @@ class AlertUnitsTest {
                         val a = leadingNumber(actual)
                         val l = leadingNumber(limit)
                         val consistent = if (comparison == Comparison.BELOW) a < l else a > l
-                        assertTrue(consistent, "${subject.key} $comparison: \"$actual\" vs \"$limit\"")
+                        assertTrue(consistent, "${subject.key} $comparison in $c: \"$actual\" vs \"$limit\"")
                     }
                 }
             }

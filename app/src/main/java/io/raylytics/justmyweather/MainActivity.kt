@@ -200,8 +200,8 @@ class MainActivity : ComponentActivity() {
             // may be shown at all (region/AdConsent). Unknown until the store
             // answers, and the banner is withheld until then, like adsRemoved.
             val conventions by container.regionRepository.conventions.collectAsStateWithLifecycle(Conventions.US)
-            val region by container.regionRepository.resolved.collectAsStateWithLifecycle(null)
-            val adsServedHere = region?.region?.adConsent == AdConsent.NOT_REQUIRED
+            val adConsent by container.regionRepository.adConsent.collectAsStateWithLifecycle(null)
+            val adsServedHere = adConsent == AdConsent.NOT_REQUIRED
             // The bars sit on the app-painted background, and the user can
             // force a mood against the system setting — so bar icon contrast
             // must follow the app's resolved mood, not the system default

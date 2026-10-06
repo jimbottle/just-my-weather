@@ -90,4 +90,15 @@ class RegionResolverTest {
         val clues = RegionClues(phoneNetwork = "GB")
         assertEquals(clues, RegionCodec.decodeClues(RegionCodec.encodeClues(clues)))
     }
+
+    @Test
+    fun `a region picked by hand changes the units, never whether an ad may be shown`() {
+        // An American in London who picks the US for its 12-hour clock.
+        val inLondon = RegionClues(phoneNetwork = "GB")
+        val settings = RegionSettings(manualRegion = "US")
+        assertEquals("US", RegionResolver.resolve(settings, inLondon).region.code)
+        assertEquals(AdConsent.CERTIFIED_CMP_REQUIRED, RegionResolver.adConsent(inLondon))
+        // And the reverse: a Briton in Ohio who picks the UK still gets the banner.
+        assertEquals(AdConsent.NOT_REQUIRED, RegionResolver.adConsent(RegionClues(phoneNetwork = "US")))
+    }
 }

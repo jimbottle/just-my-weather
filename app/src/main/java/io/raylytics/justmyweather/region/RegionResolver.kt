@@ -92,6 +92,15 @@ object RegionResolver {
         return ResolvedRegion(Regions.of(code), source)
     }
 
+    /**
+     * Whether a banner may be shown, which follows where the phone IS and
+     * never a region the user picked by hand. Picking "United States" for
+     * its 12-hour clock must not serve an ad from Berlin without the consent
+     * form that law requires there (roborev 5400). So the manual choice is
+     * ignored here; units and dates still follow it.
+     */
+    fun adConsent(clues: RegionClues): AdConsent = resolve(RegionSettings.AUTOMATIC, clues).region.adConsent
+
     /** The conventions in force: the region's, with any unit the user chose
      * put in its place. The date order and clock always follow the region —
      * choosing a region is how to change them. */

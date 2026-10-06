@@ -5,7 +5,6 @@ import androidx.lifecycle.viewModelScope
 import io.raylytics.justmyweather.region.RegionRepository
 import io.raylytics.justmyweather.region.RegionSettings
 import io.raylytics.justmyweather.region.ResolvedRegion
-import io.raylytics.justmyweather.view.Conventions
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
@@ -25,8 +24,6 @@ class RegionViewModel(
         repository.resolved.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
     val automatic: StateFlow<ResolvedRegion?> =
         repository.automatic.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
-    val conventions: StateFlow<Conventions> =
-        repository.conventions.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), Conventions.US)
 
     fun update(transform: (RegionSettings) -> RegionSettings) {
         viewModelScope.launch {

@@ -27,6 +27,11 @@ What a region does **not** decide: where the weather comes from. That is per
 else (`data/WeatherRepository.kt`). Someone in Leeds who looks at Ohio gets
 NWS's Ohio forecast, read in Celsius.
 
+A region the user picks by hand changes units and dates only. **Whether an
+ad may be shown always follows where the phone is** (the automatic answer),
+so picking "United States" in Berlin for its 12-hour clock can never serve
+an ad without the consent the law there requires.
+
 The user can pin any unit by hand. A pinned unit overrides the region's,
 and the unpinned ones keep following the region. The date order and the
 clock always follow the region; choosing a region is how to change them.
