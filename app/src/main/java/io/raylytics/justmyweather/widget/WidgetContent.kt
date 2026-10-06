@@ -38,8 +38,7 @@ import io.raylytics.justmyweather.data.nws.DailyPeriod
 import io.raylytics.justmyweather.data.nws.ForecastPoint
 import io.raylytics.justmyweather.ui.home.DayForecast
 import io.raylytics.justmyweather.ui.home.ObservationAge
-import io.raylytics.justmyweather.ui.home.combineDays
-import io.raylytics.justmyweather.ui.home.forecastDays
+import io.raylytics.justmyweather.ui.home.dailyView
 import io.raylytics.justmyweather.ui.home.monthDayFormat
 import io.raylytics.justmyweather.ui.home.periods
 import io.raylytics.justmyweather.ui.home.shortDateFormat
@@ -514,15 +513,12 @@ private fun ForecastWidget(
                         HourTile(hour, content, palette, tileHeight)
                     }
                 }
-            ForecastMode.DAILY ->
-                ForecastFrame(content.periods, content.error, palette) { periods ->
-                    val days =
-                        forecastDays(
-                            combineDays(periods, content.hours, content.placeZone),
-                            content.extended,
-                            content.dailyDays,
-                            content.placeZone,
-                        )
+            ForecastMode.DAILY -> {
+                // Framed on the days, not NWS's periods: abroad there are no
+                // periods and every day is MET's (dailyView).
+                val shownDays =
+                    dailyView(content.periods, content.hours, content.extended, content.dailyDays, content.placeZone)
+                ForecastFrame(shownDays, content.error, palette) { days ->
                     val tileHeight = spec.tileHeight + ELEMENT_LINE_HEIGHT * content.elements.dayLines()
                     val columns = (cells / ModuleSize.CELL.columns / 2).coerceAtLeast(1)
                     when (content.dailyStyle) {
@@ -543,6 +539,7 @@ private fun ForecastWidget(
                         }
                     }
                 }
+            }
         }
     }
 }
@@ -649,7 +646,7 @@ private fun DayTile(day: DayForecast, content: ModuleContent.Forecast, palette: 
     ZonedTile(
         top = day.name,
         // Italic marks an extended day, as on the glance: past NWS's reach.
-        topItalic = day.extended != null,
+        topItalic = day.markedExtended,
         chance = day.precipChance.takeIf { ForecastElement.PRECIP_CHANCE in content.elements },
         words = day.shortForecast.takeIf { ForecastElement.CONDITIONS in content.elements },
         bottomLines = 2,

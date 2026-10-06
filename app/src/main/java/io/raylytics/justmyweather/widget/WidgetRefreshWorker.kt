@@ -108,10 +108,14 @@ class WidgetRefreshWorker(
                 now,
                 CARRY_WINDOW,
             )
+        // Outside NWS territory the periods come back empty and MET's whole
+        // days ARE the Daily view, so they are needed whenever the periods
+        // are — not only past NWS's seven days.
+        val needsExtended = needs.extended || (needs.periods && periods?.items?.isEmpty() == true)
         val extended =
             settle(
-                needs.extended,
-                fetched(needs.extended) { repository.loadExtendedDaily(location) },
+                needsExtended,
+                fetched(needsExtended) { repository.loadExtendedDaily(location) },
                 previous?.extended,
                 now,
                 CARRY_WINDOW,

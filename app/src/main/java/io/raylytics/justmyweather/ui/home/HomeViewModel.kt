@@ -444,11 +444,6 @@ class HomeViewModel(
                 ForecastMode.DAILY -> listOf(ForecastMode.DAILY, ForecastMode.HOURLY)
             }
         forecastMutex.withLock {
-            if (choice.mode == ForecastMode.DAILY && choice.extended && forecasts.value.extended == null) {
-                val location = currentLocation()
-                val days = runCatching { repository.loadExtendedDaily(location) }.getOrDefault(emptyList())
-                forecasts.value = forecasts.value.copy(extended = days)
-            }
             for (framing in needs) {
                 val current = forecasts.value
                 val needed =
@@ -473,6 +468,16 @@ class HomeViewModel(
                             ForecastMode.DAILY -> current.copy(dailyError = e.toUserMessage())
                         }
                 }
+            }
+            // After the periods, because they decide it: past NWS's seven
+            // days when the user asked for more, and ALWAYS when the periods
+            // came back empty — a place outside NWS territory, whose Daily
+            // view is MET's days alone (see dailyView, which waits for them).
+            val abroad = forecasts.value.daily?.isEmpty() == true
+            if (choice.mode == ForecastMode.DAILY && (choice.extended || abroad) && forecasts.value.extended == null) {
+                val location = currentLocation()
+                val days = runCatching { repository.loadExtendedDaily(location) }.getOrDefault(emptyList())
+                forecasts.value = forecasts.value.copy(extended = days)
             }
         }
     }

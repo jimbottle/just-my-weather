@@ -169,26 +169,29 @@ internal fun ForecastModuleContent(
                     }
                 }
 
-            ForecastMode.DAILY ->
-                ForecastFrame(items = content.periods, error = content.error) { list ->
-                    // Pairing the half-day periods is pure; cache per list.
-                    // Both styles count in DAYS through the same trim
-                    // (visibleDays): the combined style shows those rows and
-                    // the day-and-night style the periods they are made of,
-                    // so the two agree on how far ahead "3 days" reaches.
-                    // Past NWS's reach the days come from the extended source
-                    // (forecastDays); they carry no half-day periods, so the
-                    // day-and-night style shows them as whole-day tiles after
-                    // NWS's periods.
-                    val days =
-                        remember(list, content.hours, content.placeZone, content.dailyDays, content.extended) {
-                            forecastDays(
-                                combineDays(list, content.hours, content.placeZone),
-                                content.extended,
-                                content.dailyDays,
-                                content.placeZone,
-                            )
-                        }
+            ForecastMode.DAILY -> {
+                // Pairing the half-day periods is pure; cache per list.
+                // Both styles count in DAYS through the same trim
+                // (visibleDays): the combined style shows those rows and
+                // the day-and-night style the periods they are made of,
+                // so the two agree on how far ahead "3 days" reaches.
+                // Past NWS's reach the days come from the extended source
+                // (forecastDays); they carry no half-day periods, so the
+                // day-and-night style shows them as whole-day tiles after
+                // NWS's periods. Outside NWS territory every day is MET's,
+                // which is why the frame waits on the DAYS, not the periods
+                // (dailyView).
+                val shownDays =
+                    remember(content.periods, content.hours, content.placeZone, content.dailyDays, content.extended) {
+                        dailyView(
+                            content.periods,
+                            content.hours,
+                            content.extended,
+                            content.dailyDays,
+                            content.placeZone,
+                        )
+                    }
+                ForecastFrame(items = shownDays, error = content.error) { days ->
                     val halfDayTiles =
                         remember(days) {
                             days.filter { it.extended == null }.periods.map(DailyTile::Period) +
@@ -240,6 +243,7 @@ internal fun ForecastModuleContent(
                         }
                     }
                 }
+            }
         }
     }
 }
@@ -361,8 +365,8 @@ private fun CombinedDayTile(
         top = day.name,
         // Italic names the one quiet difference an extended day carries:
         // past NWS's reach, from MET Norway. The detail sheet says so in
-        // words.
-        topItalic = day.extended != null,
+        // words. Abroad every day is MET's, so none is marked.
+        topItalic = day.markedExtended,
         bottomLines = DAY_BOTTOM_LINES,
         layout = layout,
         bottom =

@@ -38,7 +38,15 @@ data class DayForecast(
     /** Set when this day is past NWS's reach and came from MET Norway; the
      * tile marks it quietly and the detail sheet names the source. */
     val extended: ExtendedDay? = null,
+    /** True when the place is outside NWS territory and EVERY day is MET's:
+     * there is no NWS day for an extended one to differ from, so the tile's
+     * marker would mean nothing, and the sheet explains the source instead. */
+    val outsideNws: Boolean = false,
 ) {
+    /** Whether the tile marks this day as coming from the second source. */
+    val markedExtended: Boolean
+        get() = extended != null && !outsideNws
+
     // One answer per question, whichever source the day came from, so the
     // tile and the detail sheet cannot disagree (an extended day's chance was
     // once in its sheet but missing from its tile).
@@ -138,6 +146,11 @@ fun forecastDays(
     dailyDays: Int,
     zone: ZoneId,
 ): List<DayForecast> {
+    // Outside NWS territory there are no NWS days at all: MET's are the
+    // forecast, from its first whole day.
+    if (nwsDays.isEmpty()) {
+        return extended.orEmpty().take(dailyDays).map { it.toDayForecast(outsideNws = true) }
+    }
     val shown = visibleDays(nwsDays, dailyDays)
     val leadingNight = shown.firstOrNull()?.let { it.day == null && it.night != null } == true
     val needed = dailyDays - (if (leadingNight) shown.size - 1 else shown.size)
@@ -149,16 +162,39 @@ fun forecastDays(
         extended
             .filter { it.date.isAfter(lastNwsDate) }
             .take(needed)
-            .map { day ->
-                DayForecast(
-                    name = day.date.format(EXTENDED_NAME),
-                    highF = day.highF,
-                    lowF = day.lowF,
-                    shortForecast = day.conditions,
-                    extended = day,
-                )
-            }
+            .map { it.toDayForecast(outsideNws = false) }
 }
+
+/**
+ * The Daily view's days, or null while there is not yet enough to decide.
+ *
+ * Null while the periods are still coming, and also while they have come
+ * back EMPTY with MET's days not yet loaded: an empty period list is what a
+ * place outside NWS territory gets, and its days are MET's, a fetch behind.
+ * Showing "No forecast" in that gap would flash a false empty state on every
+ * load abroad. Once MET's list arrives — empty too, if its fetch failed —
+ * the answer is final either way.
+ */
+fun dailyView(
+    periods: List<DailyPeriod>?,
+    hours: List<ForecastPoint>?,
+    extended: List<ExtendedDay>?,
+    dailyDays: Int,
+    zone: ZoneId,
+): List<DayForecast>? {
+    if (periods == null || (periods.isEmpty() && extended == null)) return null
+    return forecastDays(combineDays(periods, hours, zone), extended, dailyDays, zone)
+}
+
+private fun ExtendedDay.toDayForecast(outsideNws: Boolean) =
+    DayForecast(
+        name = date.format(EXTENDED_NAME),
+        highF = highF,
+        lowF = lowF,
+        shortForecast = conditions,
+        extended = this,
+        outsideNws = outsideNws,
+    )
 
 /** "Tue 10/6": an extended day has no NWS name, and a bare weekday would
  * repeat one already on screen a week earlier. */
@@ -216,7 +252,7 @@ fun DayForecast.detail(): Detail {
         return Detail(
             title = name,
             // MET Norway's data is CC BY 4.0; this is its attribution.
-            subtitle = "Extended forecast · MET Norway",
+            subtitle = if (outsideNws) "Forecast · MET Norway" else "Extended forecast · MET Norway",
             rows =
                 listOf(
                     DetailRow("High", ext.highF.degrees()),
@@ -235,8 +271,13 @@ fun DayForecast.detail(): Detail {
                     DetailRow("Conditions", ext.conditions ?: "—"),
                 ),
             body =
-                "Past the seven days the National Weather Service forecasts, " +
-                    "this day comes from the Norwegian Meteorological Institute (MET Norway).",
+                if (outsideNws) {
+                    "This place is outside the National Weather Service's coverage, so its " +
+                        "forecast comes from the Norwegian Meteorological Institute (MET Norway)."
+                } else {
+                    "Past the seven days the National Weather Service forecasts, " +
+                        "this day comes from the Norwegian Meteorological Institute (MET Norway)."
+                },
         )
     }
     return Detail(
