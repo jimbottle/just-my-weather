@@ -5,6 +5,13 @@ import io.raylytics.justmyweather.data.WeatherSnapshot
 import io.raylytics.justmyweather.data.metno.ExtendedDay
 import io.raylytics.justmyweather.data.nws.DailyPeriod
 import io.raylytics.justmyweather.data.nws.ForecastPoint
+import io.raylytics.justmyweather.view.Conventions
+import io.raylytics.justmyweather.view.DateOrder
+import io.raylytics.justmyweather.view.PrecipitationUnit
+import io.raylytics.justmyweather.view.PressureUnit
+import io.raylytics.justmyweather.view.TemperatureUnit
+import io.raylytics.justmyweather.view.UnitPrefs
+import io.raylytics.justmyweather.view.WindUnit
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
@@ -94,6 +101,20 @@ object WidgetDataCodec {
         val hoursFetchedAtEpochMillis: Long? = null,
         val periodsFetchedAtEpochMillis: Long? = null,
         val extendedFetchedAtEpochMillis: Long? = null,
+        // Absent in data written before regions: the US conventions, which
+        // is what such a widget was already showing.
+        val conventions: StoredConventions? = null,
+    )
+
+    /** Units by their stable keys, never enum names (view/Conventions). */
+    @Serializable
+    private data class StoredConventions(
+        val temperature: String,
+        val wind: String,
+        val pressure: String,
+        val precipitation: String,
+        val dayFirst: Boolean,
+        val clock24: Boolean,
     )
 
     private val json = Json { ignoreUnknownKeys = true }
@@ -113,6 +134,17 @@ object WidgetDataCodec {
                 hoursFetchedAtEpochMillis = data.hours?.at?.toEpochMilli(),
                 periodsFetchedAtEpochMillis = data.periods?.at?.toEpochMilli(),
                 extendedFetchedAtEpochMillis = data.extended?.at?.toEpochMilli(),
+                conventions =
+                    data.conventions.let { c ->
+                        StoredConventions(
+                            temperature = c.units.temperature.key,
+                            wind = c.units.wind.key,
+                            pressure = c.units.pressure.key,
+                            precipitation = c.units.precipitation.key,
+                            dayFirst = c.dateOrder == DateOrder.DAY_FIRST,
+                            clock24 = c.clock24,
+                        )
+                    },
             ),
         )
 
@@ -129,6 +161,25 @@ object WidgetDataCodec {
             extended = fetched(s.extended?.mapNotNull { it.restored() }, s.extendedFetchedAtEpochMillis),
             fetchedAt = Instant.ofEpochMilli(s.fetchedAtEpochMillis),
             error = s.error,
+            conventions = s.conventions?.restored() ?: Conventions.US,
+        )
+    }
+
+    /** A unit key this build doesn't know falls back to the US unit for that
+     * dimension rather than failing the whole widget. */
+    private fun StoredConventions.restored(): Conventions {
+        val us = Conventions.US.units
+        return Conventions(
+            units =
+                UnitPrefs(
+                    temperature = TemperatureUnit.entries.firstOrNull { it.key == temperature } ?: us.temperature,
+                    wind = WindUnit.entries.firstOrNull { it.key == wind } ?: us.wind,
+                    pressure = PressureUnit.entries.firstOrNull { it.key == pressure } ?: us.pressure,
+                    precipitation =
+                        PrecipitationUnit.entries.firstOrNull { it.key == precipitation } ?: us.precipitation,
+                ),
+            dateOrder = if (dayFirst) DateOrder.DAY_FIRST else DateOrder.MONTH_FIRST,
+            clock24 = clock24,
         )
     }
 

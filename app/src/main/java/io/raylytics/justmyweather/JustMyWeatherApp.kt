@@ -18,6 +18,7 @@ import io.raylytics.justmyweather.data.DataStoreSnapshotCache
 import io.raylytics.justmyweather.data.GadgetbridgeSettingsRepository
 import io.raylytics.justmyweather.data.ThemeConfigRepository
 import io.raylytics.justmyweather.data.ViewConfigRepository
+import io.raylytics.justmyweather.data.WeatherLocation
 import io.raylytics.justmyweather.data.WeatherRepository
 import io.raylytics.justmyweather.data.WidgetConfigRepository
 import io.raylytics.justmyweather.data.WidgetDataStore
@@ -31,6 +32,8 @@ import io.raylytics.justmyweather.data.places.PlaceLookup
 import io.raylytics.justmyweather.data.places.SavedPlacesRepository
 import io.raylytics.justmyweather.location.LocationProvider
 import io.raylytics.justmyweather.location.LocationResolver
+import io.raylytics.justmyweather.region.AndroidRegionSignals
+import io.raylytics.justmyweather.region.RegionRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -100,11 +103,25 @@ class AppContainer(context: Context, scope: CoroutineScope) {
     // A chosen place outranks the device fix, for the alert worker as much as
     // for the glance — they share this one resolver, which is why the choice
     // reaches background polling without any extra wiring.
+    // The region — units, dates, ads — and the user's choices about it. Its
+    // clues are re-read on every refresh of the glance and the workers;
+    // docs/REGIONS.md is the whole story.
+    val regionRepository =
+        RegionRepository(
+            appContext.dataStore,
+            AndroidRegionSignals(appContext, locationProvider, placeLookup),
+        )
+
     val locationResolver =
         LocationResolver(
             locationProvider,
             DataStoreLastLocationStore(appContext.dataStore),
             chosenPlace = savedPlacesRepository::current,
+            fallback = {
+                regionRepository.currentRegion().defaultPlace?.let { place ->
+                    WeatherLocation(place.latitude, place.longitude, place.label, place.timeZone)
+                } ?: WeatherLocation.DEFAULT
+            },
         )
     val viewConfigRepository = ViewConfigRepository(appContext.dataStore)
     val themeConfigRepository = ThemeConfigRepository(appContext.dataStore)

@@ -39,6 +39,12 @@ fun AppSettingsScreen(
     gadgetbridgeEnabled: Boolean,
     onSetGadgetbridgeEnabled: (Boolean) -> Unit,
     adsRemoved: Boolean,
+    /** False where the region's consent rules keep the banner off
+     * (region/AdConsent): no banner, so no purchase to offer. */
+    adsServedHere: Boolean,
+    /** "United Kingdom · °C, mph" — the Region & units row's second line. */
+    regionSummary: String,
+    onRegion: () -> Unit,
     /** Play's localised price ("$0.99"), or null while Play has not answered. */
     removeAdsPrice: String?,
     removeAdsStatus: RemoveAdsStatus,
@@ -66,8 +72,17 @@ fun AppSettingsScreen(
                 TextButton(onClick = onDone) { Text("Done") }
             }
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                Column(modifier = Modifier.fillMaxWidth().padding(top = 16.dp)) {
+                    Text("Region", style = MaterialTheme.typography.labelMedium)
+                    AboutLink(title = "Region & units", detail = regionSummary, onClick = onRegion)
+                }
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
                 AdsSection(
                     adsRemoved = adsRemoved,
+                    adsServedHere = adsServedHere,
                     price = removeAdsPrice,
                     status = removeAdsStatus,
                     onBuy = onBuyRemoveAds,
@@ -104,6 +119,7 @@ fun AppSettingsScreen(
 @Composable
 private fun AdsSection(
     adsRemoved: Boolean,
+    adsServedHere: Boolean,
     price: String?,
     status: RemoveAdsStatus,
     onBuy: () -> Unit,
@@ -119,6 +135,19 @@ private fun AdsSection(
                 Text("Ads removed", style = MaterialTheme.typography.bodyLarge)
                 Text(
                     text = "Thank you. The banner is gone on every phone signed in to this Google account.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            return@Column
+        }
+        if (!adsServedHere) {
+            // Nothing to remove: selling Remove Ads where no banner is shown
+            // would be selling nothing.
+            Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+                Text("No ads in your region", style = MaterialTheme.typography.bodyLarge)
+                Text(
+                    text = "The banner isn't shown where the law asks for a consent form first.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

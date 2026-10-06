@@ -33,14 +33,16 @@ class DetailsTest {
 
     @Test
     fun `a reading opens the whole observation, its own field first`() {
-        val detail = Details.ofModule(module(WeatherField.WIND), snapshot, newYork)!!
+        val detail = Details.ofModule(module(WeatherField.WIND), snapshot, newYork, Conventions.US)!!
         assertEquals("Wind", detail.title)
         // Observed in the zone the SCREEN reads in — the caller's choice, the
         // place's here — not the snapshot's own.
         assertEquals("Observed 7:00 PM · Louisville, KY", detail.subtitle)
         assertEquals(
             "Observed 4:00 PM · Louisville, KY",
-            Details.ofModule(module(WeatherField.WIND), snapshot, ZoneId.of("America/Los_Angeles"))!!.subtitle,
+            Details
+                .ofModule(module(WeatherField.WIND), snapshot, ZoneId.of("America/Los_Angeles"), Conventions.US)!!
+                .subtitle,
         )
         assertEquals(
             listOf("Wind", "Temperature", "Feels like", "Conditions", "Precip (last hr)", "Pressure", "Humidity"),
@@ -56,7 +58,7 @@ class DetailsTest {
     @Test
     fun `a reading with nothing behind it still opens, with dashes`() {
         val empty = WeatherSnapshot("Nowhere", null, null, null, null, null, observedAt = null)
-        val detail = Details.ofModule(module(WeatherField.TEMPERATURE), empty, newYork)!!
+        val detail = Details.ofModule(module(WeatherField.TEMPERATURE), empty, newYork, Conventions.US)!!
         assertEquals("Nowhere", detail.subtitle)
         // Precipitation is the one row with words for its absence: a station
         // that does not measure it is the ordinary case, not missing data.
@@ -76,7 +78,7 @@ class DetailsTest {
                 SunDay(LocalDate.of(2026, 9, 6), null, null),
             )
         val sun = ModuleValue(ModuleKey.Sun, "Sun", ModuleKey.Sun.defaultSize, ModuleContent.Sun(days, newYork))
-        val detail = Details.ofModule(sun, snapshot, newYork)!!
+        val detail = Details.ofModule(sun, snapshot, newYork, Conventions.US)!!
         assertEquals(
             listOf(
                 "Sunrise · Sep 5", "Sunset · Sep 5", "Daylight · Sep 5",
@@ -108,7 +110,7 @@ class DetailsTest {
                     placeZone = newYork,
                 ),
             )
-        assertNull(Details.ofModule(forecast, snapshot, newYork))
+        assertNull(Details.ofModule(forecast, snapshot, newYork, Conventions.US))
     }
 
     @Test
@@ -124,7 +126,7 @@ class DetailsTest {
                 relativeHumidityPercent = 60.0,
                 dewpointF = 70.3,
             )
-        val detail = Details.ofHour(hour, newYork)
+        val detail = Details.ofHour(hour, newYork, Conventions.US)
         assertEquals("6 pm", detail.title)
         assertEquals("Saturday, September 5 · Forecast", detail.subtitle)
         assertEquals(
@@ -154,7 +156,7 @@ class DetailsTest {
                 windDirection = "S",
                 detailedForecast = "Partly cloudy, with a low around 70.",
             )
-        val detail = Details.ofPeriod(night)
+        val detail = Details.ofPeriod(night, Conventions.US)
         assertEquals("Friday Night", detail.title)
         assertEquals("Forecast · night", detail.subtitle)
         assertEquals("Low", detail.rows.first().label)
@@ -165,9 +167,9 @@ class DetailsTest {
 
     @Test
     fun `wind reads the same way everywhere`() {
-        assertEquals("—", Details.wind(null, "SW"))
-        assertEquals("Calm", Details.wind(0.4, "SW"))
-        assertEquals("12 mph", Details.wind(12.4, null))
-        assertEquals("12 mph SW", Details.wind(12.4, "SW"))
+        assertEquals("—", Conventions.US.wind(null, "SW"))
+        assertEquals("Calm", Conventions.US.wind(0.4, "SW"))
+        assertEquals("12 mph", Conventions.US.wind(12.4, null))
+        assertEquals("12 mph SW", Conventions.US.wind(12.4, "SW"))
     }
 }

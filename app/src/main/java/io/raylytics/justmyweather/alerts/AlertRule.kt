@@ -1,5 +1,7 @@
 package io.raylytics.justmyweather.alerts
 
+import io.raylytics.justmyweather.view.Conventions
+
 /** Which side of the threshold fires the alert. */
 enum class Comparison(val key: String, val word: String) {
     ABOVE("above", "above"),
@@ -43,12 +45,12 @@ data class AlertRule(
     val firedCount: Int = 0,
 ) {
     /** A plain-language description for the rule list: "Temperature above 75°",
-     * or "Chance of rain above 50% within 12 hours" for a forecast window. */
-    val summary: String
-        get() {
-            val core = "${subject.label} ${comparison.word} ${subject.format(threshold)}"
-            return if (window.isForecast) "$core ${window.phrase}" else core
-        }
+     * or "Chance of rain above 50% within 12 hours" for a forecast window —
+     * the threshold in the user's units. */
+    fun summary(conventions: Conventions): String {
+        val core = "${subject.label} ${comparison.word} ${subject.format(threshold, conventions)}"
+        return if (window.isForecast) "$core ${window.phrase}" else core
+    }
 
     /** True once the rule has fired as many times as its [limit] allows. */
     val isSpent: Boolean

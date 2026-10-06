@@ -63,6 +63,9 @@ class HomeViewModel(
      * MainActivity. Defaults to doing nothing, which is also what tests want.
      */
     private val onSnapshotLoaded: suspend (WeatherSnapshot) -> Unit = {},
+    /** Invoked with the place each refresh resolved — how the region learns
+     * which place the app is showing (region/RegionRepository.refresh). */
+    private val onPlaceResolved: suspend (WeatherLocation) -> Unit = {},
     /** Injected so the sun times are testable without waiting for dawn. */
     private val clock: () -> Instant = Instant::now,
     /** Injected alongside the clock: which local day it is decides which rows
@@ -244,6 +247,10 @@ class HomeViewModel(
             // pre-refresh data can never be resurrected past the clear.
             forecastMutex.withLock { forecasts.value = ForecastLoad() }
             val location = currentLocation()
+            // Best-effort, and before the fetch: the region is about the
+            // phone and the place, not the weather, so a dead network must
+            // not stop units following someone who has just landed abroad.
+            runCatching { onPlaceResolved(location) }
             // Before the fetch, and independent of it: pure arithmetic that
             // cannot fail, so the sun times still appear on a dead network.
             sunLocation = location

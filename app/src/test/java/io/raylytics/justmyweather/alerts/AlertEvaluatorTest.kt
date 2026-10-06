@@ -1,6 +1,7 @@
 package io.raylytics.justmyweather.alerts
 
 import io.raylytics.justmyweather.data.WeatherSnapshot
+import io.raylytics.justmyweather.view.Conventions
 import io.raylytics.justmyweather.view.WeatherField
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -64,11 +65,12 @@ class AlertEvaluatorTest {
     fun `rule summary reads naturally with the field unit`() {
         assertEquals(
             "Temperature below 32°",
-            AlertRule("r", AlertSubject.Field(WeatherField.TEMPERATURE), Comparison.BELOW, 32.0).summary,
+            AlertRule("r", AlertSubject.Field(WeatherField.TEMPERATURE), Comparison.BELOW, 32.0)
+                .summary(Conventions.US),
         )
         assertEquals(
             "Wind above 20 mph",
-            AlertRule("r", AlertSubject.Field(WeatherField.WIND), Comparison.ABOVE, 20.0).summary,
+            AlertRule("r", AlertSubject.Field(WeatherField.WIND), Comparison.ABOVE, 20.0).summary(Conventions.US),
         )
     }
 }

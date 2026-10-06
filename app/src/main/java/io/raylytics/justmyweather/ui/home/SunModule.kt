@@ -17,9 +17,11 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import io.raylytics.justmyweather.data.SunDay
+import io.raylytics.justmyweather.ui.theme.LocalConventions
 import io.raylytics.justmyweather.view.ModuleSize
 import java.time.Instant
 import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 /*
@@ -184,7 +186,7 @@ private fun SunPairLine(
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
     Text(
-        text = event?.atZone(zone)?.format(timeFormat) ?: "—",
+        text = event?.let { LocalConventions.current.clock(it, zone) } ?: "—",
         style = timeStyle,
         color = color,
         maxLines = 1,
@@ -201,12 +203,12 @@ private fun SunDayRow(day: SunDay, zone: ZoneId) {
         // date wherever it appears on this screen.
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = day.date.format(weekdayFormat).uppercase(Locale.getDefault()),
+                text = day.date.format(WEEKDAY).uppercase(Locale.ENGLISH),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
-                text = day.date.format(monthDayFormat),
+                text = day.date.format(LocalConventions.current.monthDay),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -225,10 +227,13 @@ private fun SunTimeCell(
     color: Color,
 ) {
     Text(
-        text = event?.atZone(zone)?.format(timeFormat) ?: "—",
+        text = event?.let { LocalConventions.current.clock(it, zone) } ?: "—",
         style = MaterialTheme.typography.titleMedium,
         color = color,
         textAlign = TextAlign.End,
         modifier = Modifier.width(SUN_COLUMN_WIDTH),
     )
 }
+
+/** "TUE": the weekday reads the same in every region; only its date moves. */
+private val WEEKDAY: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE", Locale.ENGLISH)

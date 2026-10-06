@@ -15,6 +15,7 @@ import androidx.work.WorkerParameters
 import io.raylytics.justmyweather.JustMyWeatherApp
 import io.raylytics.justmyweather.data.metno.ExtendedDay
 import io.raylytics.justmyweather.ui.home.weatherErrorMessage
+import io.raylytics.justmyweather.view.Conventions
 import java.time.Duration
 import java.time.Instant
 import java.util.concurrent.TimeUnit
@@ -136,6 +137,14 @@ class WidgetRefreshWorker(
                 extended = extended,
                 fetchedAt = if (reading.isSuccess) now else previous?.fetchedAt ?: now,
                 error = error,
+                // How the widgets read — the region's units, dates and clock.
+                // Re-read every tick, so a region change reaches them within
+                // one; the last known conventions stand if the read fails.
+                conventions =
+                    runCatching {
+                        container.regionRepository.refresh(location)
+                        container.regionRepository.currentConventions()
+                    }.getOrNull() ?: previous?.conventions ?: Conventions.US,
             )
         container.widgetDataStore.put(data)
         // Into each widget's own state, then the draw: the composition reads

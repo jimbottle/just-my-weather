@@ -2,6 +2,7 @@ package io.raylytics.justmyweather.alerts
 
 import io.raylytics.justmyweather.data.WeatherSnapshot
 import io.raylytics.justmyweather.data.nws.ForecastPoint
+import io.raylytics.justmyweather.view.Conventions
 import io.raylytics.justmyweather.view.WeatherField
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -89,7 +90,7 @@ class AlertForecastEvaluatorTest {
         assertTrue(decision.fired)
         assertEquals(70.0, decision.value)
         assertTrue(decision.reason.contains("70%"))
-        assertEquals("Chance of rain above 50% within 12 hours", precipRule.summary)
+        assertEquals("Chance of rain above 50% within 12 hours", precipRule.summary(Conventions.US))
     }
 
     @Test
@@ -142,7 +143,7 @@ class AlertForecastEvaluatorTest {
     fun `forecast summary appends the window phrase`() {
         assertEquals(
             "Temperature below 35° overnight",
-            rule(temp, Comparison.BELOW, 35.0, AlertWindow.OVERNIGHT).summary,
+            rule(temp, Comparison.BELOW, 35.0, AlertWindow.OVERNIGHT).summary(Conventions.US),
         )
     }
 }

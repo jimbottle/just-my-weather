@@ -1,6 +1,7 @@
 package io.raylytics.justmyweather.alerts
 
 import io.raylytics.justmyweather.data.WeatherSnapshot
+import io.raylytics.justmyweather.view.Conventions
 
 /** The outcome of testing one rule against one context. [reason] is written
  * for the user — it becomes the notification body. */
@@ -26,17 +27,17 @@ object AlertEvaluator {
         if (rule.window.isForecast) {
             evaluateForecast(rule, context)
         } else {
-            evaluateNow(rule, context.snapshot)
+            evaluateNow(rule, context.snapshot, context.conventions)
         }
 
-    private fun evaluateNow(rule: AlertRule, snapshot: WeatherSnapshot): FireDecision {
+    private fun evaluateNow(rule: AlertRule, snapshot: WeatherSnapshot, conventions: Conventions): FireDecision {
         val value =
             rule.subject.currentValue(snapshot)
                 ?: return FireDecision(false, "No ${rule.subject.label.lowercase()} reading", null)
 
         val fired = rule.comparison.test(value, rule.threshold)
-        val actual = rule.subject.format(value)
-        val limit = rule.subject.format(rule.threshold)
+        val actual = rule.subject.format(value, conventions)
+        val limit = rule.subject.format(rule.threshold, conventions)
         val reason =
             if (fired) {
                 "${rule.subject.label} is $actual, ${rule.comparison.word} your $limit"
@@ -67,8 +68,8 @@ object AlertEvaluator {
                 Comparison.ABOVE -> values.max()
             }
         val fired = rule.comparison.test(extreme, rule.threshold)
-        val actual = rule.subject.format(extreme)
-        val limit = rule.subject.format(rule.threshold)
+        val actual = rule.subject.format(extreme, context.conventions)
+        val limit = rule.subject.format(rule.threshold, context.conventions)
         val reason =
             if (fired) {
                 "${rule.subject.label} ${rule.window.phrase} reaches $actual, ${rule.comparison.word} your $limit"

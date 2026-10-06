@@ -52,6 +52,7 @@ import io.raylytics.justmyweather.alerts.AlertSubject
 import io.raylytics.justmyweather.alerts.AlertWindow
 import io.raylytics.justmyweather.alerts.Comparison
 import io.raylytics.justmyweather.alerts.FireLimit
+import io.raylytics.justmyweather.ui.theme.LocalConventions
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import java.util.Locale
@@ -408,7 +409,7 @@ private fun RuleRow(
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = rule.summary,
+                text = rule.summary(LocalConventions.current),
                 style = MaterialTheme.typography.bodyMedium,
                 color =
                     if (rule.enabled) {
@@ -453,6 +454,8 @@ private fun AddRuleForm(
     var subject by remember { mutableStateOf(AlertSubject.current.first()) }
     var comparison by remember { mutableStateOf(Comparison.BELOW) }
     var thresholdText by remember { mutableStateOf("") }
+    // Typed in the user's unit; stored canonical (AlertSubject.toCanonical).
+    val conventions = LocalConventions.current
     val threshold = thresholdText.toDoubleOrNull()
     var limitChoice by remember { mutableStateOf(LimitChoice.EVERY_TIME) }
     var limitText by remember { mutableStateOf("") }
@@ -503,6 +506,7 @@ private fun AddRuleForm(
                 value = thresholdText,
                 onValueChange = { thresholdText = it },
                 placeholder = { Text("Value") },
+                suffix = { Text(subject.unitLabel(conventions)) },
                 singleLine = true,
                 keyboardOptions =
                     KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
@@ -512,7 +516,7 @@ private fun AddRuleForm(
                 onClick = {
                     val chosen = limit ?: return@TextButton
                     threshold?.let {
-                        onAdd(subject, comparison, it, window, chosen)
+                        onAdd(subject, comparison, subject.toCanonical(it, conventions), window, chosen)
                         thresholdText = ""
                     }
                 },

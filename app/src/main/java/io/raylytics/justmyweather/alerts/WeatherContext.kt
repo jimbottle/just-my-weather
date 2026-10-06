@@ -2,6 +2,7 @@ package io.raylytics.justmyweather.alerts
 
 import io.raylytics.justmyweather.data.WeatherSnapshot
 import io.raylytics.justmyweather.data.nws.ForecastPoint
+import io.raylytics.justmyweather.view.Conventions
 import java.time.Instant
 import java.time.ZoneId
 
@@ -19,4 +20,7 @@ data class WeatherContext(
     val now: Instant,
     val forecast: List<ForecastPoint> = emptyList(),
     val zone: ZoneId = ZoneId.systemDefault(),
+    /** The units the notification reads in. The comparison itself is in
+     * canonical units and never depends on this. */
+    val conventions: Conventions = Conventions.US,
 )

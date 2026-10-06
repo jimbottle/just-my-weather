@@ -38,7 +38,9 @@ import androidx.lifecycle.repeatOnLifecycle
 import io.raylytics.justmyweather.data.SunDay
 import io.raylytics.justmyweather.data.WeatherSnapshot
 import io.raylytics.justmyweather.data.nws.ActiveAlert
+import io.raylytics.justmyweather.ui.theme.LocalConventions
 import io.raylytics.justmyweather.view.AlertBannerPosition
+import io.raylytics.justmyweather.view.Conventions
 import io.raylytics.justmyweather.view.Detail
 import io.raylytics.justmyweather.view.Details
 import io.raylytics.justmyweather.view.ForecastData
@@ -53,7 +55,6 @@ import io.raylytics.justmyweather.view.render
 import kotlinx.coroutines.delay
 import java.time.Instant
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
@@ -364,7 +365,8 @@ private fun NowContent(
     /** Null when the user has switched tap-for-details off. */
     onOpenDetail: ((Detail) -> Unit)?,
 ) {
-    val rendered: RenderedView = config.render(snapshot, sunDays, zone, forecast)
+    val conventions = LocalConventions.current
+    val rendered: RenderedView = config.render(snapshot, sunDays, zone, forecast, conventions)
     val spec = config.density.spec()
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -393,7 +395,7 @@ private fun NowContent(
                 // from, which lives here and not on the tile.
                 onOpenModule = onOpenDetail?.let {
                         open ->
-                    { module -> Details.ofModule(module, snapshot, observedZone)?.let(open) }
+                    { module -> Details.ofModule(module, snapshot, observedZone, conventions)?.let(open) }
                 },
                 onOpenDetail = onOpenDetail,
                 modifier = Modifier.fillMaxWidth(),
@@ -480,7 +482,7 @@ internal fun ObservedLine(
             }
         }
     }
-    val heading = ReadingHeading.of(snapshot.fromForecast, observedLabel(snapshot, zone))
+    val heading = ReadingHeading.of(snapshot.fromForecast, observedLabel(snapshot, zone, LocalConventions.current))
     // A forecast hour names its source where an observation shows its age.
     val trailer =
         if (snapshot.fromForecast) {
@@ -563,25 +565,10 @@ private fun ErrorView(
     }
 }
 
-// Internal, like hourFormat: the sun module formats the same kinds of value,
-// and two files disagreeing about how a time reads is exactly the drift a
-// shared constant prevents.
-internal val timeFormat: DateTimeFormatter = DateTimeFormatter.ofPattern("h:mm a", Locale.getDefault())
-
-// Internal: the forecast grid names its hour tiles with the same pattern, and
-// two screens showing "3 pm" and "3 PM" for the same hour is the kind of drift
-// a shared constant exists to prevent.
-internal val hourFormat: DateTimeFormatter = DateTimeFormatter.ofPattern("h a", Locale.getDefault())
-
-/** "10pm": the hour with no space before the meridiem, for the tile label
- * that shares a line with a date — "10 pm 9/22" overran a one-cell tile. */
-internal val tileHourFormat: DateTimeFormatter = DateTimeFormatter.ofPattern("ha", Locale.getDefault())
-
-/** "9/6": the day an hour belongs to, as short as a date gets. Numeric rather
- * than "Sep 6" because it shares one line with the hour in a one-cell tile. */
-internal val shortDateFormat: DateTimeFormatter = DateTimeFormatter.ofPattern("M/d", Locale.getDefault())
-internal val weekdayFormat: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE", Locale.getDefault())
-internal val monthDayFormat: DateTimeFormatter = DateTimeFormatter.ofPattern("MMM d", Locale.getDefault())
+// Every time and date on these screens formats through LocalConventions
+// (view/Conventions): one pattern per kind of value, chosen by the region,
+// so a 24-hour region reads "16:05" in the sun table and the observed line
+// alike, and two screens can't drift apart.
 
 /**
  * The time the STATION took the reading — never the time we fetched it.
@@ -608,5 +595,5 @@ internal val monthDayFormat: DateTimeFormatter = DateTimeFormatter.ofPattern("MM
  * printing the age beside this — "Observed 12:40 PM · 12 min ago" — so the
  * timestamp keeps saying what it means and the age answers "is this current?".
  */
-private fun observedLabel(snapshot: WeatherSnapshot, zone: ZoneId): String? =
-    snapshot.observedAt?.atZone(zone)?.format(timeFormat)
+private fun observedLabel(snapshot: WeatherSnapshot, zone: ZoneId, conventions: Conventions): String? =
+    snapshot.observedAt?.let { conventions.clock(it, zone) }

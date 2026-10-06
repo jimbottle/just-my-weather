@@ -46,6 +46,9 @@ data class Place(
     companion object {
         const val US = "US"
 
+        /** NWS territories with an ISO code (and Play listing) of their own. */
+        val TERRITORIES = setOf("PR", "GU", "VI", "AS", "MP")
+
         /** The country's English name ("United Kingdom"), from the JDK's
          * own data — no table to keep, and stable for a given code. */
         fun countryName(code: String): String =
@@ -176,11 +179,18 @@ class PlaceCatalog(val places: List<Place>) {
                 val lon = parts[3].toDoubleOrNull() ?: return@mapNotNull null
                 val name = parts[0].trim()
                 val state = parts[1].trim()
-                val country = parts.getOrNull(4)?.trim()?.takeIf { it.length == 2 } ?: Place.US
+                // Play lists Puerto Rico, Guam and the other territories as
+                // countries of their own, so their Census rows take that code.
+                val country =
+                    parts.getOrNull(4)?.trim()?.takeIf { it.length == 2 }
+                        ?: state.takeIf { it in Place.TERRITORIES }
+                        ?: Place.US
                 val zone = parts.getOrNull(5)?.trim()?.takeIf { it.isNotEmpty() }
                 // A US place needs its state; a foreign one its zone.
-                if (name.isEmpty() || (country == Place.US && state.isEmpty())) return@mapNotNull null
-                if (country != Place.US && zone == null) return@mapNotNull null
+                // A Census place needs its state; a GeoNames one its zone.
+                val census = parts.size < 6
+                if (name.isEmpty() || (census && state.isEmpty())) return@mapNotNull null
+                if (!census && zone == null) return@mapNotNull null
                 Place(name, state, lat, lon, country, zone)
             }.toList()
 

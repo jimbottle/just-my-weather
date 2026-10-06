@@ -77,7 +77,16 @@ class AlertWorker(
         // clock and zone are read here at the edge and handed to the pure path.
         val zone = ZoneId.systemDefault()
         val now = Instant.now()
-        val context = WeatherContext(snapshot, now, forecast, zone)
+        // The notification reads in the user's units; the comparison never
+        // depends on them (thresholds are stored canonical).
+        runCatching { container.regionRepository.refresh(location) }
+        val conventions = runCatching { container.regionRepository.currentConventions() }.getOrNull()
+        val context =
+            if (conventions != null) {
+                WeatherContext(snapshot, now, forecast, zone, conventions)
+            } else {
+                WeatherContext(snapshot, now, forecast, zone)
+            }
         val outcome = AlertTransitions.compute(rules, context, repository.firingIds())
         // Quiet hours hush the delivery (silent channel), they don't drop alerts.
         val silent = settings.isQuietAt(now.atZone(zone).hour)

@@ -2,6 +2,7 @@ package io.raylytics.justmyweather.widget
 
 import android.appwidget.AppWidgetManager
 import android.content.Context
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.datastore.preferences.core.Preferences
 import androidx.glance.GlanceId
 import androidx.glance.appwidget.GlanceAppWidget
@@ -15,6 +16,8 @@ import androidx.glance.state.GlanceStateDefinition
 import androidx.glance.state.PreferencesGlanceStateDefinition
 import io.raylytics.justmyweather.AppContainer
 import io.raylytics.justmyweather.JustMyWeatherApp
+import io.raylytics.justmyweather.ui.theme.LocalConventions
+import io.raylytics.justmyweather.view.Conventions
 import io.raylytics.justmyweather.view.ThemeConfig
 import io.raylytics.justmyweather.view.ViewConfig
 import kotlinx.coroutines.flow.first
@@ -61,7 +64,12 @@ class WeatherWidget : GlanceAppWidget() {
             val config =
                 WidgetConfigCodec.decode(prefs[WidgetState.CONFIG])
                     ?: WidgetConfig(ViewConfig.DEFAULT.showingOnly(WidgetConfig.DEFAULT_MODULE), ThemeConfig.DEFAULT)
-            WidgetContent(config = config, data = WidgetDataCodec.decode(prefs[WidgetState.DATA]), now = Instant.now())
+            val data = WidgetDataCodec.decode(prefs[WidgetState.DATA])
+            // The widget reads in the conventions its last fetch stored —
+            // the region's units, dates and clock (WidgetRefreshWorker).
+            CompositionLocalProvider(LocalConventions provides (data?.conventions ?: Conventions.US)) {
+                WidgetContent(config = config, data = data, now = Instant.now())
+            }
         }
     }
 

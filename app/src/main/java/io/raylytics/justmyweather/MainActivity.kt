@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -39,6 +40,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import io.raylytics.justmyweather.ads.AdBanner
 import io.raylytics.justmyweather.ads.AdPolicy
 import io.raylytics.justmyweather.alerts.AlertWorker
+import io.raylytics.justmyweather.region.AdConsent
 import io.raylytics.justmyweather.support.SupportKind
 import io.raylytics.justmyweather.support.bugDiagnostics
 import io.raylytics.justmyweather.support.composeSupportMail
@@ -60,10 +62,14 @@ import io.raylytics.justmyweather.ui.places.PlacesScreen
 import io.raylytics.justmyweather.ui.places.PlacesViewModel
 import io.raylytics.justmyweather.ui.settings.AppSettingsScreen
 import io.raylytics.justmyweather.ui.settings.AppSettingsViewModel
+import io.raylytics.justmyweather.ui.settings.RegionScreen
+import io.raylytics.justmyweather.ui.settings.RegionViewModel
 import io.raylytics.justmyweather.ui.support.SupportScreen
 import io.raylytics.justmyweather.ui.theme.JustMyWeatherTheme
+import io.raylytics.justmyweather.ui.theme.LocalConventions
 import io.raylytics.justmyweather.ui.theme.ThemeViewModel
 import io.raylytics.justmyweather.ui.theme.themeResolvesToDark
+import io.raylytics.justmyweather.view.Conventions
 import io.raylytics.justmyweather.view.ThemeConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -77,7 +83,7 @@ private const val GLANCE_WAIT_MS = 2_000L
 
 /** The screens this app has. A plain enum + state switch is all the navigation
  * a handful of destinations need — no nav library to learn or wire. */
-private enum class Screen { HOME, CUSTOMIZE, APP_SETTINGS, ALERTS, PLACES, REPORT_BUG, SUBMIT_IDEA }
+private enum class Screen { HOME, CUSTOMIZE, APP_SETTINGS, REGION, ALERTS, PLACES, REPORT_BUG, SUBMIT_IDEA }
 
 class MainActivity : ComponentActivity() {
     private val container by lazy { (application as JustMyWeatherApp).container }
@@ -91,6 +97,7 @@ class MainActivity : ComponentActivity() {
                     container.viewConfigRepository,
                     // No-op unless the user switched the hand-off on.
                     container.gadgetbridgeExporter::export,
+                    onPlaceResolved = container.regionRepository::refresh,
                 )
             }
         }
@@ -108,6 +115,10 @@ class MainActivity : ComponentActivity() {
         viewModelFactory {
             initializer { AppSettingsViewModel(container.gadgetbridgeSettingsRepository, container.removeAdsManager) }
         }
+    }
+
+    private val regionViewModel: RegionViewModel by viewModels {
+        viewModelFactory { initializer { RegionViewModel(container.regionRepository) } }
     }
 
     private val placesViewModel: PlacesViewModel by viewModels {
@@ -175,6 +186,12 @@ class MainActivity : ComponentActivity() {
             // Starts true: the banner is withheld until the store's answer
             // is read, so an owner never sees it flash in.
             val adsRemoved by container.adsEntitlementRepository.adsRemoved.collectAsStateWithLifecycle(true)
+            // The region decides how everything reads, and whether a banner
+            // may be shown at all (region/AdConsent). Unknown until the store
+            // answers, and the banner is withheld until then, like adsRemoved.
+            val conventions by container.regionRepository.conventions.collectAsStateWithLifecycle(Conventions.US)
+            val region by container.regionRepository.resolved.collectAsStateWithLifecycle(null)
+            val adsServedHere = region?.region?.adConsent == AdConsent.NOT_REQUIRED
             // The bars sit on the app-painted background, and the user can
             // force a mood against the system setting — so bar icon contrast
             // must follow the app's resolved mood, not the system default
@@ -205,20 +222,24 @@ class MainActivity : ComponentActivity() {
                         .safeDrawingPadding()
                         .semantics { testTagsAsResourceId = true },
                 ) {
-                    App(
-                        homeViewModel = homeViewModel,
-                        customizeViewModel = customizeViewModel,
-                        appSettingsViewModel = appSettingsViewModel,
-                        alertsViewModel = alertsViewModel,
-                        placesViewModel = placesViewModel,
-                        themeConfig = themeConfig,
-                        onThemeChange = themeViewModel::save,
-                        onEnterAlerts = ::requestNotificationsIfNeeded,
-                        loadBugReportState = ::bugReportState,
-                        adsRemoved = adsRemoved,
-                        onBuyRemoveAds = { appSettingsViewModel.buyRemoveAds(this@MainActivity) },
-                        onRateApp = { openStoreListing() },
-                    )
+                    CompositionLocalProvider(LocalConventions provides conventions) {
+                        App(
+                            homeViewModel = homeViewModel,
+                            customizeViewModel = customizeViewModel,
+                            appSettingsViewModel = appSettingsViewModel,
+                            regionViewModel = regionViewModel,
+                            alertsViewModel = alertsViewModel,
+                            placesViewModel = placesViewModel,
+                            themeConfig = themeConfig,
+                            onThemeChange = themeViewModel::save,
+                            onEnterAlerts = ::requestNotificationsIfNeeded,
+                            loadBugReportState = ::bugReportState,
+                            adsRemoved = adsRemoved,
+                            adsServedHere = adsServedHere,
+                            onBuyRemoveAds = { appSettingsViewModel.buyRemoveAds(this@MainActivity) },
+                            onRateApp = { openStoreListing() },
+                        )
+                    }
                 }
             }
         }
@@ -263,12 +284,15 @@ private fun App(
     homeViewModel: HomeViewModel,
     customizeViewModel: CustomizeViewModel,
     appSettingsViewModel: AppSettingsViewModel,
+    regionViewModel: RegionViewModel,
     alertsViewModel: AlertsViewModel,
     placesViewModel: PlacesViewModel,
     themeConfig: ThemeConfig,
     onThemeChange: (ThemeConfig) -> Unit,
     onEnterAlerts: () -> Unit,
     adsRemoved: Boolean,
+    /** Whether the region allows the banner at all (region/AdConsent). */
+    adsServedHere: Boolean,
     /** Opens Play's purchase sheet; needs the Activity, so the host supplies it. */
     onBuyRemoveAds: () -> Unit,
     /** Opens the Play listing; the Activity owns the intent. */
@@ -323,7 +347,7 @@ private fun App(
                     },
                     modifier = Modifier.weight(1f),
                 )
-                if (!adsRemoved) {
+                if (!adsRemoved && adsServedHere) {
                     AdBanner(unitId = AdPolicy.bannerUnitId(BuildConfig.DEBUG, BuildConfig.ADMOB_BANNER_UNIT_ID))
                 }
             }
@@ -367,10 +391,18 @@ private fun App(
             val settingsAdsRemoved by appSettingsViewModel.adsRemoved.collectAsStateWithLifecycle()
             val removeAdsOffer by appSettingsViewModel.removeAdsOffer.collectAsStateWithLifecycle()
             val removeAdsStatus by appSettingsViewModel.removeAdsStatus.collectAsStateWithLifecycle()
+            val inForce by regionViewModel.resolved.collectAsStateWithLifecycle()
+            val reading = LocalConventions.current.units
+            val regionSummary =
+                listOfNotNull(inForce?.region?.name, "${reading.temperature.label}, ${reading.wind.label}")
+                    .joinToString(" · ")
             AppSettingsScreen(
                 gadgetbridgeEnabled = gadgetbridgeEnabled,
                 onSetGadgetbridgeEnabled = appSettingsViewModel::setGadgetbridgeEnabled,
                 adsRemoved = settingsAdsRemoved,
+                adsServedHere = adsServedHere,
+                regionSummary = regionSummary,
+                onRegion = { screen = Screen.REGION },
                 removeAdsPrice = removeAdsOffer?.formattedPrice,
                 removeAdsStatus = removeAdsStatus,
                 onBuyRemoveAds = onBuyRemoveAds,
@@ -465,6 +497,21 @@ private fun App(
                     // last place's weather under the new place's name.
                     homeViewModel.refresh()
                 },
+            )
+        }
+
+        Screen.REGION -> {
+            BackHandler { screen = Screen.APP_SETTINGS }
+            val settings by regionViewModel.settings.collectAsStateWithLifecycle()
+            val resolved by regionViewModel.resolved.collectAsStateWithLifecycle()
+            val automatic by regionViewModel.automatic.collectAsStateWithLifecycle()
+            RegionScreen(
+                settings = settings,
+                resolved = resolved,
+                automatic = automatic,
+                conventions = LocalConventions.current,
+                onUpdate = regionViewModel::update,
+                onDone = { screen = Screen.APP_SETTINGS },
             )
         }
 

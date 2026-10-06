@@ -35,6 +35,13 @@ class LocationResolver(
      * ignorant of storage — and so tests can answer it without a DataStore.
      */
     private val chosenPlace: suspend () -> WeatherLocation? = { null },
+    /**
+     * The last rung, for an install that has never had a fix or a choice:
+     * somewhere real in the user's REGION (region/Regions defaultPlace), so
+     * a first run in London opens on London rather than New York. Defaults
+     * to the app-wide default for tests and anything not wired to a region.
+     */
+    private val fallback: suspend () -> WeatherLocation = { WeatherLocation.DEFAULT },
 ) {
     suspend fun resolve(): WeatherLocation {
         // An explicit choice outranks a live fix, and says so first. Someone
@@ -50,6 +57,8 @@ class LocationResolver(
             runCatching { store.save(fix) }
             return fix
         }
-        return runCatching { store.load() }.getOrNull() ?: WeatherLocation.DEFAULT
+        return runCatching { store.load() }.getOrNull()
+            ?: runCatching { fallback() }.getOrNull()
+            ?: WeatherLocation.DEFAULT
     }
 }

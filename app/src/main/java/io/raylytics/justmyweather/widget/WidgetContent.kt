@@ -38,14 +38,9 @@ import io.raylytics.justmyweather.data.nws.DailyPeriod
 import io.raylytics.justmyweather.data.nws.ForecastPoint
 import io.raylytics.justmyweather.ui.home.DayForecast
 import io.raylytics.justmyweather.ui.home.dailyView
-import io.raylytics.justmyweather.ui.home.monthDayFormat
 import io.raylytics.justmyweather.ui.home.periods
-import io.raylytics.justmyweather.ui.home.shortDateFormat
-import io.raylytics.justmyweather.ui.home.tileHourFormat
-import io.raylytics.justmyweather.ui.home.timeFormat
-import io.raylytics.justmyweather.ui.home.weekdayFormat
+import io.raylytics.justmyweather.ui.theme.LocalConventions
 import io.raylytics.justmyweather.view.DailyStyle
-import io.raylytics.justmyweather.view.Details
 import io.raylytics.justmyweather.view.ForecastData
 import io.raylytics.justmyweather.view.ForecastElement
 import io.raylytics.justmyweather.view.ForecastMode
@@ -56,11 +51,11 @@ import io.raylytics.justmyweather.view.ModuleValue
 import io.raylytics.justmyweather.view.SunDays
 import io.raylytics.justmyweather.view.TimesIn
 import io.raylytics.justmyweather.view.WeatherField
-import io.raylytics.justmyweather.view.degrees
 import io.raylytics.justmyweather.view.field
 import io.raylytics.justmyweather.view.render
 import java.time.Instant
 import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.roundToInt
 
@@ -189,7 +184,7 @@ private fun WidgetConfig.moduleValue(data: WidgetData, now: Instant): ModuleValu
             placeZone = placeZone,
             extended = data.extended?.items,
         )
-    return view.render(snapshot, sunDays, displayZone, forecast).modules.firstOrNull()
+    return view.render(snapshot, sunDays, displayZone, forecast, data.conventions).modules.firstOrNull()
 }
 
 private fun emptySnapshot(data: WidgetData) =
@@ -305,7 +300,9 @@ private fun ReadingWidget(
         }
         if (showFooter) {
             Text(
-                text = snapshot?.let { readingLine(it, observedZone, now, wide = size.width >= HERO_WIDTH) } ?: "",
+                text = snapshot?.let {
+                    readingLine(it, observedZone, now, wide = size.width >= HERO_WIDTH, LocalConventions.current)
+                } ?: "",
                 style = TextStyle(color = palette.muted, fontSize = FOOTER_SP, fontFamily = palette.font),
                 maxLines = 1,
             )
@@ -378,7 +375,7 @@ private fun SunRow(day: SunDay, zone: ZoneId, palette: WidgetPalette, spec: Widg
     ) {
         Column(modifier = GlanceModifier.defaultWeight()) {
             Text(
-                text = day.date.format(weekdayFormat).uppercase(Locale.getDefault()),
+                text = day.date.format(WEEKDAY).uppercase(Locale.ENGLISH),
                 style =
                     TextStyle(
                         color = palette.ink,
@@ -389,7 +386,7 @@ private fun SunRow(day: SunDay, zone: ZoneId, palette: WidgetPalette, spec: Widg
                 maxLines = 1,
             )
             Text(
-                text = day.date.format(monthDayFormat),
+                text = day.date.format(LocalConventions.current.monthDay),
                 style = TextStyle(color = palette.muted, fontSize = ELEMENT_SP, fontFamily = palette.font),
                 maxLines = 1,
             )
@@ -402,7 +399,7 @@ private fun SunRow(day: SunDay, zone: ZoneId, palette: WidgetPalette, spec: Widg
 @Composable
 private fun SunTime(event: Instant?, zone: ZoneId, color: androidx.glance.unit.ColorProvider, palette: WidgetPalette) {
     Text(
-        text = event?.atZone(zone)?.format(timeFormat) ?: "—",
+        text = event?.let { LocalConventions.current.clock(it, zone) } ?: "—",
         style = TextStyle(color = color, fontSize = TEMP_SP, fontFamily = palette.font, textAlign = TextAlign.End),
         maxLines = 1,
         modifier = GlanceModifier.width(SUN_TIME_WIDTH),
@@ -427,7 +424,7 @@ private fun SunPair(
             maxLines = 1,
         )
         Text(
-            text = event?.atZone(zone)?.format(timeFormat) ?: "—",
+            text = event?.let { LocalConventions.current.clock(it, zone) } ?: "—",
             style = TextStyle(color = color, fontSize = TEMP_SP, fontFamily = palette.font),
             maxLines = 1,
         )
@@ -494,7 +491,14 @@ private fun ForecastWidget(
                 // Framed on the days, not NWS's periods: abroad there are no
                 // periods and every day is MET's (dailyView).
                 val shownDays =
-                    dailyView(content.periods, content.hours, content.extended, content.dailyDays, content.placeZone)
+                    dailyView(
+                        content.periods,
+                        content.hours,
+                        content.extended,
+                        content.dailyDays,
+                        content.placeZone,
+                        LocalConventions.current,
+                    )
                 ForecastFrame(shownDays, content.error, palette) { days ->
                     val tileHeight = spec.tileHeight + ELEMENT_LINE_HEIGHT * content.elements.dayLines()
                     val columns = (cells / ModuleSize.CELL.columns / 2).coerceAtLeast(1)
@@ -594,8 +598,9 @@ private fun <T> TileRows(
 @Composable
 private fun HourTile(hour: ForecastPoint, content: ModuleContent.Forecast, palette: WidgetPalette, height: Dp) {
     val at = hour.startTime.atZone(content.zone)
+    val conventions = LocalConventions.current
     ZonedTile(
-        top = "${at.format(tileHourFormat).lowercase(Locale.getDefault())} ${at.format(shortDateFormat)}",
+        top = "${at.format(conventions.tileHour).lowercase(Locale.ENGLISH)} ${at.format(conventions.shortDate)}",
         topItalic = false,
         chance = hour.precipProbabilityPercent.takeIf { ForecastElement.PRECIP_CHANCE in content.elements },
         words = hour.shortForecast.takeIf { ForecastElement.CONDITIONS in content.elements },
@@ -603,7 +608,7 @@ private fun HourTile(hour: ForecastPoint, content: ModuleContent.Forecast, palet
         layout = content.layout,
         palette = palette,
         height = height,
-        middle = { TempText(hour.temperatureF.degrees(), palette.ink, palette) },
+        middle = { TempText(LocalConventions.current.degrees(hour.temperatureF), palette.ink, palette) },
         below = {
             ElementLines(
                 content.elements,
@@ -632,10 +637,10 @@ private fun DayTile(day: DayForecast, content: ModuleContent.Forecast, palette: 
         height = height,
         middle = {
             Row(verticalAlignment = Alignment.Bottom) {
-                TempText(day.highF.degrees(), palette.ink, palette)
+                TempText(LocalConventions.current.degrees(day.highF), palette.ink, palette)
                 Spacer(modifier = GlanceModifier.width(6.dp))
                 Text(
-                    text = day.lowF.degrees(),
+                    text = LocalConventions.current.degrees(day.lowF),
                     style = TextStyle(color = palette.muted, fontSize = LOW_SP, fontFamily = palette.font),
                     maxLines = 1,
                 )
@@ -659,7 +664,11 @@ private fun HalfDayTile(period: DailyPeriod, content: ModuleContent.Forecast, pa
         palette = palette,
         height = height,
         middle = {
-            TempText(period.temperatureF.degrees(), if (period.isDaytime) palette.ink else palette.muted, palette)
+            TempText(
+                LocalConventions.current.degrees(period.temperatureF),
+                if (period.isDaytime) palette.ink else palette.muted,
+                palette,
+            )
         },
         below = {
             ElementLines(content.elements, palette, windMph = period.windMph, windDirection = period.windDirection)
@@ -758,10 +767,12 @@ private fun ElementLines(
     humidity: Double? = null,
     dewpointF: Double? = null,
 ) {
-    if (ForecastElement.WIND in elements && windMph != null) QuietLine(Details.wind(windMph, windDirection), palette)
+    if (ForecastElement.WIND in elements && windMph != null) {
+        QuietLine(LocalConventions.current.wind(windMph, windDirection), palette)
+    }
     if (ForecastElement.HUMIDITY in elements && humidity != null) QuietLine("RH ${humidity.roundToInt()}%", palette)
     if (ForecastElement.DEW_POINT in elements && dewpointF != null) {
-        QuietLine("Dew ${dewpointF.roundToInt()}°", palette)
+        QuietLine("Dew ${LocalConventions.current.temperature(dewpointF)}", palette)
     }
 }
 
@@ -773,3 +784,6 @@ private fun QuietLine(text: String, palette: WidgetPalette) {
         maxLines = 1,
     )
 }
+
+/** "TUE": the weekday reads the same in every region; only its date moves. */
+private val WEEKDAY: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE", Locale.ENGLISH)

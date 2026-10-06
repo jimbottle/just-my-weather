@@ -12,12 +12,13 @@ class FeelsLikeFieldTest {
 
     @Test
     fun `feels like is a degree reading that ships as one cell and is alertable`() {
-        assertEquals("101°", WeatherField.FEELS_LIKE.format(snapshot))
+        assertEquals("101°", WeatherField.FEELS_LIKE.format(snapshot, Conventions.US))
         // No heat index or wind chill from the station means it feels like
         // the temperature — the tile, the sheet and an alert all read that.
-        assertEquals("93°", WeatherField.FEELS_LIKE.format(snapshot.copy(feelsLikeF = null)))
+        assertEquals("93°", WeatherField.FEELS_LIKE.format(snapshot.copy(feelsLikeF = null), Conventions.US))
         assertEquals(93.0, WeatherField.FEELS_LIKE.numericValue(snapshot.copy(feelsLikeF = null)))
-        assertNull(WeatherField.FEELS_LIKE.format(snapshot.copy(feelsLikeF = null, temperatureF = null)))
+        val empty = snapshot.copy(feelsLikeF = null, temperatureF = null)
+        assertNull(WeatherField.FEELS_LIKE.format(empty, Conventions.US))
         assertEquals(101.4, WeatherField.FEELS_LIKE.numericValue(snapshot))
         assertEquals(ModuleSize.CELL, WeatherField.FEELS_LIKE.defaultSize)
         assertTrue(WeatherField.FEELS_LIKE.isNumeric)

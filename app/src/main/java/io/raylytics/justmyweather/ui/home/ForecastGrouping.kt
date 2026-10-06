@@ -3,15 +3,12 @@ package io.raylytics.justmyweather.ui.home
 import io.raylytics.justmyweather.data.metno.ExtendedDay
 import io.raylytics.justmyweather.data.nws.DailyPeriod
 import io.raylytics.justmyweather.data.nws.ForecastPoint
+import io.raylytics.justmyweather.view.Conventions
 import io.raylytics.justmyweather.view.Detail
 import io.raylytics.justmyweather.view.DetailRow
-import io.raylytics.justmyweather.view.Details
-import io.raylytics.justmyweather.view.degrees
 import io.raylytics.justmyweather.view.percent
 import java.time.LocalDate
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 
 /*
  * Pure reshaping of forecast data for display: no I/O, no clock reads, no
@@ -145,11 +142,12 @@ fun forecastDays(
     extended: List<ExtendedDay>?,
     dailyDays: Int,
     zone: ZoneId,
+    conventions: Conventions,
 ): List<DayForecast> {
     // Outside NWS territory there are no NWS days at all: MET's are the
     // forecast, from its first whole day.
     if (nwsDays.isEmpty()) {
-        return extended.orEmpty().take(dailyDays).map { it.toDayForecast(outsideNws = true) }
+        return extended.orEmpty().take(dailyDays).map { it.toDayForecast(outsideNws = true, conventions) }
     }
     val shown = visibleDays(nwsDays, dailyDays)
     val leadingNight = shown.firstOrNull()?.let { it.day == null && it.night != null } == true
@@ -162,7 +160,7 @@ fun forecastDays(
         extended
             .filter { it.date.isAfter(lastNwsDate) }
             .take(needed)
-            .map { it.toDayForecast(outsideNws = false) }
+            .map { it.toDayForecast(outsideNws = false, conventions) }
 }
 
 /**
@@ -181,24 +179,24 @@ fun dailyView(
     extended: List<ExtendedDay>?,
     dailyDays: Int,
     zone: ZoneId,
+    conventions: Conventions,
 ): List<DayForecast>? {
     if (periods == null || (periods.isEmpty() && extended == null)) return null
-    return forecastDays(combineDays(periods, hours, zone), extended, dailyDays, zone)
+    return forecastDays(combineDays(periods, hours, zone), extended, dailyDays, zone, conventions)
 }
 
-private fun ExtendedDay.toDayForecast(outsideNws: Boolean) =
+/** A MET day is named "Tue 10/6" ("Tue 6/10" where the day comes first): it
+ * has no NWS name, and a bare weekday would repeat one already on screen a
+ * week earlier. */
+private fun ExtendedDay.toDayForecast(outsideNws: Boolean, conventions: Conventions) =
     DayForecast(
-        name = date.format(EXTENDED_NAME),
+        name = date.format(conventions.dayAndDate),
         highF = highF,
         lowF = lowF,
         shortForecast = conditions,
         extended = this,
         outsideNws = outsideNws,
     )
-
-/** "Tue 10/6": an extended day has no NWS name, and a bare weekday would
- * repeat one already on screen a week earlier. */
-private val EXTENDED_NAME: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE M/d", Locale.US)
 
 /** The half-day periods that make up [days], in order. */
 val List<DayForecast>.periods: List<DailyPeriod>
@@ -247,7 +245,7 @@ fun groupHoursByDay(points: List<ForecastPoint>, zone: ZoneId): List<HourDayGrou
  * half, and both halves' prose. Pure, like everything else in this file, so
  * the sheet's content is decided on the JVM.
  */
-fun DayForecast.detail(): Detail {
+fun DayForecast.detail(conventions: Conventions): Detail {
     extended?.let { ext ->
         return Detail(
             title = name,
@@ -255,8 +253,8 @@ fun DayForecast.detail(): Detail {
             subtitle = if (outsideNws) "Forecast · MET Norway" else "Extended forecast · MET Norway",
             rows =
                 listOf(
-                    DetailRow("High", ext.highF.degrees()),
-                    DetailRow("Low", ext.lowF.degrees()),
+                    DetailRow("High", conventions.degrees(ext.highF)),
+                    DetailRow("Low", conventions.degrees(ext.lowF)),
                     // MET reports an amount for most of the world and a
                     // chance only for some regions; show whichever it gave.
                     if (ext.precipChancePercent != null) {
@@ -264,10 +262,10 @@ fun DayForecast.detail(): Detail {
                     } else {
                         DetailRow(
                             "Precipitation",
-                            ext.precipIn?.let { String.format(Locale.US, "%.2f in", it) } ?: "—",
+                            ext.precipIn?.let(conventions::precipitation) ?: "—",
                         )
                     },
-                    DetailRow("Wind", Details.wind(ext.windMph, ext.windDirection)),
+                    DetailRow("Wind", conventions.wind(ext.windMph, ext.windDirection)),
                     DetailRow("Conditions", ext.conditions ?: "—"),
                 ),
             body =
@@ -285,11 +283,11 @@ fun DayForecast.detail(): Detail {
         subtitle = "Forecast",
         rows =
             buildList {
-                add(DetailRow(if (highFromHours) "High (rest of today)" else "High", highF.degrees()))
-                add(DetailRow("Low", lowF.degrees()))
+                add(DetailRow(if (highFromHours) "High (rest of today)" else "High", conventions.degrees(highF)))
+                add(DetailRow("Low", conventions.degrees(lowF)))
                 val chance = listOfNotNull(day?.precipProbabilityPercent, night?.precipProbabilityPercent).maxOrNull()
                 add(DetailRow("Chance of precipitation", chance.percent()))
-                day?.let { add(DetailRow("Wind", Details.wind(it.windMph, it.windDirection))) }
+                day?.let { add(DetailRow("Wind", conventions.wind(it.windMph, it.windDirection))) }
                 add(DetailRow("Conditions", shortForecast ?: "—"))
             },
         body =

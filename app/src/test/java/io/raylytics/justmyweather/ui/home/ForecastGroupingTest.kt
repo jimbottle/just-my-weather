@@ -2,6 +2,7 @@ package io.raylytics.justmyweather.ui.home
 
 import io.raylytics.justmyweather.data.nws.DailyPeriod
 import io.raylytics.justmyweather.data.nws.ForecastPoint
+import io.raylytics.justmyweather.view.Conventions
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -42,7 +43,7 @@ class ForecastGroupingTest {
         val days = combineDays(listOf(today, tonight))
         assertEquals(today, days[0].day)
         assertEquals(tonight, days[0].night)
-        val detail = days[0].detail()
+        val detail = days[0].detail(Conventions.US)
         assertEquals("Today", detail.title)
         assertEquals(listOf("81°", "72°", "30%", "—", "Sunny"), detail.rows.map { it.value })
         assertEquals("Sunny, with a high near 81.\n\nTonight: Clear, with a low around 72.", detail.body)
@@ -51,7 +52,7 @@ class ForecastGroupingTest {
         assertNull(evening.day)
         assertEquals(
             listOf("High", "Low", "Chance of precipitation", "Conditions"),
-            evening.detail().rows.map { it.label },
+            evening.detail(Conventions.US).rows.map { it.label },
         )
     }
 
@@ -71,7 +72,7 @@ class ForecastGroupingTest {
         val days = combineDays(listOf(night("Tonight", 64.0), day("Labor Day", 89.0)), hours, zone)
         assertEquals(83.0, days[0].highF)
         assertEquals(true, days[0].highFromHours)
-        assertEquals("High (rest of today)", days[0].detail().rows.first().label)
+        assertEquals("High (rest of today)", days[0].detail(Conventions.US).rows.first().label)
         // A leading DAY is NWS's own and is left alone; so is a later night.
         assertEquals(89.0, days[1].highF)
         assertEquals(false, days[1].highFromHours)
@@ -128,20 +129,20 @@ class ForecastGroupingTest {
         // MET starts at today like NWS does; Sep 28 and 29 must not repeat.
         val extended =
             listOf(ext("2026-09-28", 1.0), ext("2026-09-29", 2.0), ext("2026-09-30", 90.0), ext("2026-10-01", 91.0))
-        val four = forecastDays(nws, extended, dailyDays = 4, zone = zone)
+        val four = forecastDays(nws, extended, dailyDays = 4, zone = zone, Conventions.US)
         assertEquals(listOf("Monday", "Tuesday", "Wed 9/30", "Thu 10/1"), four.map { it.name })
         assertEquals(90.0, four[2].highF)
         assertEquals(extended[2], four[2].extended)
-        assertEquals("Extended forecast · MET Norway", four[2].detail().subtitle)
+        assertEquals("Extended forecast · MET Norway", four[2].detail(Conventions.US).subtitle)
         // The tile's chance and wind come from the extended day too.
         assertEquals(10.0, four[2].precipChance)
         assertEquals("S", four[2].windDirection)
         // Within NWS's reach nothing is borrowed.
-        assertEquals(listOf("Monday", "Tuesday"), forecastDays(nws, extended, 2, zone).map { it.name })
+        assertEquals(listOf("Monday", "Tuesday"), forecastDays(nws, extended, 2, zone, Conventions.US).map { it.name })
         // No extended data, or NWS periods with no dates to align on: NWS only.
-        assertEquals(2, forecastDays(nws, null, 4, zone).size)
+        assertEquals(2, forecastDays(nws, null, 4, zone, Conventions.US).size)
         val undated = combineDays(listOf(day("Monday", 80.0), night("Monday Night", 60.0)))
-        assertEquals(1, forecastDays(undated, extended, 4, zone).size)
+        assertEquals(1, forecastDays(undated, extended, 4, zone, Conventions.US).size)
     }
 
     @Test
@@ -189,14 +190,14 @@ class ForecastGroupingTest {
     fun `outside NWS territory every day is MET's, from its first, and none is marked as different`() {
         val zone = ZoneId.of("Europe/London")
         val met = listOf(ext("2026-10-07", 60.0), ext("2026-10-08", 62.0), ext("2026-10-09", 58.0))
-        val days = forecastDays(emptyList(), met, dailyDays = 2, zone = zone)
+        val days = forecastDays(emptyList(), met, dailyDays = 2, zone = zone, Conventions.US)
         assertEquals(
             listOf(LocalDate.parse("2026-10-07"), LocalDate.parse("2026-10-08")),
             days.map { it.extended!!.date },
         )
         assertTrue(days.all { it.outsideNws && !it.markedExtended })
         // The sheet names the source for what it is: the whole forecast.
-        val sheet = days.first().detail()
+        val sheet = days.first().detail(Conventions.US)
         assertEquals("Forecast · MET Norway", sheet.subtitle)
         assertTrue(sheet.body!!.contains("outside the National Weather Service's coverage"))
     }
@@ -205,24 +206,24 @@ class ForecastGroupingTest {
     fun `in NWS territory an extended day is still marked and explained as past NWS's reach`() {
         val zone = ZoneId.of("America/New_York")
         val nws = combineDays(listOf(dated(day("Monday", 70.0), "2026-09-28T10:00:00-04:00")))
-        val days = forecastDays(nws, listOf(ext("2026-09-29", 72.0)), dailyDays = 2, zone = zone)
+        val days = forecastDays(nws, listOf(ext("2026-09-29", 72.0)), dailyDays = 2, zone = zone, Conventions.US)
         val extended = days.last()
         assertTrue(extended.markedExtended)
-        assertEquals("Extended forecast · MET Norway", extended.detail().subtitle)
+        assertEquals("Extended forecast · MET Norway", extended.detail(Conventions.US).subtitle)
     }
 
     @Test
     fun `the Daily view waits on MET's days when the periods come back empty, and only then`() {
         val zone = ZoneId.of("Europe/London")
         val met = listOf(ext("2026-10-07", 60.0))
-        assertNull(dailyView(null, null, met, 7, zone), "periods still coming")
-        assertNull(dailyView(emptyList(), null, null, 7, zone), "abroad, MET's days a fetch behind")
-        assertEquals(1, dailyView(emptyList(), null, met, 7, zone)!!.size)
+        assertNull(dailyView(null, null, met, 7, zone, Conventions.US), "periods still coming")
+        assertNull(dailyView(emptyList(), null, null, 7, zone, Conventions.US), "abroad, MET's days a fetch behind")
+        assertEquals(1, dailyView(emptyList(), null, met, 7, zone, Conventions.US)!!.size)
         // A failed MET fetch lands as an empty list: final, so the frame can
         // say there is no forecast instead of waiting forever.
-        assertEquals(emptyList<DayForecast>(), dailyView(emptyList(), null, emptyList(), 7, zone))
+        assertEquals(emptyList<DayForecast>(), dailyView(emptyList(), null, emptyList(), 7, zone, Conventions.US))
         // In NWS territory nothing waits on the second source.
         val periods = listOf(dated(day("Monday", 70.0), "2026-09-28T10:00:00-04:00"))
-        assertEquals(1, dailyView(periods, null, null, 7, ZoneId.of("America/New_York"))!!.size)
+        assertEquals(1, dailyView(periods, null, null, 7, ZoneId.of("America/New_York"), Conventions.US)!!.size)
     }
 }

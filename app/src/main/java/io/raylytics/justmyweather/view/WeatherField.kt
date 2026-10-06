@@ -2,7 +2,6 @@ package io.raylytics.justmyweather.view
 
 import io.raylytics.justmyweather.data.WeatherSnapshot
 import io.raylytics.justmyweather.data.nws.ForecastPoint
-import java.util.Locale
 import kotlin.math.roundToInt
 
 /**
@@ -101,14 +100,16 @@ enum class WeatherField(
             PRESSURE -> snapshot.pressureInHg
         }
 
-    /** Format a numeric value of this field with its unit ("72°", "10 mph"). */
-    fun formatValue(value: Double): String =
+    /** Format a numeric value of this field — in the app's canonical
+     * American units, as every value is stored — with the unit the user
+     * reads in ("72°" / "22°", "10 mph" / "16 km/h"). */
+    fun formatValue(value: Double, conventions: Conventions): String =
         when (this) {
-            TEMPERATURE, FEELS_LIKE -> "${value.roundToInt()}°"
+            TEMPERATURE, FEELS_LIKE -> conventions.temperature(value)
             CONDITIONS -> value.roundToInt().toString()
-            WIND -> "${value.roundToInt()} mph"
-            PRECIPITATION -> String.format(Locale.US, "%.2f in", value)
-            PRESSURE -> String.format(Locale.US, "%.2f inHg", value)
+            WIND -> conventions.windSpeed(value)
+            PRECIPITATION -> conventions.precipitation(value)
+            PRESSURE -> conventions.pressure(value)
         }
 
     /**
@@ -118,16 +119,16 @@ enum class WeatherField(
      * [numericValue] / [formatValue] — both are exhaustive (no `else`), so the
      * compiler won't let you forget to handle it.
      */
-    fun format(snapshot: WeatherSnapshot): String? =
+    fun format(snapshot: WeatherSnapshot, conventions: Conventions): String? =
         when (this) {
             CONDITIONS -> snapshot.conditions
             // "Calm" reads better than "0 mph" on the glance.
-            WIND -> snapshot.windMph?.let { if (it < 1.0) "Calm" else formatValue(it) }
+            WIND -> snapshot.windMph?.let { if (it < 1.0) "Calm" else formatValue(it, conventions) }
             // Many stations never report last-hour precipitation, rain or
             // shine — a null here is "not measured", not "none", and not
             // missing data either, so it gets words rather than a dash.
-            PRECIPITATION -> snapshot.precipitationIn?.let { formatValue(it) } ?: "Not reported"
-            else -> numericValue(snapshot)?.let { formatValue(it) }
+            PRECIPITATION -> snapshot.precipitationIn?.let { formatValue(it, conventions) } ?: "Not reported"
+            else -> numericValue(snapshot)?.let { formatValue(it, conventions) }
         }
 
     companion object {

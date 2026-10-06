@@ -29,18 +29,18 @@ class ViewConfigTest {
 
     @Test
     fun `fields format their values, rounding and labelling sensibly`() {
-        assertEquals("72°", WeatherField.TEMPERATURE.format(snapshot))
-        assertEquals("Mostly Clear", WeatherField.CONDITIONS.format(snapshot))
-        assertEquals("Calm", WeatherField.WIND.format(snapshot)) // < 1 mph
-        assertEquals("0.00 in", WeatherField.PRECIPITATION.format(snapshot))
-        assertEquals("29.92 inHg", WeatherField.PRESSURE.format(snapshot))
+        assertEquals("72°", WeatherField.TEMPERATURE.format(snapshot, Conventions.US))
+        assertEquals("Mostly Clear", WeatherField.CONDITIONS.format(snapshot, Conventions.US))
+        assertEquals("Calm", WeatherField.WIND.format(snapshot, Conventions.US)) // < 1 mph
+        assertEquals("0.00 in", WeatherField.PRECIPITATION.format(snapshot, Conventions.US))
+        assertEquals("29.92 inHg", WeatherField.PRESSURE.format(snapshot, Conventions.US))
     }
 
     @Test
     fun `a missing value formats as null, not a fabricated number`() {
         val empty = snapshot.copy(temperatureF = null, conditions = null)
-        assertNull(WeatherField.TEMPERATURE.format(empty))
-        assertNull(WeatherField.CONDITIONS.format(empty))
+        assertNull(WeatherField.TEMPERATURE.format(empty, Conventions.US))
+        assertNull(WeatherField.CONDITIONS.format(empty, Conventions.US))
     }
 
     @Test
@@ -94,7 +94,7 @@ class ViewConfigTest {
     fun `render projects the visible modules, in order, with their sizes`() {
         // temp, conditions, wind and the forecast visible, in catalog order
         val config = ViewConfig.DEFAULT.toggle(reading(WeatherField.WIND))
-        val rendered = config.render(snapshot)
+        val rendered = config.render(snapshot, conventions = Conventions.US)
         assertEquals(
             listOf("72°", "Mostly Clear", "Calm"),
             rendered.modules.mapNotNull { (it.content as? ModuleContent.Reading)?.text },
@@ -112,7 +112,7 @@ class ViewConfigTest {
 
     @Test
     fun `render shows an em-dash for an enabled but empty module`() {
-        val rendered = ViewConfig.DEFAULT.render(snapshot.copy(temperatureF = null))
+        val rendered = ViewConfig.DEFAULT.render(snapshot.copy(temperatureF = null), conventions = Conventions.US)
         assertEquals("—", (rendered.modules.first().content as ModuleContent.Reading).text)
     }
 
@@ -125,7 +125,9 @@ class ViewConfigTest {
         // The render hands the tile only as many rows as the setting says,
         // from however many were computed: the slider never recomputes.
         val computed = (0 until 14).map { SunDay(LocalDate.of(2026, 6, 24).plusDays(it.toLong()), null, null) }
-        val five = ViewConfig.DEFAULT.toggle(ModuleKey.Sun).setSunDays(5).render(snapshot, computed, ZoneId.of("UTC"))
+        val five =
+            ViewConfig.DEFAULT.toggle(ModuleKey.Sun).setSunDays(5)
+                .render(snapshot, computed, ZoneId.of("UTC"), conventions = Conventions.US)
         val sun = five.modules.first { it.module == ModuleKey.Sun }.content as ModuleContent.Sun
         assertEquals(computed.take(5), sun.days)
     }
@@ -138,7 +140,11 @@ class ViewConfigTest {
         val days = listOf(SunDay(LocalDate.of(2026, 6, 24), null, null))
         val config = ViewConfig.DEFAULT.toggle(ModuleKey.Sun)
         val zone = ZoneId.of("America/New_York")
-        val sun = config.render(snapshot, days, zone).modules.first { it.module == ModuleKey.Sun }
+        val sun =
+            config
+                .render(snapshot, days, zone, conventions = Conventions.US)
+                .modules
+                .first { it.module == ModuleKey.Sun }
         // The zone travels WITH the days: they are instants, and the same
         // sunrise formats as a different clock time depending where you ask.
         assertEquals(ModuleContent.Sun(days, zone), sun.content)
@@ -257,7 +263,7 @@ class ViewConfigTest {
         assertEquals(4, ViewConfig.DEFAULT.setHourlyHours(0).hourlyHours)
         assertEquals(48, ViewConfig.DEFAULT.setHourlyHours(48).hourlyHours)
         // …and the rendered forecast carries the setting to the tile.
-        val rendered = ViewConfig.DEFAULT.setHourlyHours(48).render(snapshot)
+        val rendered = ViewConfig.DEFAULT.setHourlyHours(48).render(snapshot, conventions = Conventions.US)
         val forecast = rendered.modules.last().content as ModuleContent.Forecast
         assertEquals(48, forecast.hourlyHours)
     }
@@ -275,7 +281,8 @@ class ViewConfigTest {
         assertEquals(emptySet<ForecastElement>(), bare.forecastElements)
         val windy = bare.toggleForecastElement(ForecastElement.WIND)
         assertEquals(setOf(ForecastElement.WIND), windy.forecastElements)
-        val forecast = windy.render(snapshot).modules.last().content as ModuleContent.Forecast
+        val forecast =
+            windy.render(snapshot, conventions = Conventions.US).modules.last().content as ModuleContent.Forecast
         assertEquals(setOf(ForecastElement.WIND), forecast.elements)
     }
 
@@ -294,7 +301,7 @@ class ViewConfigTest {
         assertEquals(9, ViewConfig.DEFAULT.setDailyDays(14).dailyDays)
         assertEquals(9, ViewConfig.DEFAULT.setDailyDays(40).dailyDays)
         assertEquals(1, ViewConfig.DEFAULT.setDailyDays(0).dailyDays)
-        val rendered = ViewConfig.DEFAULT.setDailyDays(3).render(snapshot)
+        val rendered = ViewConfig.DEFAULT.setDailyDays(3).render(snapshot, conventions = Conventions.US)
         val forecast = rendered.modules.last().content as ModuleContent.Forecast
         assertEquals(3, forecast.dailyDays)
     }

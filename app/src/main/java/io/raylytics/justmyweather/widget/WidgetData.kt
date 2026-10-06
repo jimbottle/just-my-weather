@@ -6,6 +6,7 @@ import io.raylytics.justmyweather.data.WeatherSnapshot
 import io.raylytics.justmyweather.data.metno.ExtendedDay
 import io.raylytics.justmyweather.data.nws.DailyPeriod
 import io.raylytics.justmyweather.data.nws.ForecastPoint
+import io.raylytics.justmyweather.view.Conventions
 import io.raylytics.justmyweather.view.DailyDays
 import io.raylytics.justmyweather.view.ForecastMode
 import io.raylytics.justmyweather.view.ModuleKey
@@ -38,6 +39,10 @@ data class WidgetData(
     /** The fetch's failure, if any, in the user's words. A failed fetch keeps
      * the previous data and reports beside it, as the glance does. */
     val error: String? = null,
+    /** How the widget reads — the region's units, date order and clock, as
+     * of this fetch. Carried with the data because a widget has no view
+     * model to ask, and a worker that knows the region writes it here. */
+    val conventions: Conventions = Conventions.US,
 ) {
     /**
      * Whether this data describes [location] — the gate on reusing it after

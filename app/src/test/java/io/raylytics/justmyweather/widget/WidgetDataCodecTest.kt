@@ -91,6 +91,14 @@ class WidgetDataCodecTest {
     }
 
     @Test
+    fun `the region's conventions travel with the data, and older data reads as US`() {
+        val london = full.copy(conventions = io.raylytics.justmyweather.region.Regions.of("GB").conventions)
+        assertEquals(london, WidgetDataCodec.decode(WidgetDataCodec.encode(london)))
+        val older = WidgetDataCodec.encode(full).replace(Regex(""","conventions":\{[^}]*\}"""), "")
+        assertEquals(io.raylytics.justmyweather.view.Conventions.US, WidgetDataCodec.decode(older)!!.conventions)
+    }
+
+    @Test
     fun `round-trips the sparse case - a failed first fetch with nothing but an error`() {
         val sparse = WidgetData(location, snapshot = null, fetchedAt = Instant.EPOCH, error = "Couldn't reach it.")
         assertEquals(sparse, WidgetDataCodec.decode(WidgetDataCodec.encode(sparse)))

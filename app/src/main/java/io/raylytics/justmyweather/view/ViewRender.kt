@@ -120,6 +120,8 @@ fun ViewConfig.render(
      * unknown. */
     zone: ZoneId = ZoneId.systemDefault(),
     forecast: ForecastData = ForecastData(),
+    /** How the readings read: units and all (view/Conventions). */
+    conventions: Conventions,
 ): RenderedView =
     RenderedView(
         visible.map { setting ->
@@ -130,7 +132,7 @@ fun ViewConfig.render(
                 content =
                     when (val module = setting.module) {
                         is ModuleKey.Reading ->
-                            ModuleContent.Reading(module.field.format(snapshot) ?: "—")
+                            ModuleContent.Reading(module.field.format(snapshot, conventions) ?: "—")
                         // The rows were computed to the horizon (SunDays.MAX);
                         // the user's setting says how many of them the tile
                         // draws, so changing it never recomputes anything.

@@ -2,7 +2,7 @@ package io.raylytics.justmyweather.widget
 
 import io.raylytics.justmyweather.data.WeatherSnapshot
 import io.raylytics.justmyweather.ui.home.ObservationAge
-import io.raylytics.justmyweather.ui.home.timeFormat
+import io.raylytics.justmyweather.view.Conventions
 import io.raylytics.justmyweather.view.ReadingHeading
 import java.time.Duration
 import java.time.Instant
@@ -23,9 +23,15 @@ import java.time.ZoneId
  * [STALE_FORECAST] behind it shows its age as well — or "Forecast for
  * 8:00 PM" would sit there for days looking current (roborev 5393).
  */
-internal fun readingLine(snapshot: WeatherSnapshot, zone: ZoneId, now: Instant, wide: Boolean): String {
+internal fun readingLine(
+    snapshot: WeatherSnapshot,
+    zone: ZoneId,
+    now: Instant,
+    wide: Boolean,
+    conventions: Conventions,
+): String {
     val observedAt = snapshot.observedAt
-    val time = observedAt?.atZone(zone)?.format(timeFormat)
+    val time = observedAt?.let { conventions.clock(it, zone) }
     if (snapshot.fromForecast) {
         val stale = observedAt != null && Duration.between(observedAt, now) > STALE_FORECAST
         val age = if (stale) ObservationAge.label(observedAt!!, now) else null

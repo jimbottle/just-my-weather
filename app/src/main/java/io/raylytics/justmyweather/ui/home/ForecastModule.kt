@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.constrainHeight
 import androidx.compose.ui.unit.dp
 import io.raylytics.justmyweather.data.nws.DailyPeriod
 import io.raylytics.justmyweather.data.nws.ForecastPoint
+import io.raylytics.justmyweather.ui.theme.LocalConventions
 import io.raylytics.justmyweather.view.DailyStyle
 import io.raylytics.justmyweather.view.Detail
 import io.raylytics.justmyweather.view.Details
@@ -41,7 +42,6 @@ import io.raylytics.justmyweather.view.ForecastElement
 import io.raylytics.justmyweather.view.ForecastMode
 import io.raylytics.justmyweather.view.ForecastTileLayout
 import io.raylytics.justmyweather.view.ModuleContent
-import io.raylytics.justmyweather.view.degrees
 import java.time.ZoneId
 import java.util.Locale
 import kotlin.math.roundToInt
@@ -127,6 +127,7 @@ internal fun ForecastModuleContent(
     onOpenDetail: ((Detail) -> Unit)?,
 ) {
     val open = onOpenDetail?.takeIf { !arranging }
+    val conventions = LocalConventions.current
     Column(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -159,7 +160,7 @@ internal fun ForecastModuleContent(
                                 layout = content.layout,
                                 modifier =
                                     tileModifier
-                                        .opens(open) { Details.ofHour(hour, content.zone) }
+                                        .opens(open) { Details.ofHour(hour, content.zone, conventions) }
                                         // A stable handle per tile for the
                                         // layout test, which asserts zones
                                         // in real dp against the tile's box.
@@ -182,13 +183,21 @@ internal fun ForecastModuleContent(
                 // which is why the frame waits on the DAYS, not the periods
                 // (dailyView).
                 val shownDays =
-                    remember(content.periods, content.hours, content.placeZone, content.dailyDays, content.extended) {
+                    remember(
+                        content.periods,
+                        content.hours,
+                        content.placeZone,
+                        content.dailyDays,
+                        content.extended,
+                        conventions,
+                    ) {
                         dailyView(
                             content.periods,
                             content.hours,
                             content.extended,
                             content.dailyDays,
                             content.placeZone,
+                            conventions,
                         )
                     }
                 ForecastFrame(items = shownDays, error = content.error) { days ->
@@ -211,7 +220,7 @@ internal fun ForecastModuleContent(
                                         day = day,
                                         elements = content.elements,
                                         layout = content.layout,
-                                        modifier = tileModifier.opens(open) { day.detail() },
+                                        modifier = tileModifier.opens(open) { day.detail(conventions) },
                                     )
                                 }
 
@@ -229,14 +238,17 @@ internal fun ForecastModuleContent(
                                                 period = tile.period,
                                                 elements = content.elements,
                                                 layout = content.layout,
-                                                modifier = tileModifier.opens(open) { Details.ofPeriod(tile.period) },
+                                                modifier =
+                                                    tileModifier.opens(open) {
+                                                        Details.ofPeriod(tile.period, conventions)
+                                                    },
                                             )
                                         is DailyTile.Day ->
                                             CombinedDayTile(
                                                 day = tile.day,
                                                 elements = content.elements,
                                                 layout = content.layout,
-                                                modifier = tileModifier.opens(open) { tile.day.detail() },
+                                                modifier = tileModifier.opens(open) { tile.day.detail(conventions) },
                                             )
                                     }
                                 }
@@ -329,8 +341,9 @@ private fun HourTile(
     modifier: Modifier = Modifier,
 ) {
     val at = hour.startTime.atZone(zone)
+    val conventions = LocalConventions.current
     ZonedTile(
-        top = "${at.format(tileHourFormat).lowercase(Locale.getDefault())} ${at.format(shortDateFormat)}",
+        top = "${at.format(conventions.tileHour).lowercase(Locale.ENGLISH)} ${at.format(conventions.shortDate)}",
         bottom = bottomLine(elements, hour.shortForecast, hour.precipProbabilityPercent),
         bottomLines = HOUR_BOTTOM_LINES,
         layout = layout,
@@ -346,7 +359,7 @@ private fun HourTile(
         },
     ) {
         Text(
-            text = hour.temperatureF.degrees(),
+            text = conventions.degrees(hour.temperatureF),
             style = MaterialTheme.typography.titleLarge,
             color = MaterialTheme.colorScheme.onBackground,
         )
@@ -387,12 +400,12 @@ private fun CombinedDayTile(
     ) {
         Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(
-                text = day.highF.degrees(),
+                text = LocalConventions.current.degrees(day.highF),
                 style = MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.onBackground,
             )
             Text(
-                text = day.lowF.degrees(),
+                text = LocalConventions.current.degrees(day.lowF),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -424,7 +437,7 @@ private fun HalfDayTile(
         },
     ) {
         Text(
-            text = period.temperatureF.degrees(),
+            text = LocalConventions.current.degrees(period.temperatureF),
             style = MaterialTheme.typography.titleLarge,
             // The daytime high carries the emphasis and the night the
             // quieter tone, so which is which survives being read out of
@@ -665,9 +678,12 @@ private fun ElementLines(
     humidity: Double? = null,
     dewpointF: Double? = null,
 ) {
-    if (ForecastElement.WIND in elements && windMph != null) QuietLine(Details.wind(windMph, windDirection))
+    val conventions = LocalConventions.current
+    if (ForecastElement.WIND in elements && windMph != null) QuietLine(conventions.wind(windMph, windDirection))
     if (ForecastElement.HUMIDITY in elements && humidity != null) QuietLine("RH ${humidity.roundToInt()}%")
-    if (ForecastElement.DEW_POINT in elements && dewpointF != null) QuietLine("Dew ${dewpointF.roundToInt()}°")
+    if (ForecastElement.DEW_POINT in elements && dewpointF != null) {
+        QuietLine("Dew ${conventions.temperature(dewpointF)}")
+    }
 }
 
 @Composable
