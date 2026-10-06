@@ -102,6 +102,10 @@ class HomeViewModelTest {
         var failDaily = false
         var failHourly = false
         var failObservation = false
+
+        /** NWS answers /points with "not my territory": the place is abroad. */
+        var abroad = false
+        var failMet = false
         var gateDaily: CompletableDeferred<Unit>? = null
         var gateObservation: CompletableDeferred<Unit>? = null
 
@@ -117,10 +121,13 @@ class HomeViewModelTest {
                         OBSERVATION
                     }
                     url.endsWith("/stations") -> STATIONS
-                    "/points/" in url ->
+                    "/points/" in url -> {
+                        if (abroad) return HttpResult(404, NOT_NWS, null)
                         if (westLatPrefix?.let { url.contains(it) } == true) POINTS_WEST else points
+                    }
                     "api.met.no" in url -> {
                         extendedFetches++
+                        if (failMet) return HttpResult(503, "busy", null)
                         MET_NO
                     }
                     url.endsWith("/forecast/hourly") -> {
@@ -251,6 +258,29 @@ class HomeViewModelTest {
         advanceUntilIdle()
         assertEquals(0, hourly.transport.extendedFetches)
     }
+
+    @Test
+    fun `abroad a failed MET fetch is the Daily view's error, and tapping Daily retries it`() =
+        runTest(dispatcher) {
+            val h = harness()
+            h.transport.abroad = true
+            advanceUntilIdle()
+            assertTrue(h.vm.ready().snapshot.fromForecast, "the reading itself came from MET")
+
+            // MET goes down; Daily has nothing of NWS's to fall back on.
+            h.transport.failMet = true
+            h.vm.setForecastMode(ForecastMode.DAILY)
+            advanceUntilIdle()
+            assertNotNull(h.vm.ready().forecastError, "an error, not a false 'No forecast'")
+            assertNull(h.vm.ready().extendedDaily)
+
+            // Same-chip tap retries — the days stayed null, so they are refetched.
+            h.transport.failMet = false
+            h.vm.setForecastMode(ForecastMode.DAILY)
+            advanceUntilIdle()
+            assertEquals(2, h.vm.ready().extendedDaily?.size)
+            assertNull(h.vm.ready().forecastError)
+        }
 
     @Test
     fun `refresh clears forecasts and refetches the active framing`() = runTest(dispatcher) {
@@ -916,6 +946,10 @@ class HomeViewModelTest {
                   "next_6_hours":{"summary":{"symbol_code":"cloudy"},
                   "details":{"air_temperature_max":22.0,"air_temperature_min":18.0,"precipitation_amount":0.0}}}}"""
             }
+
+        /** What NWS answers for a point outside its territory. */
+        const val NOT_NWS =
+            """{"type":"https://api.weather.gov/problems/InvalidPoint","status":404}"""
 
         const val DAILY =
             """{"properties":{"periods":[{"name":"Today","isDaytime":true,

@@ -39,6 +39,7 @@ class WeatherRepositoryTest {
             val body =
                 when {
                     "/observations/latest" in url -> OBSERVATION
+                    "/alerts/active" in url -> ALERTS
                     url.endsWith("/stations") -> STATIONS
                     "/points/" in url -> points
                     "api.met.no" in url -> metNo
@@ -163,6 +164,42 @@ class WeatherRepositoryTest {
             val nowhere = repo(abroad(), metNo = MetNoClient(abroad())).load(london.copy(label = ""))
             assertEquals("Current location", nowhere.locationLabel)
             assertNull(nowhere.timeZone)
+        }
+
+    @Test
+    fun `a named coordinate place abroad takes its nearest town's zone, so its hours and days agree`() = runTest {
+        val transport = abroad()
+        val westminster = Place("London", "", 51.51, -0.13, "GB", "Europe/London")
+        val repository =
+            repo(transport, metNo = MetNoClient(transport), nearest = { _, _ -> westminster })
+        // The coordinate form always names a place, but gives it no zone.
+        val typed = london.copy(label = "Flat")
+        val snapshot = repository.load(typed)
+        assertEquals("Flat", snapshot.locationLabel, "the user's name stands")
+        assertEquals("Europe/London", snapshot.timeZone)
+        assertEquals(
+            MetNoClient(transport).getDailyForecast(51.51, -0.13, ZoneId.of("Europe/London")),
+            repository.loadExtendedDaily(typed),
+            "Daily is cut in the same zone the hours read in",
+        )
+    }
+
+    @Test
+    fun `safety alerts never wait on resolving the point, and skip NWS only when it is known abroad`() =
+        runTest {
+            // /points is down. Before, the alert query waited on it and was
+            // silently dropped; a tornado warning must not depend on it.
+            val down = RoutingTransport(points = """{"status":500}""", pointsStatus = 500)
+            val alerts = repo(down).loadActiveAlerts(WeatherLocation(38.25, -85.76, "Home"))
+            assertEquals(listOf("Tornado Warning"), alerts.map { it.event })
+            assertEquals(0, down.pointsLookups(), "no resolution was attempted")
+
+            // Once a load has learned the place is abroad, NWS isn't asked.
+            val cache = InMemoryPointCache()
+            cache.put(PointCacheKey.of(london), ResolvedPoint.OutsideNws)
+            val away = abroad()
+            assertEquals(emptyList<Any>(), repo(away, cache = cache).loadActiveAlerts(london))
+            assertTrue(away.requested.none { "/alerts/" in it })
         }
 
     @Test
@@ -349,6 +386,10 @@ class WeatherRepositoryTest {
             {"time":"2026-10-06T21:00:00Z","data":{"instant":{"details":{"air_temperature":16.9}},
               "next_1_hours":{"summary":{"symbol_code":"cloudy"},"details":{"precipitation_amount":0.2}}}}
             ]}}"""
+
+        const val ALERTS =
+            """{"features":[{"properties":{"id":"urn:1","event":"Tornado Warning",
+              "severity":"Extreme","headline":"Tornado Warning until 5 PM"}}]}"""
 
         const val STATIONS = """{"features":[{"properties":{"stationIdentifier":"KNYC"}}]}"""
 

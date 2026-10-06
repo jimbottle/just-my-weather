@@ -87,12 +87,23 @@ class PlaceCatalog(val places: List<Place>) {
      */
     fun search(query: String, limit: Int = DEFAULT_LIMIT): List<Place> {
         val parsed = parseQuery(query, states, countryNames)
-        val needle = parsed.name
+        val filtered = search(parsed.name, parsed.state, limit)
+        // "Roi Et" (Thailand) ends in a code (ET, Ethiopia), and so do "Bang
+        // Na", "Sơn La" and others now that countries share the suffix slot.
+        // So a SPACE-separated code is only a guess: places whose name is the
+        // whole query come first, then the guess's (roborev 5398). "london
+        // ky" names no place, so it still reads as London, Kentucky. A comma
+        // is deliberate and stands alone.
+        val whole = parsed.whole ?: return filtered
+        return (search(whole, null, limit) + filtered).distinct().take(limit)
+    }
+
+    private fun search(needle: String, code: String?, limit: Int): List<Place> {
         if (needle.isEmpty()) return emptyList()
         val matches = mutableListOf<Ranked>()
         for (i in places.indices) {
             val place = places[i]
-            if (parsed.state != null && place.state != parsed.state && place.country != parsed.state) continue
+            if (code != null && place.state != code && place.country != code) continue
             val candidate = searchNames[i]
             val rank =
                 when {
@@ -215,12 +226,14 @@ class PlaceCatalog(val places: List<Place>) {
             if (lastSpace > 0) {
                 val tail = trimmed.substring(lastSpace + 1).uppercase()
                 if (tail.length == 2 && tail in states) {
-                    return ParsedQuery(normalize(trimmed.substring(0, lastSpace)), tail)
+                    return ParsedQuery(normalize(trimmed.substring(0, lastSpace)), tail, whole = normalize(trimmed))
                 }
             }
             return ParsedQuery(normalize(trimmed), null)
         }
     }
 
-    internal data class ParsedQuery(val name: String, val state: String?)
+    /** [whole] is the full query as a name, kept when a space-separated
+     * suffix was read as a code — the fallback if that reading finds nothing. */
+    internal data class ParsedQuery(val name: String, val state: String?, val whole: String? = null)
 }

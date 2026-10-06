@@ -38,4 +38,14 @@ class BundledGazetteerTest {
         }
         assertTrue(catalog.search("louisville, ky").isNotEmpty(), "the US rows are still there")
     }
+
+    @Test
+    fun `a place whose name ends in a country code is still found by its name`() {
+        // Each ends in a two-letter token that is also a code (ET, NA, NE, LA).
+        for (name in listOf("Roi Et", "Bang Na", "Mui Ne", "Sơn La", "Lak Si")) {
+            assertEquals(name, catalog.search(name).firstOrNull()?.name, name)
+        }
+        // A real suffix still narrows: Kentucky's London, not England's.
+        assertEquals("London, KY", catalog.search("london ky").first().label)
+    }
 }

@@ -37,7 +37,6 @@ import io.raylytics.justmyweather.data.WeatherSnapshot
 import io.raylytics.justmyweather.data.nws.DailyPeriod
 import io.raylytics.justmyweather.data.nws.ForecastPoint
 import io.raylytics.justmyweather.ui.home.DayForecast
-import io.raylytics.justmyweather.ui.home.ObservationAge
 import io.raylytics.justmyweather.ui.home.dailyView
 import io.raylytics.justmyweather.ui.home.monthDayFormat
 import io.raylytics.justmyweather.ui.home.periods
@@ -54,7 +53,6 @@ import io.raylytics.justmyweather.view.ForecastTileLayout
 import io.raylytics.justmyweather.view.ModuleContent
 import io.raylytics.justmyweather.view.ModuleSize
 import io.raylytics.justmyweather.view.ModuleValue
-import io.raylytics.justmyweather.view.ReadingHeading
 import io.raylytics.justmyweather.view.SunDays
 import io.raylytics.justmyweather.view.TimesIn
 import io.raylytics.justmyweather.view.WeatherField
@@ -307,32 +305,11 @@ private fun ReadingWidget(
         }
         if (showFooter) {
             Text(
-                text = snapshot?.let { observedLine(it, observedZone, now, wide = size.width >= HERO_WIDTH) } ?: "",
+                text = snapshot?.let { readingLine(it, observedZone, now, wide = size.width >= HERO_WIDTH) } ?: "",
                 style = TextStyle(color = palette.muted, fontSize = FOOTER_SP, fontFamily = palette.font),
                 maxLines = 1,
             )
         }
-    }
-}
-
-/**
- * "Observed 12:40 PM · 12 min ago", as the glance words it, or just the
- * age where there is no room for the clock time. The age is what carries
- * staleness on a surface that cannot say "refreshing".
- */
-private fun observedLine(snapshot: WeatherSnapshot, zone: ZoneId, now: Instant, wide: Boolean): String {
-    val observedAt = snapshot.observedAt
-    // A forecast hour (outside NWS territory) has no age to carry staleness;
-    // its clock time says which hour it is, and the next tick replaces it.
-    if (snapshot.fromForecast || observedAt == null) {
-        return ReadingHeading.of(snapshot.fromForecast, observedAt?.atZone(zone)?.format(timeFormat))
-    }
-    val time = observedAt.atZone(zone).format(timeFormat)
-    val age = ObservationAge.label(observedAt, now)
-    return when {
-        age == null -> "Observed $time"
-        wide -> "Observed $time · $age"
-        else -> "Observed $age"
     }
 }
 

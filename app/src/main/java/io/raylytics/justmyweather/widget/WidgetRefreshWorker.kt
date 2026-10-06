@@ -13,6 +13,7 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import io.raylytics.justmyweather.JustMyWeatherApp
+import io.raylytics.justmyweather.data.metno.ExtendedDay
 import io.raylytics.justmyweather.ui.home.weatherErrorMessage
 import java.time.Duration
 import java.time.Instant
@@ -120,6 +121,11 @@ class WidgetRefreshWorker(
                 now,
                 CARRY_WINDOW,
             )
+                // Abroad, with MET's fetch failed and nothing to carry, settle
+                // on "none" rather than leaving the Daily tile on its loading
+                // dots until a tick succeeds (dailyView waits on null;
+                // roborev 5394). The next tick asks again either way.
+                ?: Fetched(emptyList<ExtendedDay>(), now).takeIf { needsExtended && periods?.items?.isEmpty() == true }
 
         val data =
             WidgetData(

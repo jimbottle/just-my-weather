@@ -123,7 +123,12 @@ class WeatherRepository(
                 }
                 ResolvedPoint.OutsideNws -> {
                     val now = metOrFail().getNow(location.latitude, location.longitude, clock())
-                    val near = if (location.label.isBlank()) nearestTo(location) else null
+                    // Asked whenever the place lacks a name OR a zone: a
+                    // coordinate entered by hand has a name but no zone, and
+                    // must not read in the phone's while its Daily days are
+                    // cut in the town's (loadExtendedDaily; roborev 5398).
+                    val near =
+                        if (location.label.isBlank() || location.timeZone == null) nearestTo(location) else null
                     WeatherSnapshot(
                         // MET names no place, so a GPS fix borrows the
                         // nearest bundled town — what NWS's relativeLocation
@@ -196,18 +201,22 @@ class WeatherRepository(
      * means the rule can change without touching the layer that fetches.
      *
      * Queried by coordinate rather than by the cached grid's zone, so
-     * county/polygon warnings (tornado, severe thunderstorm) are not missed —
-     * the resolution is consulted only to know whether NWS covers the place
-     * at all. Outside its territory there are no official alerts to show (NWS
+     * county/polygon warnings (tornado, severe thunderstorm) are not missed.
+     *
+     * Outside NWS territory there are no official alerts to show (NWS
      * answers a foreign point with a 400), and an empty list says exactly
-     * that. The verdict is nearly always cached already: every caller loads
-     * the reading first.
+     * that — but only when the point cache ALREADY knows the place is abroad.
+     * This never resolves a point itself: the alert worker's safety-only
+     * poll calls it without loading a reading first, and making a tornado
+     * warning wait on /points and /stations succeeding — for every new
+     * kilometre a moving phone covers — would let any hiccup in either drop
+     * the warning (found in review, roborev 5393). Unknown means "ask NWS".
      */
-    suspend fun loadActiveAlerts(location: WeatherLocation): List<ActiveAlert> =
-        when (resolve(location)) {
-            is ResolvedPoint.Nws -> nws.getActiveAlertsAt(location.latitude, location.longitude)
-            ResolvedPoint.OutsideNws -> emptyList()
-        }
+    suspend fun loadActiveAlerts(location: WeatherLocation): List<ActiveAlert> {
+        val known = runCatching { pointCache.get(PointCacheKey.of(location)) }.getOrNull()
+        if (known == ResolvedPoint.OutsideNws) return emptyList()
+        return nws.getActiveAlertsAt(location.latitude, location.longitude)
+    }
 
     /** The daily (half-day period) forecast for the home screen's Daily mode.
      * Same cached point resolution as everything else. Empty outside NWS

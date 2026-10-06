@@ -476,8 +476,25 @@ class HomeViewModel(
             val abroad = forecasts.value.daily?.isEmpty() == true
             if (choice.mode == ForecastMode.DAILY && (choice.extended || abroad) && forecasts.value.extended == null) {
                 val location = currentLocation()
-                val days = runCatching { repository.loadExtendedDaily(location) }.getOrDefault(emptyList())
-                forecasts.value = forecasts.value.copy(extended = days)
+                runCatching { repository.loadExtendedDaily(location) }
+                    .onSuccess { days ->
+                        val current = forecasts.value
+                        forecasts.value =
+                            current.copy(extended = days, dailyError = if (abroad) null else current.dailyError)
+                    }.onFailure { e ->
+                        // Past day seven MET's days are a bonus, and losing
+                        // them costs nothing NWS didn't already show: settle
+                        // on none. Abroad they ARE the Daily view, so a
+                        // failure is the framing's error — and leaving them
+                        // null keeps the chip's tap-to-retry working.
+                        val current = forecasts.value
+                        forecasts.value =
+                            if (abroad) {
+                                current.copy(dailyError = e.toUserMessage())
+                            } else {
+                                current.copy(extended = emptyList())
+                            }
+                    }
             }
         }
     }
