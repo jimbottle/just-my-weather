@@ -20,7 +20,8 @@ The app is free and shows one banner ad, served by **Google AdMob**, at the
 bottom of the screen. AdMob receives standard advertising signals from your
 device to serve that ad (see "Ads and purchases"). A one-time $0.99 purchase
 removes the ad. In the United Kingdom, the European Economic Area and
-Switzerland the app currently shows no ad at all.
+Switzerland the app currently shows no ad at all and does not start the ad
+library.
 
 Everything you set up — which modules show, how they are arranged, your theme,
 your saved places, your alert rules — stays on your phone (and in your own
@@ -85,7 +86,9 @@ no advertising ID.
 ## Ads and purchases
 
 Unless you have bought ad removal, the app shows **one banner ad** at the
-bottom of the screen. It is served by **Google AdMob**, a Google service, and
+bottom of the screen. In the United Kingdom, the European Economic Area and
+Switzerland it shows no ad and does not start the ad SDK at all, so nothing
+below reaches Google from there. It is served by **Google AdMob**, a Google service, and
 the app requests **non-personalized ads only**. To serve and measure that ad,
 the Google Mobile Ads SDK built into the app may collect:
 
