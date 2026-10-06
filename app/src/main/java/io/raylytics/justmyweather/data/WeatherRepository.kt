@@ -193,6 +193,20 @@ class WeatherRepository(
         }
 
     /**
+     * Whether official NWS alerts exist for [location]: true in NWS territory,
+     * false outside it, null when the place hasn't been resolved yet. Cache-
+     * only, like [cachedZone] — a settings screen asking must never become a
+     * fetch. Every refresh of the glance resolves the place first, so by the
+     * time anyone opens Alerts the answer is nearly always known.
+     */
+    suspend fun officialAlertsAvailable(location: WeatherLocation): Boolean? =
+        when (runCatching { pointCache.get(PointCacheKey.of(location)) }.getOrNull()) {
+            is ResolvedPoint.Nws -> true
+            ResolvedPoint.OutsideNws -> false
+            null -> null
+        }
+
+    /**
      * Active NWS alerts for the location's forecast zone, unfiltered.
      *
      * Raw on purpose: which of these count as a safety concern is a product
@@ -212,6 +226,7 @@ class WeatherRepository(
      * kilometre a moving phone covers — would let any hiccup in either drop
      * the warning (found in review, roborev 5393). Unknown means "ask NWS".
      */
+
     suspend fun loadActiveAlerts(location: WeatherLocation): List<ActiveAlert> {
         val known = runCatching { pointCache.get(PointCacheKey.of(location)) }.getOrNull()
         if (known == ResolvedPoint.OutsideNws) return emptyList()

@@ -151,6 +151,9 @@ class MainActivity : ComponentActivity() {
                         AlertWorker.sync(applicationContext, hasWork, minutes)
                     },
                     onRuleActivated = { AlertWorker.runOnce(applicationContext) },
+                    officialAlertsHere = {
+                        container.weatherRepository.officialAlertsAvailable(container.locationResolver.resolve())
+                    },
                 )
             }
         }
@@ -343,6 +346,7 @@ private fun App(
                     onCustomize = { screen = Screen.CUSTOMIZE },
                     onAlerts = {
                         onEnterAlerts()
+                        alertsViewModel.refreshCoverage()
                         screen = Screen.ALERTS
                     },
                     modifier = Modifier.weight(1f),
@@ -519,6 +523,7 @@ private fun App(
             BackHandler { screen = Screen.HOME }
             val rules by alertsViewModel.rules.collectAsStateWithLifecycle()
             val alertSettings by alertsViewModel.settings.collectAsStateWithLifecycle()
+            val officialAlertsHere by alertsViewModel.officialAlerts.collectAsStateWithLifecycle()
             AlertsScreen(
                 rules = rules,
                 settings = alertSettings,
@@ -529,6 +534,7 @@ private fun App(
                 onSetQuietWindow = alertsViewModel::setQuietWindow,
                 onSetSafetyNotifications = alertsViewModel::setSafetyNotifications,
                 onSetPollCadence = alertsViewModel::setPollCadence,
+                officialAlertsHere = officialAlertsHere,
                 onDone = { screen = Screen.HOME },
                 events = alertsViewModel.events,
             )

@@ -13,6 +13,7 @@ import io.raylytics.justmyweather.data.AlertRulesRepository
 import io.raylytics.justmyweather.data.AlertSettingsRepository
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -40,7 +41,21 @@ class AlertsViewModel(
     /** Kicks an immediate alert check. Invoked after a change that could make a
      * rule newly fire, so the user gets feedback now instead of next hour. */
     private val onRuleActivated: () -> Unit = {},
+    /** Whether official alerts exist where the app is looking — null when
+     * not yet known (WeatherRepository.officialAlertsAvailable). */
+    private val officialAlertsHere: suspend () -> Boolean? = { null },
 ) : ViewModel() {
+    private val officialAlertsState = MutableStateFlow<Boolean?>(null)
+
+    /** False outside NWS territory: the screen then explains instead of
+     * offering a switch that could never fire. Null shows the switch. */
+    val officialAlerts: StateFlow<Boolean?> = officialAlertsState
+
+    /** Re-ask on each visit: the place may have changed since the last. */
+    fun refreshCoverage() {
+        viewModelScope.launch { officialAlertsState.value = runCatching { officialAlertsHere() }.getOrNull() }
+    }
+
     val rules: StateFlow<List<AlertRule>> =
         repository.rules.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 

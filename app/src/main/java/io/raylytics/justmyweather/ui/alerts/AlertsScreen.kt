@@ -77,6 +77,9 @@ fun AlertsScreen(
     onSetPollCadence: (Int) -> Unit,
     onDone: () -> Unit,
     modifier: Modifier = Modifier,
+    /** False outside NWS territory (no official alerts there); null while
+     * unknown, which offers the switch as before. */
+    officialAlertsHere: Boolean? = null,
     /** One-shot confirmations from the view model; see [AlertsEvent]. */
     events: Flow<AlertsEvent> = emptyFlow(),
 ) {
@@ -159,10 +162,22 @@ fun AlertsScreen(
                 onSetQuietWindow = onSetQuietWindow,
             )
             CadenceRow(selected = settings.pollMinutes, onSelect = onSetPollCadence)
-            SafetyAlertsRow(
-                enabled = settings.safetyNotifications,
-                onChange = onSetSafetyNotifications,
-            )
+            if (officialAlertsHere == false) {
+                // The honest version of a switch that could never fire.
+                Text(
+                    text =
+                        "Official weather warnings come from the US National Weather Service, which " +
+                            "doesn't cover this place. Your own alerts above work everywhere.",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(vertical = 6.dp).testTag("safetyUnavailable"),
+                )
+            } else {
+                SafetyAlertsRow(
+                    enabled = settings.safetyNotifications,
+                    onChange = onSetSafetyNotifications,
+                )
+            }
         }
     }
 }

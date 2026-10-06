@@ -203,6 +203,20 @@ class WeatherRepositoryTest {
         }
 
     @Test
+    fun `whether official alerts exist is answered from the cache, never a fetch`() = runTest {
+        val transport = abroad()
+        val repository = repo(transport, metNo = MetNoClient(transport))
+        assertNull(repository.officialAlertsAvailable(london), "unknown before the place is resolved")
+        assertTrue(transport.requested.isEmpty(), "and asking did not fetch")
+        repository.load(london)
+        assertEquals(false, repository.officialAlertsAvailable(london))
+
+        val home = repo(RoutingTransport())
+        home.load(WeatherLocation(40.71, -74.0, "Home"))
+        assertEquals(true, home.officialAlertsAvailable(WeatherLocation(40.71, -74.0, "Home")))
+    }
+
+    @Test
     fun `a saved place abroad keeps its own label and zone, and nothing is looked up`() = runTest {
         val transport = abroad()
         val place = london.copy(timeZone = "Europe/London", country = "GB")
