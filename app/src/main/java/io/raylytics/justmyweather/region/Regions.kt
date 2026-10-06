@@ -32,16 +32,17 @@ object Regions {
         listOf(
             // Wave 0 — live since 0.2.0.
             Prepared("US", PlayStatus.LIVE, DefaultPlace("New York, NY", 40.7128, -74.0060, "America/New_York")),
-            // Wave 1 — English-primary, strong ad markets.
-            Prepared("CA", PlayStatus.PLANNED, DefaultPlace("Toronto, Canada", 43.70, -79.42, "America/Toronto")),
-            Prepared("AU", PlayStatus.PLANNED, DefaultPlace("Sydney, Australia", -33.87, 151.21, "Australia/Sydney")),
+            // Wave 1 — English-primary, strong ad markets. READY: gate passed
+            // 2026-10-06, evidence in localization/wave-1.md.
+            Prepared("CA", PlayStatus.READY, DefaultPlace("Toronto, Canada", 43.70, -79.42, "America/Toronto")),
+            Prepared("AU", PlayStatus.READY, DefaultPlace("Sydney, Australia", -33.87, 151.21, "Australia/Sydney")),
             Prepared(
                 "NZ",
-                PlayStatus.PLANNED,
+                PlayStatus.READY,
                 DefaultPlace("Auckland, New Zealand", -36.85, 174.76, "Pacific/Auckland"),
             ),
-            Prepared("GB", PlayStatus.PLANNED, DefaultPlace("London, United Kingdom", 51.51, -0.13, "Europe/London")),
-            Prepared("IE", PlayStatus.PLANNED, DefaultPlace("Dublin, Ireland", 53.33, -6.25, "Europe/Dublin")),
+            Prepared("GB", PlayStatus.READY, DefaultPlace("London, United Kingdom", 51.51, -0.13, "Europe/London")),
+            Prepared("IE", PlayStatus.READY, DefaultPlace("Dublin, Ireland", 53.33, -6.25, "Europe/Dublin")),
             // Wave 2 — English official or dominant, very large populations.
             Prepared("IN", PlayStatus.PLANNED, DefaultPlace("New Delhi, India", 28.64, 77.22, "Asia/Kolkata")),
             Prepared("PH", PlayStatus.PLANNED, DefaultPlace("Manila, Philippines", 14.60, 120.98, "Asia/Manila")),

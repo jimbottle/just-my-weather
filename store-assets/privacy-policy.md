@@ -1,6 +1,6 @@
 # Privacy Policy — Just My Weather
 
-_Last updated: 2026-10-04_
+_Last updated: 2026-10-06_
 
 Just My Weather is a free Android weather app published by Raylytics, LLC. It shows the weather for a place you choose, lets you build your
 own view of it, and sends you notifications for conditions you define. This
@@ -47,9 +47,18 @@ current approximate position to keep that up to date; on Android 10 and later
 the system does not give this app location in the background, so it uses the
 last position from when the app was open.
 
-**Places you choose.** You can search a list of about 32,000 US towns and
-cities that is bundled inside the app, or type coordinates. The search runs
-entirely on your phone; nothing you type is sent anywhere.
+**Places you choose.** You can search a list of about 60,000 towns and
+cities worldwide that is bundled inside the app, or type coordinates. The
+search runs entirely on your phone; nothing you type is sent anywhere.
+
+**Your region.** To show the weather in your units and your date and time
+format, and to know whether an ad may be shown where you are, the app works
+out which country you are in. It reads the country of the mobile network
+your phone is connected to (which needs no permission), or the country of
+your approximate location or of the place you are viewing, matched against
+the bundled place list, or your phone's language settings. All of this
+happens on your phone, and the country is not sent anywhere. You can set
+your region yourself in App settings.
 
 ## Where your data goes
 
@@ -61,9 +70,10 @@ To fetch the weather, the app sends the coordinates of the selected place to:
   includes the developer's contact email; it does not include anything that
   identifies you.
 - **The Norwegian Meteorological Institute** (api.met.no, "MET Norway"), a
-  Norwegian government agency, only when you have set the daily forecast to
-  show more than seven days. Days eight and nine come from MET Norway and are
-  marked as such in the app. As MET requires, each request identifies the app
+  Norwegian government agency, for any place outside the National Weather
+  Service's coverage (the whole forecast for that place), and for days eight
+  and nine of the daily forecast when you have set it to show more than
+  seven days. Weather from MET Norway is marked as such in the app. As MET requires, each request identifies the app
   and includes the developer's contact email; it does not include anything
   that identifies you.
 

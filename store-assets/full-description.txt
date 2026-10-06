@@ -19,9 +19,10 @@ YOUR OWN ALERTS
 
 FORECASTS FROM THE SOURCE
 
-• Current conditions, hourly, and daily forecasts from the US National Weather Service. No API key, no middleman.
-• The daily view can reach nine days: seven from the NWS, then two more from MET Norway, clearly marked.
-• Saved places: search a bundled offline list of about 32,000 US towns and cities, or enter coordinates. No geocoding service sees what you type.
+• Current conditions, hourly, and daily forecasts from the US National Weather Service in the US, and from MET Norway everywhere else. No API key, no middleman.
+• The daily view can reach nine days, the last two from MET Norway in the US, clearly marked.
+• Units, dates and the clock follow your region automatically — or set them yourself.
+• Saved places: search a bundled offline list of about 60,000 towns and cities worldwide, or enter coordinates. No geocoding service sees what you type.
 
 FREE, WITH ONE SMALL BANNER
 
@@ -36,4 +37,4 @@ NO ACCOUNT, YOUR DATA STAYS PUT
 
 If you have been looking for a customizable weather app that shows only what you ask for, this is it.
 
-Weather data is for the United States (National Weather Service coverage).
+Weather from the US National Weather Service in the United States and from MET Norway elsewhere. Official weather warnings are available in the US only.
