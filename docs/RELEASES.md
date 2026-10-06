@@ -19,12 +19,32 @@ Per-version log of what shipped where. Two audiences:
 
 ---
 
-## 0.3.0 — unreleased (next upload: versionCode 6)
+## 0.3.0 — versionCode 6, Play internal 2026-10-06
 
-Home screen widgets. Built 2026-10-05 on top of 0.2.1 (which is on the
-internal track as versionCode 5); nothing cut yet.
+Home screen widgets, and the app outside the US. Cut from main at
+4555bec+chore (code identical to 456f3e6, CI green incl. Maestro).
+Production opened in 14 more countries the same day (wave 1: CA, AU, NZ,
+GB, IE; wave 2: IN, PK, NG, PH, ZA, KE, GH, MY, SG — docs/REGIONS.md).
 
 ### Store-facing (≤500 chars)
+
+> Now outside the US: forecasts from MET Norway wherever the National
+> Weather Service doesn't reach, a worldwide place search, and units, dates
+> and the clock that follow your region (App settings → Region & units).
+> And widgets: put a tile of your glance on the home screen and set it up
+> the way you set up the glance. They refresh every 15 minutes.
+
+### Internal — regions (epic just-my-weather-5fm)
+
+- Added: MET Norway as the sole source outside NWS territory (cached
+  `ResolvedPoint.OutsideNws`), worldwide GeoNames gazetteer, `region/`
+  (registry, resolver: manual > phone network > fix > place > language),
+  `view/Conventions.kt` (all unit/date formatting), Region & units screen.
+- Changed: alert thresholds typed in the user's unit, stored canonical;
+  ads withheld where a certified CMP is required (EEA, UK, CH).
+- Fixed: roborev 5393, 5394, 5398, 5400, 5402, 5408, 5409.
+
+### Previous store-facing draft (widgets only, superseded)
 
 > Widgets. Put a tile of your glance on the home screen — the temperature,
 > feels-like, conditions, wind, pressure, sunrise and sunset, or the forecast
