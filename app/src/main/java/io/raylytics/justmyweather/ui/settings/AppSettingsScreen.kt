@@ -16,6 +16,11 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
@@ -40,6 +45,7 @@ fun AppSettingsScreen(
     onBuyRemoveAds: () -> Unit,
     onRestorePurchases: () -> Unit,
     onReportBug: () -> Unit,
+    onSubmitIdea: () -> Unit,
     /** Opens the Play listing, where the rating lives. */
     onRateApp: () -> Unit,
     /** "0.2.0 (build 2)" — the line a bug reply would otherwise ask for. */
@@ -71,12 +77,15 @@ fun AppSettingsScreen(
                     color = MaterialTheme.colorScheme.surfaceVariant,
                     modifier = Modifier.padding(top = 16.dp),
                 )
-                GadgetbridgeToggle(enabled = gadgetbridgeEnabled, onChange = onSetGadgetbridgeEnabled)
+                HelpSection(onReportBug = onReportBug, onSubmitIdea = onSubmitIdea, onRateApp = onRateApp)
                 HorizontalDivider(
                     color = MaterialTheme.colorScheme.surfaceVariant,
                     modifier = Modifier.padding(top = 16.dp),
                 )
-                HelpSection(onReportBug = onReportBug, onRateApp = onRateApp)
+                AdvancedSection(
+                    gadgetbridgeEnabled = gadgetbridgeEnabled,
+                    onSetGadgetbridgeEnabled = onSetGadgetbridgeEnabled,
+                )
                 HorizontalDivider(
                     color = MaterialTheme.colorScheme.surfaceVariant,
                     modifier = Modifier.padding(top = 16.dp),
@@ -169,6 +178,40 @@ private fun AdsSection(
 }
 
 /**
+ * Settings most people never need, folded away behind a switch so the page
+ * stays short. The switch only shows or hides them — it changes nothing on
+ * its own. It opens itself whenever something inside is on, so a setting
+ * that is doing something is never hidden.
+ */
+@Composable
+private fun AdvancedSection(
+    gadgetbridgeEnabled: Boolean,
+    onSetGadgetbridgeEnabled: (Boolean) -> Unit,
+) {
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    // Keyed on the value, not read once: the stored setting arrives a frame
+    // after the screen does, so an initial value would always read "off".
+    LaunchedEffect(gadgetbridgeEnabled) { if (gadgetbridgeEnabled) expanded = true }
+    Column(modifier = Modifier.fillMaxWidth().padding(top = 16.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("Advanced", style = MaterialTheme.typography.labelMedium)
+            Switch(
+                checked = expanded,
+                onCheckedChange = { expanded = it },
+                modifier = Modifier.testTag("advanced-toggle"),
+            )
+        }
+        if (expanded) {
+            GadgetbridgeToggle(enabled = gadgetbridgeEnabled, onChange = onSetGadgetbridgeEnabled)
+        }
+    }
+}
+
+/**
  * Opt-in hand-off of each reading to Gadgetbridge, which relays it to a paired
  * watch. Off by default: it sends data to another app, so it stays something
  * you go and switch on rather than something you discover already running.
@@ -179,10 +222,9 @@ private fun GadgetbridgeToggle(
     onChange: (Boolean) -> Unit,
 ) {
     Column(
-        modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Text("Watch", style = MaterialTheme.typography.labelMedium)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -204,14 +246,16 @@ private fun GadgetbridgeToggle(
     }
 }
 
-/** The way to the bug-report form, and the way to the store page for a
- * rating. Ideas are offered at the bottom of Customize instead, where
- * someone notices the option they wanted is missing. The rating row asks
- * once and plainly, here where someone has come looking, rather than
- * interrupting the glance with a pop-up. */
+/** The ways to reach the developer — the bug-report form and the idea form —
+ * and the way to the store page for a rating. The idea form is also offered
+ * at the bottom of Customize, where someone notices the option they wanted
+ * is missing; here is where someone comes looking for it on purpose. The
+ * rating row asks once and plainly, here where someone has come looking,
+ * rather than interrupting the glance with a pop-up. */
 @Composable
 private fun HelpSection(
     onReportBug: () -> Unit,
+    onSubmitIdea: () -> Unit,
     onRateApp: () -> Unit,
 ) {
     Column(
@@ -229,6 +273,22 @@ private fun HelpSection(
             Text("Report a bug", style = MaterialTheme.typography.bodyLarge)
             Text(
                 text = "Something wrong? Email the developer, with your app version and device attached.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onSubmitIdea)
+                    .padding(vertical = 8.dp)
+                    .testTag("submit-idea"),
+        ) {
+            Text("Submit your idea to the developer", style = MaterialTheme.typography.bodyLarge)
+            Text(
+                text = "A tile, an alert or an option you wish it had. " +
+                    "Only the app version and phone model go with it.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

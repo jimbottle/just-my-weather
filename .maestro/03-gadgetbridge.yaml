@@ -22,6 +22,17 @@ appId: io.raylytics.justmyweather
     timeout: 60000
 - tapOn: "App Settings"
 - assertVisible: "App settings"
+
+# The hand-off sits under Advanced, folded away until the switch opens it.
+- assertNotVisible: "Send to Gadgetbridge"
+- scrollUntilVisible:
+    element:
+      id: "advanced-toggle"
+- assertVisible:
+    id: "advanced-toggle"
+    checked: false
+- tapOn:
+    id: "advanced-toggle"
 - assertVisible: "Send to Gadgetbridge"
 
 # Off by default. The Switch carries no text, so it's targeted by testTag,
@@ -36,8 +47,16 @@ appId: io.raylytics.justmyweather
 - assertVisible:
     id: "gadgetbridge-toggle"
     checked: true
+# Advanced opens itself when something inside it is on, so an active
+# hand-off is never hidden.
 - tapOn: "Done"
 - tapOn: "App Settings"
+- scrollUntilVisible:
+    element:
+      id: "gadgetbridge-toggle"
+- assertVisible:
+    id: "advanced-toggle"
+    checked: true
 - assertVisible:
     id: "gadgetbridge-toggle"
     checked: true

@@ -1,5 +1,6 @@
-# The two ways to reach the developer, and that they are two: an idea from the
-# bottom of Customize, a bug report from App Settings. Each opens its own form
+# The two ways to reach the developer, and that they are two: an idea (from the
+# bottom of Customize, or App Settings' Help group) and a bug report (from App
+# Settings). Each opens its own form
 # with its own attachment, shown in full before anything is sent.
 #
 # The email hand-off itself isn't asserted — what opens depends on the mail
@@ -41,5 +42,18 @@ appId: io.raylytics.justmyweather
 - assertVisible: "Attached diagnostics"
 - assertVisible:
     text: ".*Source screen: App Settings.*"
+- tapOn: "Done"
+- assertVisible: "App settings"
+
+# The idea form is offered in App Settings too, and returns there.
+- scrollUntilVisible:
+    element:
+      id: "submit-idea"
+- tapOn:
+    id: "submit-idea"
+- assertVisible: "Submit an idea"
+- assertVisible:
+    text: ".*Screen: App Settings.*"
+- assertNotVisible: "Attached diagnostics"
 - tapOn: "Done"
 - assertVisible: "App settings"

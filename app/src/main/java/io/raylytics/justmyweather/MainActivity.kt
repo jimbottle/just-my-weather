@@ -277,6 +277,9 @@ private fun App(
     loadBugReportState: suspend () -> List<Pair<String, String>>,
 ) {
     var screen by rememberSaveable { mutableStateOf(Screen.HOME) }
+    // The idea form opens from Customize and from App Settings, and returns
+    // to whichever one opened it.
+    var ideaFrom by rememberSaveable { mutableStateOf(Screen.CUSTOMIZE) }
 
     // Keep "next sunrise / next sunset" actually next. The value decays with
     // the clock rather than with the data, so nothing about a fetch would
@@ -350,7 +353,10 @@ private fun App(
                 onSetAlertBannerPosition = customizeViewModel::setAlertBannerPosition,
                 theme = themeConfig,
                 onThemeChange = onThemeChange,
-                onSubmitIdea = { screen = Screen.SUBMIT_IDEA },
+                onSubmitIdea = {
+                    ideaFrom = Screen.CUSTOMIZE
+                    screen = Screen.SUBMIT_IDEA
+                },
                 onDone = { screen = Screen.HOME },
             )
         }
@@ -370,6 +376,10 @@ private fun App(
                 onBuyRemoveAds = onBuyRemoveAds,
                 onRestorePurchases = appSettingsViewModel::restorePurchases,
                 onReportBug = { screen = Screen.REPORT_BUG },
+                onSubmitIdea = {
+                    ideaFrom = Screen.APP_SETTINGS
+                    screen = Screen.SUBMIT_IDEA
+                },
                 onRateApp = onRateApp,
                 version = "${BuildConfig.VERSION_NAME} (build ${BuildConfig.VERSION_CODE})",
                 onDone = { screen = Screen.HOME },
@@ -411,17 +421,18 @@ private fun App(
         }
 
         Screen.SUBMIT_IDEA -> {
-            BackHandler { screen = Screen.CUSTOMIZE }
+            BackHandler { screen = ideaFrom }
             val context = LocalContext.current
             val app = remember { currentAppInfo() }
-            val attached = remember { ideaContext(app, sourceScreen = "Customize") }
+            val sourceScreen = if (ideaFrom == Screen.APP_SETTINGS) "App Settings" else "Customize"
+            val attached = remember { ideaContext(app, sourceScreen = sourceScreen) }
             SupportScreen(
                 kind = SupportKind.IDEA,
                 attached = attached,
                 onSend = { message ->
                     context.composeSupportMail(supportMail(SupportKind.IDEA, app, message, attached))
                 },
-                onDone = { screen = Screen.CUSTOMIZE },
+                onDone = { screen = ideaFrom },
             )
         }
 
