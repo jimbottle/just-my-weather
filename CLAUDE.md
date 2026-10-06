@@ -479,6 +479,21 @@ readable `AppContainer` in `JustMyWeatherApp.kt` — no Hilt). Package layout un
   glance, non-personalized per `AdPolicy`); `RemoveAdsManager` keeps the
   on-device entitlement in step with Play behind the `BillingGateway` seam.
   See `docs/architecture.md`.
+- **`data/metno/`** — MET Norway, the second source: the whole forecast for a
+  place NWS doesn't cover (routed in `WeatherRepository`, which caches "not
+  NWS territory" with the point), and days 8–9 at home.
+- **`data/places/`** — the bundled gazetteer (US Census + GeoNames, with a
+  country and zone per foreign place) and `PlaceLookup`, "nearest place to a
+  coordinate" with no geocoder.
+- **`region/`** — a region is a Google Play country. `Regions.kt` is the
+  registry; `RegionResolver` picks the region (manual choice > phone network
+  > last fix > place shown > language settings). It drives units, dates,
+  clock and ad consent. **docs/REGIONS.md** has how it works and the
+  step-by-step for adding, opening, pausing or removing a region. Never
+  change the Play Console country list yourself — hand it off.
+- **`view/Conventions.kt`** — the ONE place a canonical value (°F, mph, inHg,
+  in) becomes display text; every formatter takes a `Conventions`, provided
+  to Compose as `LocalConventions`. Data and alert thresholds stay canonical.
 - **`location/`** — `LocationProvider` over the platform `LocationManager`
   (coarse only, no Play Services, so it builds from source anywhere).
 - **`ui/theme/`** — the small palette + type scale, all in one place so the

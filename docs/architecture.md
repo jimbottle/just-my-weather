@@ -25,14 +25,15 @@ shapes never leak past `WeatherRepository`.
   is a fun-interface seam isolating the HTTP call so the retry/parse logic is
   unit-tested with a fake (no network). `Units` holds pure conversions; `NwsWire`
   is the raw JSON DTOs, `NwsModels` the cleaned-up domain shapes.
-- **`data/metno/`** — the second source, only for Daily days eight and nine,
-  which NWS does not forecast. `MetNoClient` (MET Norway's Locationforecast,
-  CC BY 4.0, commercial use allowed) over the same `HttpTransport` seam — but
-  its own OkHttp client with a disk cache, since MET asks clients to honour
-  Expires / If-Modified-Since; it folds MET's six-hourly instants into days in
-  the place's calendar. `ExtendedDay` is its cleaned-up day, `MetNoSymbols` the
-  weather symbols in NWS-style words. Fetched only when the user asks for more
-  days than NWS covers.
+- **`data/metno/`** — the second source. `MetNoClient` (MET Norway's
+  Locationforecast, CC BY 4.0, commercial use allowed) over the same
+  `HttpTransport` seam, with its own disk-cached OkHttp client (MET asks
+  clients to honour Expires / If-Modified-Since). In NWS territory it adds
+  Daily days eight and nine; everywhere else `WeatherRepository` routes every
+  load to it — a "now" reading from the current forecast hour (marked
+  `fromForecast`, so it never reads as "Observed"), the hourly head, and
+  whole days. The verdict "not NWS territory" (an NWS `/points` 404
+  InvalidPoint, and nothing less certain) is cached with the point.
 - **`data/`** — `WeatherRepository` is the single seam between NWS (and the
   extended source) and the app
   (cached point resolution, label fill, current + forecast loads). The
@@ -72,6 +73,14 @@ shapes never leak past `WeatherRepository`.
   built by `scripts/build-gazetteer.sh` from public-domain US Census data);
   `AssetPlaceSource` is the only Android-aware part; `SavedPlaces` + its codec
   and repository hold what the user kept and which one is showing.
+- **`region/`** — a region is a Google Play country; it decides units,
+  date order, clock and ad consent, chosen automatically (user's choice >
+  phone network > last fix > place shown > language settings). The registry
+  is `Regions.kt`. Everything about regions, including how to add one, is in
+  [REGIONS.md](REGIONS.md).
+- **`view/Conventions.kt`** — the one place a canonical value (°F, mph,
+  inHg, in) becomes text in the user's units and date/clock style. Every
+  formatter takes it; Compose reads it as `LocalConventions`.
 - **`view/`** — the customization *data* (pure, no Compose): `WeatherField` (the
   data-point catalog), `ViewConfig` + `Density`, `ThemeConfig`, and their JSON
   codecs, plus `ModuleKey` (the catalog of things that can sit on the glance —

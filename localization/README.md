@@ -1,9 +1,10 @@
 # Localization — taking Just My Weather outside the United States
 
-**Status: follow-up, not started.** Filed 2026-10-04 as a plan of record so
-the work can be picked up after the US production launch. Nothing in the
-app has changed for this yet. The tracker epic is **just-my-weather-5fm**
-(`bd show just-my-weather-5fm` lists the pieces and their order).
+**Status (2026-10-06): engineering items A–H done and in main** — MET as the
+sole source abroad, worldwide gazetteer, regions with automatic units/dates/
+ad consent. **How regions work and how to add one: `docs/REGIONS.md`.** What
+remains is human: the UK/EEA consent decision (5fm.9) and each console
+change. The tracker epic is **just-my-weather-5fm**.
 
 ## What "outside the US" means here
 
