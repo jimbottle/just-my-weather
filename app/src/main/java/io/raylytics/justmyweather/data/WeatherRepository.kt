@@ -7,6 +7,7 @@ import io.raylytics.justmyweather.data.nws.DailyPeriod
 import io.raylytics.justmyweather.data.nws.ForecastPoint
 import io.raylytics.justmyweather.data.nws.NwsClient
 import io.raylytics.justmyweather.data.nws.NwsHttpException
+import io.raylytics.justmyweather.data.places.Place
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.time.Instant
@@ -17,6 +18,16 @@ data class WeatherLocation(
     val latitude: Double,
     val longitude: Double,
     val label: String,
+    /**
+     * IANA zone of the place, when the place itself says so — a gazetteer
+     * place abroad does. In NWS territory the point lookup supplies the zone
+     * and this stays null; for a raw GPS fix it is null and the device's zone
+     * applies, which is right, since the device is where the fix is.
+     */
+    val timeZone: String? = null,
+    /** ISO 3166-1 alpha-2 country of the place, when known (a gazetteer
+     * place). One input to the app's region; see docs/REGIONS.md. */
+    val country: String? = null,
 ) {
     companion object {
         /** Until the user grants location or picks a place, fall back to
@@ -57,6 +68,11 @@ class WeatherRepository(
      * a place outside NWS territory. Null means no second source: the Daily
      * view stops where NWS does, and a place abroad fails to load. */
     private val metNo: MetNoClient? = null,
+    /** The bundled place nearest a coordinate (data/places/PlaceLookup).
+     * Abroad it stands in for what NWS's point gives at home: a name for a
+     * GPS fix and the place's time zone. Null-returning by default, which
+     * leaves a fix abroad as "Current location" in the device's zone. */
+    private val nearest: suspend (latitude: Double, longitude: Double) -> Place? = { _, _ -> null },
 ) {
     // Serialises point resolution so two refreshes fired close together (VM
     // init + the location-permission grant) don't both hit the network for the
@@ -107,11 +123,12 @@ class WeatherRepository(
                 }
                 ResolvedPoint.OutsideNws -> {
                     val now = metOrFail().getNow(location.latitude, location.longitude, clock())
+                    val near = if (location.label.isBlank()) nearestTo(location) else null
                     WeatherSnapshot(
-                        // No nearest-city label comes back from MET; a GPS
-                        // fix abroad stays "Current location" until the
-                        // user names the place.
-                        locationLabel = location.label.ifBlank { "Current location" },
+                        // MET names no place, so a GPS fix borrows the
+                        // nearest bundled town — what NWS's relativeLocation
+                        // does at home.
+                        locationLabel = location.label.ifBlank { near?.label ?: "Current location" },
                         temperatureF = now.temperatureF,
                         conditions = now.conditions,
                         windMph = now.windMph,
@@ -121,10 +138,10 @@ class WeatherRepository(
                         relativeHumidityPercent = now.relativeHumidityPercent,
                         windDirectionDegrees = now.windDirectionDegrees,
                         feelsLikeF = now.feelsLikeF,
-                        // Unknown: MET does not say, and times fall back to
-                        // the device's zone — right for a GPS fix, which is
-                        // where the device is.
-                        timeZone = null,
+                        // MET does not say. A gazetteer place carries its
+                        // own; a GPS fix takes its nearest town's, and failing
+                        // that the device's zone applies — where the fix is.
+                        timeZone = location.timeZone ?: near?.timeZone,
                         fromForecast = true,
                     )
                 }
@@ -210,10 +227,14 @@ class WeatherRepository(
      * MET's too. */
     suspend fun loadExtendedDaily(location: WeatherLocation): List<ExtendedDay> {
         val client = metNo ?: return emptyList()
-        val zone =
-            (runCatching { resolve(location) }.getOrNull() as? ResolvedPoint.Nws)?.point?.timeZone
-                ?.let { runCatching { ZoneId.of(it) }.getOrNull() }
-                ?: ZoneId.systemDefault()
+        val resolved = runCatching { resolve(location) }.getOrNull()
+        val id =
+            when (resolved) {
+                is ResolvedPoint.Nws -> resolved.point.timeZone
+                ResolvedPoint.OutsideNws -> location.timeZone ?: nearestTo(location)?.timeZone
+                null -> location.timeZone
+            }
+        val zone = id?.let { runCatching { ZoneId.of(it) }.getOrNull() } ?: ZoneId.systemDefault()
         return client.getDailyForecast(location.latitude, location.longitude, zone)
     }
 
@@ -229,6 +250,8 @@ class WeatherRepository(
     suspend fun cachedZone(location: WeatherLocation): String? =
         (runCatching { pointCache.get(PointCacheKey.of(location)) }.getOrNull() as? ResolvedPoint.Nws)
             ?.point?.timeZone
+            // A place abroad knows its own zone; no lookup needed.
+            ?: location.timeZone
 
     private suspend fun resolve(location: WeatherLocation): ResolvedPoint {
         // Rounded, not raw: a coarse fix jitters by metres between launches
@@ -257,6 +280,9 @@ class WeatherRepository(
             val noSuchPoint = e.status == 404 && !e.path.endsWith("/stations") && "InvalidPoint" in e.body
             if (noSuchPoint) ResolvedPoint.OutsideNws else throw e
         }
+
+    private suspend fun nearestTo(location: WeatherLocation): Place? =
+        runCatching { nearest(location.latitude, location.longitude) }.getOrNull()
 
     private fun metOrFail(): MetNoClient =
         metNo ?: error("No forecast source covers this place")

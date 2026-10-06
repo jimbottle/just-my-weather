@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Rebuild the bundled place list from the US Census Gazetteer.
+# Rebuild the bundled place list: the US Census Gazetteer for the United
+# States and its territories, then GeoNames for every other country.
 #
 # WHY THIS EXISTS: the app needs to turn "Louisville" into a coordinate, and it
 # has no geocoder to ask. NWS does not geocode, and every online geocoder wants
@@ -12,10 +13,23 @@
 # census-designated places across the states, DC, PR, VI, GU, AS and MP — which
 # is exactly the footprint NWS forecasts for.
 #
+# WHY GEONAMES ABROAD: outside NWS territory the forecast comes from MET
+# Norway, and a place abroad needs the same lookup. GeoNames' cities15000
+# (every place of 15,000 people or more, ~30k outside the US) is CC BY 4.0 —
+# the attribution sits in App settings beside MET's — and each row carries
+# the two things a foreign place cannot get from NWS: its ISO country code
+# (which is also how the app tells which REGION a coordinate is in; see
+# docs/REGIONS.md) and its IANA time zone.
+#
+# Row format, tab-separated:
+#   US rows:     name  state  lat  lon
+#   world rows:  name  ""     lat  lon  country  timezone
+# A row with no country column is a US place; NWS supplies its zone.
+#
 # The output is checked in, so contributors do not need to run this. Run it to
 # pick up a newer vintage; the asset it writes is the only thing the app reads.
 #
-#   scripts/build-gazetteer.sh [year]
+#   scripts/build-gazetteer.sh [census-year]
 #
 # Requires: curl, unzip, python3. Writes app/src/main/assets/places.tsv.
 set -euo pipefail
@@ -24,6 +38,7 @@ YEAR="${1:-2023}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUT="$ROOT/app/src/main/assets/places.tsv"
 URL="https://www2.census.gov/geo/docs/maps-data/data/gazetteer/${YEAR}_Gazetteer/${YEAR}_Gaz_place_national.zip"
+GEONAMES_URL="https://download.geonames.org/export/dump/cities15000.zip"
 
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
@@ -34,12 +49,18 @@ unzip -q -o "$WORK/gaz.zip" -d "$WORK"
 SRC="$(find "$WORK" -name '*.txt' | head -1)"
 [ -n "$SRC" ] || { echo "!! no .txt in the archive — did the layout change?" >&2; exit 1; }
 
+echo "→ downloading GeoNames cities15000"
+curl -sSfL --max-time 300 -o "$WORK/geonames.zip" "$GEONAMES_URL"
+unzip -q -o "$WORK/geonames.zip" -d "$WORK"
+WORLD="$WORK/cities15000.txt"
+[ -f "$WORLD" ] || { echo "!! no cities15000.txt in the archive — did the layout change?" >&2; exit 1; }
+
 echo "→ trimming"
 mkdir -p "$(dirname "$OUT")"
-python3 - "$SRC" "$OUT" <<'PY'
+python3 - "$SRC" "$OUT" "$WORLD" <<'PY'
 import csv, sys
 
-src, out = sys.argv[1], sys.argv[2]
+src, out, world = sys.argv[1], sys.argv[2], sys.argv[3]
 
 # The NAME column carries the legal/statistical type as a trailing word ("Dover
 # city", "Kiryas Joel village", "Ocean City CDP"). People do not say those, and
@@ -92,13 +113,42 @@ with open(src, encoding="latin-1", newline="") as handle:
             best[key] = entry
 
 rows = sorted(best.values(), key=lambda e: (e[2], e[1]))
+
+# GeoNames, for everywhere the Census does not cover. The US and the
+# territories NWS forecasts are skipped — the Census rows above are richer
+# there (every incorporated place, not just the 15,000-people ones).
+CENSUS_COUNTRIES = {"US", "PR", "GU", "VI", "AS", "MP"}
+# Feature codes that are not a place someone would pick: a neighbourhood or
+# section of a city (PPLX — London alone has dozens), and places that are
+# historical, abandoned or destroyed.
+SKIP_FEATURES = {"PPLX", "PPLH", "PPLQ", "PPLW"}
+abroad: dict[tuple[str, str], tuple[int, str, str, str, str, str]] = {}
+with open(world, encoding="utf-8") as handle:
+    for line in handle:
+        f = line.rstrip("\n").split("\t")
+        if len(f) < 18:
+            continue
+        name, lat, lon, feature, country, population, zone = f[1], f[4], f[5], f[7], f[8], f[14], f[17]
+        if country in CENSUS_COUNTRIES or feature in SKIP_FEATURES or not (name and country and zone):
+            continue
+        key = (name.lower(), country)
+        pop = int(population or 0)
+        # Same name twice in one country: the larger is almost certainly
+        # the one meant, as with the Census collisions above.
+        entry = (pop, name, f"{float(lat):.2f}", f"{float(lon):.2f}", country, zone)
+        if key not in abroad or pop > abroad[key][0]:
+            abroad[key] = entry
+world_rows = sorted(abroad.values(), key=lambda e: (e[4], e[1]))
+
 with open(out, "w", encoding="utf-8") as handle:
     # Tab-separated, not comma: place names contain commas and quoting rules
     # are a parser bug waiting to happen. Tabs cannot appear in a name.
     for _, name, state, lat, lon in rows:
         handle.write(f"{name}\t{state}\t{lat}\t{lon}\n")
+    for _, name, lat, lon, country, zone in world_rows:
+        handle.write(f"{name}\t\t{lat}\t{lon}\t{country}\t{zone}\n")
 
-print(f"   {len(rows)} places")
+print(f"   {len(rows)} US places, {len(world_rows)} elsewhere")
 PY
 
 echo "→ wrote $OUT ($(du -h "$OUT" | cut -f1))"

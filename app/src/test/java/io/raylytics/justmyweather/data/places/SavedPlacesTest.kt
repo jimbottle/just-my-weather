@@ -62,6 +62,17 @@ class SavedPlacesTest {
     }
 
     @Test
+    fun `a place abroad keeps its zone and country, and an older entry reads as having none`() {
+        val london = WeatherLocation(51.51, -0.13, "London, United Kingdom", "Europe/London", "GB")
+        val saved = SavedPlaces.EMPTY.add(london).select(london.label)
+        assertEquals(saved, SavedPlacesCodec.decode(SavedPlacesCodec.encode(saved)))
+        val older = """{"places":[{"label":"Louisville, KY","lat":38.22,"lon":-85.74}]}"""
+        val place = SavedPlacesCodec.decode(older).places.single()
+        assertEquals(null, place.timeZone)
+        assertEquals(null, place.country)
+    }
+
+    @Test
     fun `absent or corrupt storage decodes to an empty list, never a crash`() {
         assertEquals(SavedPlaces.EMPTY, SavedPlacesCodec.decode(null))
         assertEquals(SavedPlaces.EMPTY, SavedPlacesCodec.decode(""))

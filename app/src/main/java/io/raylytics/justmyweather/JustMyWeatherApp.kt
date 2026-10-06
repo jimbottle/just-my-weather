@@ -27,6 +27,7 @@ import io.raylytics.justmyweather.data.metno.MetNoClient
 import io.raylytics.justmyweather.data.nws.NwsClient
 import io.raylytics.justmyweather.data.nws.OkHttpTransport
 import io.raylytics.justmyweather.data.places.AssetPlaceSource
+import io.raylytics.justmyweather.data.places.PlaceLookup
 import io.raylytics.justmyweather.data.places.SavedPlacesRepository
 import io.raylytics.justmyweather.location.LocationProvider
 import io.raylytics.justmyweather.location.LocationResolver
@@ -68,6 +69,14 @@ class AppContainer(context: Context, scope: CoroutineScope) {
                 ),
         )
 
+    /** The gazetteer is opened only when the places screen asks; nothing here
+     * holds its rows for the life of the process. */
+    val placeSource = AssetPlaceSource(appContext)
+
+    /** Nearest-place answers for a bare coordinate (a fix abroad, the
+     * region). Loads its own copy of the gazetteer on first use only. */
+    val placeLookup = PlaceLookup(load = placeSource::load)
+
     // Both caches are persisted so a cold start has something to work with: the
     // point cache reuses the resolved grid instead of re-hitting /points +
     // /stations, and the snapshot cache gives the home screen a real reading to
@@ -78,6 +87,7 @@ class AppContainer(context: Context, scope: CoroutineScope) {
             metNo = metNoClient,
             pointCache = DataStorePointCache(appContext.dataStore),
             snapshotCache = DataStoreSnapshotCache(appContext.dataStore),
+            nearest = placeLookup::nearest,
         )
     val locationProvider = LocationProvider(appContext)
 
@@ -86,10 +96,6 @@ class AppContainer(context: Context, scope: CoroutineScope) {
     // be, not to a default city. The background poll is the caller that most
     // depends on it — it never gets a fix at all.
     val savedPlacesRepository = SavedPlacesRepository(appContext.dataStore)
-
-    /** The gazetteer is opened only when the places screen asks; nothing here
-     * holds 32k rows for the life of the process. */
-    val placeSource = AssetPlaceSource(appContext)
 
     // A chosen place outranks the device fix, for the alert worker as much as
     // for the glance — they share this one resolver, which is why the choice

@@ -22,6 +22,10 @@ object SavedPlacesCodec {
         val label: String,
         val lat: Double,
         val lon: Double,
+        // Null for a US place and for anything saved before places abroad
+        // existed; both mean "NWS knows the zone".
+        val timeZone: String? = null,
+        val country: String? = null,
     )
 
     @Serializable
@@ -35,7 +39,10 @@ object SavedPlacesCodec {
     fun encode(saved: SavedPlaces): String =
         json.encodeToString(
             Stored(
-                places = saved.places.map { StoredPlace(it.label, it.latitude, it.longitude) },
+                places =
+                    saved.places.map {
+                        StoredPlace(it.label, it.latitude, it.longitude, it.timeZone, it.country)
+                    },
                 selected = saved.selected,
             ),
         )
@@ -48,7 +55,13 @@ object SavedPlacesCodec {
         val places =
             stored.places.mapNotNull { place ->
                 if (place.label.isBlank() || !place.lat.isFinite() || !place.lon.isFinite()) return@mapNotNull null
-                WeatherLocation(latitude = place.lat, longitude = place.lon, label = place.label)
+                WeatherLocation(
+                    latitude = place.lat,
+                    longitude = place.lon,
+                    label = place.label,
+                    timeZone = place.timeZone,
+                    country = place.country,
+                )
             }
         // A selection naming a place that did not survive the read resolves to
         // "follow the device" rather than dangling — the safe direction.

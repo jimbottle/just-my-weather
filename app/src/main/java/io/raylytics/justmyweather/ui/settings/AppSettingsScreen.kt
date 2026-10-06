@@ -317,8 +317,8 @@ const val PRIVACY_POLICY_URL = "https://raylytics.io/justmyweather/privacy"
 
 /**
  * What the app is and whose data it shows. The attribution is not a courtesy:
- * MET Norway's CC BY 4.0 licence asks for it wherever its data appears, and a
- * store build is the place a user would look for it.
+ * MET Norway's and GeoNames' CC BY 4.0 licences ask for it wherever their data
+ * appears, and a store build is the place a user would look for it.
  */
 @Composable
 private fun AboutSection(version: String) {
@@ -341,8 +341,9 @@ private fun AboutSection(version: String) {
             onClick = { uriHandler.openUri(PRIVACY_POLICY_URL) },
         )
         Text(
-            text = "Weather data from the US National Weather Service (public domain). " +
-                "Days eight and nine of the daily forecast from MET Norway (CC BY 4.0).",
+            text = "Weather data from the US National Weather Service (public domain) in the United " +
+                "States, and from MET Norway (CC BY 4.0) everywhere else and for days eight and nine. " +
+                "Places from the US Census Gazetteer (public domain) and GeoNames (CC BY 4.0).",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 8.dp),

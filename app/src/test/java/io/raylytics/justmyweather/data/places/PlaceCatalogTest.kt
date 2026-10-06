@@ -105,4 +105,61 @@ class PlaceCatalogTest {
         assertEquals(37.40, location.latitude, 0.001)
         assertEquals(-122.08, location.longitude, 0.001)
     }
+
+    private val world =
+        PlaceCatalog(
+            PlaceCatalog.parse(
+                sequenceOf(
+                    "London\tKY\t37.13\t-84.08",
+                    "Fresno\tCA\t36.75\t-119.77",
+                    "London\t\t51.51\t-0.13\tGB\tEurope/London",
+                    "London\t\t42.98\t-81.23\tCA\tAmerica/Toronto",
+                    "Toronto\t\t43.70\t-79.42\tCA\tAmerica/Toronto",
+                    "Dover\t\t51.13\t1.31\tGB\tEurope/London",
+                    "Calais\t\t50.95\t1.86\tFR\tEurope/Paris",
+                    // A foreign row with no zone is malformed: it is the one
+                    // thing NWS cannot supply for it.
+                    "Nowhere\t\t10.0\t10.0\tXX\t",
+                ),
+            ),
+        )
+
+    @Test
+    fun `a place abroad carries its country and zone, and reads as city and country`() {
+        val london = world.search("london, gb").single()
+        assertEquals("London, United Kingdom", london.label)
+        assertEquals("GB", london.country)
+        val location = london.toLocation()
+        assertEquals("Europe/London", location.timeZone)
+        assertEquals("GB", location.country)
+        // A US place is unchanged: its state, no zone (NWS supplies it).
+        val kentucky = world.search("london, ky").single()
+        assertEquals("London, KY", kentucky.label)
+        assertEquals(null, kentucky.toLocation().timeZone)
+        assertEquals("US", kentucky.toLocation().country)
+        assertTrue(world.search("nowhere").isEmpty(), "a foreign row with no zone is skipped")
+    }
+
+    @Test
+    fun `a country narrows by its code or its English name, and CA means California or Canada`() {
+        assertEquals(listOf("London, United Kingdom"), world.search("london, united kingdom").map { it.label })
+        assertEquals(listOf("London, United Kingdom"), world.search("london gb").map { it.label })
+        assertEquals(listOf("Toronto, Canada"), world.search("toronto, canada").map { it.label })
+        // California's Fresno and Canada's London both answer to CA.
+        assertEquals(listOf("Fresno, CA"), world.search("fresno, ca").map { it.label })
+        assertEquals(listOf("London, Canada"), world.search("london, ca").map { it.label })
+        assertEquals(3, world.search("london").size)
+    }
+
+    @Test
+    fun `the nearest place names a fix's country, and open ocean is nowhere`() {
+        // Trafalgar Square, and a fix in the Channel nearer Calais than Dover.
+        assertEquals("GB", world.nearest(51.508, -0.128)?.country)
+        assertEquals("FR", world.nearest(50.97, 1.80)?.country)
+        // Across the date line, longitude wraps.
+        val wrap = PlaceCatalog(PlaceCatalog.parse(sequenceOf("Taveuni\t\t-16.80\t179.95\tFJ\tPacific/Fiji")))
+        assertEquals("FJ", wrap.nearest(-16.8, -179.95)?.country)
+        // Mid-Atlantic: nothing within reach.
+        assertEquals(null, world.nearest(30.0, -40.0))
+    }
 }

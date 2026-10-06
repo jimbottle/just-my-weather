@@ -4,6 +4,7 @@ import io.raylytics.justmyweather.data.metno.MetNoClient
 import io.raylytics.justmyweather.data.nws.HttpResult
 import io.raylytics.justmyweather.data.nws.HttpTransport
 import io.raylytics.justmyweather.data.nws.NwsClient
+import io.raylytics.justmyweather.data.places.Place
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
@@ -57,7 +58,15 @@ class WeatherRepositoryTest {
         snapshots: SnapshotCache = InMemorySnapshotCache(),
         now: Instant = Instant.parse("2026-06-24T18:05:00Z"),
         metNo: MetNoClient? = null,
-    ) = WeatherRepository(NwsClient(transport = transport), cache, snapshots, clock = { now }, metNo = metNo)
+        nearest: suspend (Double, Double) -> Place? = { _, _ -> null },
+    ) = WeatherRepository(
+        NwsClient(transport = transport),
+        cache,
+        snapshots,
+        clock = { now },
+        metNo = metNo,
+        nearest = nearest,
+    )
 
     @Test
     fun `extended days are cut in the place's calendar, which the NWS point knows`() = runTest {
@@ -135,10 +144,35 @@ class WeatherRepositoryTest {
     }
 
     @Test
-    fun `a GPS fix abroad has no NWS city to borrow, so it is the current location`() = runTest {
+    fun `a GPS fix abroad borrows the nearest bundled town's name and zone, as NWS's point does at home`() =
+        runTest {
+            val transport = abroad()
+            val westminster = Place("London", "", 51.51, -0.13, "GB", "Europe/London")
+            val asked = mutableListOf<Pair<Double, Double>>()
+            val snapshot =
+                repo(transport, metNo = MetNoClient(transport), nearest = { lat, lon ->
+                    asked += lat to lon
+                    westminster
+                }).load(london.copy(label = ""))
+            assertEquals("London, United Kingdom", snapshot.locationLabel)
+            assertEquals("Europe/London", snapshot.timeZone)
+            assertEquals(listOf(51.51 to -0.13), asked)
+
+            // With no town in reach (or no lookup), it is the current location
+            // in the device's zone.
+            val nowhere = repo(abroad(), metNo = MetNoClient(abroad())).load(london.copy(label = ""))
+            assertEquals("Current location", nowhere.locationLabel)
+            assertNull(nowhere.timeZone)
+        }
+
+    @Test
+    fun `a saved place abroad keeps its own label and zone, and nothing is looked up`() = runTest {
         val transport = abroad()
-        val snapshot = repo(transport, metNo = MetNoClient(transport)).load(london.copy(label = ""))
-        assertEquals("Current location", snapshot.locationLabel)
+        val place = london.copy(timeZone = "Europe/London", country = "GB")
+        val snapshot =
+            repo(transport, metNo = MetNoClient(transport), nearest = { _, _ -> error("not needed") }).load(place)
+        assertEquals("London", snapshot.locationLabel)
+        assertEquals("Europe/London", snapshot.timeZone)
     }
 
     @Test
