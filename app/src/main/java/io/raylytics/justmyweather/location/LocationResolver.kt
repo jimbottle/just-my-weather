@@ -43,7 +43,19 @@ class LocationResolver(
      */
     private val fallback: suspend () -> WeatherLocation = { WeatherLocation.DEFAULT },
 ) {
-    suspend fun resolve(): WeatherLocation {
+    suspend fun resolve(): WeatherLocation =
+        resolveKnown()
+            ?: runCatching { fallback() }.getOrNull()
+            ?: WeatherLocation.DEFAULT
+
+    /**
+     * [resolve] without the last rung: a place the user chose, a live fix,
+     * or the last fix we knew — or null. The region's clues are refreshed
+     * with this, never with [resolve]: the fallback city is derived FROM the
+     * region (possibly one picked by hand), and feeding it back as a "place"
+     * clue would make the region confirm itself (roborev 5424).
+     */
+    suspend fun resolveKnown(): WeatherLocation? {
         // An explicit choice outranks a live fix, and says so first. Someone
         // who picked a place is telling the app which sky to watch; quietly
         // preferring wherever the phone happens to be would make the setting
@@ -58,7 +70,5 @@ class LocationResolver(
             return fix
         }
         return runCatching { store.load() }.getOrNull()
-            ?: runCatching { fallback() }.getOrNull()
-            ?: WeatherLocation.DEFAULT
     }
 }

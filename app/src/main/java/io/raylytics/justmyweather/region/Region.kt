@@ -59,6 +59,24 @@ enum class AdConsent {
 }
 
 /**
+ * Whether the banner may be shown — and the ad SDK started — on this phone
+ * right now. Three states, because "the law here asks for consent" and "the
+ * app can't tell where the phone is" are different facts, and the settings
+ * screen says which one applies (roborev 5425).
+ */
+enum class AdEligibility {
+    /** The phone is somewhere no certified consent platform is required. */
+    ALLOWED,
+
+    /** The phone is in the EEA, the UK or Switzerland ([AdConsent]). */
+    CONSENT_REQUIRED,
+
+    /** No mobile network and no location fix this session: no ads, since
+     * the app can't rule out a consent-required country (fail closed). */
+    LOCATION_UNKNOWN,
+}
+
+/**
  * The region's state on Google Play, which only a human changes (Play
  * Console → Production → Countries/regions). The registry records it so the
  * code and the console can be checked against each other

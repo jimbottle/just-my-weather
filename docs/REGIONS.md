@@ -31,8 +31,11 @@ A region the user picks by hand changes units and dates only. **Whether an
 ad may be shown, and the ad SDK started, follows only where the phone
 physically is**: its mobile network or its location fix. It never follows the
 manual region, the place being shown, or the language setting. With neither
-physical clue, consent is treated as required and no ad is shown (fail
-closed). So picking "United States" in Berlin, or viewing New York from a
+physical clue, no ad is shown (fail closed). Only clues gathered in the
+current session count: they are held in memory, so a cold start reads
+"location unknown" until the first refresh. Eligibility is three-state
+(`AdEligibility`: allowed, consent required, or location unknown), and App
+settings says which one applies. So picking "United States" in Berlin, or viewing New York from a
 Wi-Fi tablet there, can never serve an ad without the consent the law
 requires. The cost is no banner on a phone with no mobile network and no
 location permission, even in the US. Remembered physical clues are never

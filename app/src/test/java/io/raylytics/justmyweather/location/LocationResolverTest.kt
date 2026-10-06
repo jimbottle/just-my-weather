@@ -95,4 +95,15 @@ class LocationResolverTest {
         // And with no fix to hold, it degrades to the default rather than throwing.
         assertEquals(WeatherLocation.DEFAULT, LocationResolver(provider(null), broken).resolve())
     }
+
+    @Test
+    fun `resolveKnown never answers with the fallback city`() = runTest {
+        // The fallback is derived from the region; the region's clues must
+        // not be fed it back as a place (roborev 5424).
+        val resolver =
+            LocationResolver(provider(null), InMemoryLastLocationStore(), fallback = { error("must not be asked") })
+        assertEquals(null, resolver.resolveKnown())
+        val home = WeatherLocation(38.25, -85.76, "Home")
+        assertEquals(home, LocationResolver(provider(home), InMemoryLastLocationStore()).resolveKnown())
+    }
 }

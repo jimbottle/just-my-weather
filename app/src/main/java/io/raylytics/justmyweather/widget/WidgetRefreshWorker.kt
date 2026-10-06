@@ -142,7 +142,7 @@ class WidgetRefreshWorker(
                 // one; the last known conventions stand if the read fails.
                 conventions =
                     runCatching {
-                        container.regionRepository.refresh(location)
+                        container.regionRepository.refresh(container.locationResolver.resolveKnown())
                         container.regionRepository.currentConventions()
                     }.getOrNull() ?: previous?.conventions ?: Conventions.US,
             )

@@ -79,7 +79,7 @@ class AlertWorker(
         val now = Instant.now()
         // The notification reads in the user's units; the comparison never
         // depends on them (thresholds are stored canonical).
-        runCatching { container.regionRepository.refresh(location) }
+        runCatching { container.regionRepository.refresh(container.locationResolver.resolveKnown()) }
         val conventions = runCatching { container.regionRepository.currentConventions() }.getOrNull()
         val context =
             if (conventions != null) {

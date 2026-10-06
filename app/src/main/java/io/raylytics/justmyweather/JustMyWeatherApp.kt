@@ -32,7 +32,7 @@ import io.raylytics.justmyweather.data.places.PlaceLookup
 import io.raylytics.justmyweather.data.places.SavedPlacesRepository
 import io.raylytics.justmyweather.location.LocationProvider
 import io.raylytics.justmyweather.location.LocationResolver
-import io.raylytics.justmyweather.region.AdConsent
+import io.raylytics.justmyweather.region.AdEligibility
 import io.raylytics.justmyweather.region.AndroidRegionSignals
 import io.raylytics.justmyweather.region.RegionRepository
 import kotlinx.coroutines.CoroutineScope
@@ -182,15 +182,17 @@ class JustMyWeatherApp : Application() {
             // SDK there can reach Google before any consent, even with no
             // banner ever requested (roborev 5416). The clues are re-read
             // first — on a first launch none are remembered yet, and the
-            // device language alone could say "US" in Berlin — with the
-            // place the app will show, as the glance does, so a place-only
-            // region is seen here too (roborev 5421). Everyone else
+            // device language alone could say "US" in Berlin — with a place
+            // the user chose or a fix (never the fallback city, which comes
+            // from the region itself; roborev 5421, 5424). Only this
+            // session's network or location fix may allow it (roborev 5425).
+            // Everyone else
             // initialises it here, off the main thread, where it costs no
             // frame. Then Play is asked what the account owns, which is
             // what turns a reinstall back into an owner.
-            runCatching { container.regionRepository.refresh(container.locationResolver.resolve()) }
-            val consent = runCatching { container.regionRepository.adConsent.first() }.getOrNull()
-            if (!container.adsEntitlementRepository.adsRemoved.first() && consent == AdConsent.NOT_REQUIRED) {
+            runCatching { container.regionRepository.refresh(container.locationResolver.resolveKnown()) }
+            val eligibility = runCatching { container.regionRepository.adEligibility.first() }.getOrNull()
+            if (!container.adsEntitlementRepository.adsRemoved.first() && eligibility == AdEligibility.ALLOWED) {
                 MobileAds.initialize(this@JustMyWeatherApp) {}
             }
             container.removeAdsManager.start()

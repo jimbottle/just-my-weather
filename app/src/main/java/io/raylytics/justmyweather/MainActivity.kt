@@ -40,7 +40,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import io.raylytics.justmyweather.ads.AdBanner
 import io.raylytics.justmyweather.ads.AdPolicy
 import io.raylytics.justmyweather.alerts.AlertWorker
-import io.raylytics.justmyweather.region.AdConsent
+import io.raylytics.justmyweather.region.AdEligibility
 import io.raylytics.justmyweather.support.SupportKind
 import io.raylytics.justmyweather.support.bugDiagnostics
 import io.raylytics.justmyweather.support.composeSupportMail
@@ -98,7 +98,9 @@ class MainActivity : ComponentActivity() {
                     container.viewConfigRepository,
                     // No-op unless the user switched the hand-off on.
                     container.gadgetbridgeExporter::export,
-                    onPlaceResolved = container.regionRepository::refresh,
+                    // The region refreshes from a place the user chose or a
+                    // fix — never the fallback city (roborev 5424).
+                    onPlaceResolved = { container.regionRepository.refresh(container.locationResolver.resolveKnown()) },
                 )
             }
         }
@@ -200,8 +202,8 @@ class MainActivity : ComponentActivity() {
             // may be shown at all (region/AdConsent). Unknown until the store
             // answers, and the banner is withheld until then, like adsRemoved.
             val conventions by container.regionRepository.conventions.collectAsStateWithLifecycle(Conventions.US)
-            val adConsent by container.regionRepository.adConsent.collectAsStateWithLifecycle(null)
-            val adsServedHere = adConsent == AdConsent.NOT_REQUIRED
+            val adEligibility by container.regionRepository.adEligibility
+                .collectAsStateWithLifecycle(AdEligibility.LOCATION_UNKNOWN)
             // The bars sit on the app-painted background, and the user can
             // force a mood against the system setting — so bar icon contrast
             // must follow the app's resolved mood, not the system default
@@ -245,7 +247,7 @@ class MainActivity : ComponentActivity() {
                             onEnterAlerts = ::requestNotificationsIfNeeded,
                             loadBugReportState = ::bugReportState,
                             adsRemoved = adsRemoved,
-                            adsServedHere = adsServedHere,
+                            adEligibility = adEligibility,
                             onBuyRemoveAds = { appSettingsViewModel.buyRemoveAds(this@MainActivity) },
                             onRateApp = { openStoreListing() },
                         )
@@ -301,8 +303,8 @@ private fun App(
     onThemeChange: (ThemeConfig) -> Unit,
     onEnterAlerts: () -> Unit,
     adsRemoved: Boolean,
-    /** Whether the region allows the banner at all (region/AdConsent). */
-    adsServedHere: Boolean,
+    /** Whether the banner may be shown at all (region/AdEligibility). */
+    adEligibility: AdEligibility,
     /** Opens Play's purchase sheet; needs the Activity, so the host supplies it. */
     onBuyRemoveAds: () -> Unit,
     /** Opens the Play listing; the Activity owns the intent. */
@@ -358,7 +360,7 @@ private fun App(
                     },
                     modifier = Modifier.weight(1f),
                 )
-                if (!adsRemoved && adsServedHere) {
+                if (!adsRemoved && adEligibility == AdEligibility.ALLOWED) {
                     AdBanner(unitId = AdPolicy.bannerUnitId(BuildConfig.DEBUG, BuildConfig.ADMOB_BANNER_UNIT_ID))
                 }
             }
@@ -411,7 +413,7 @@ private fun App(
                 gadgetbridgeEnabled = gadgetbridgeEnabled,
                 onSetGadgetbridgeEnabled = appSettingsViewModel::setGadgetbridgeEnabled,
                 adsRemoved = settingsAdsRemoved,
-                adsServedHere = adsServedHere,
+                adEligibility = adEligibility,
                 regionSummary = regionSummary,
                 onRegion = { screen = Screen.REGION },
                 removeAdsPrice = removeAdsOffer?.formattedPrice,

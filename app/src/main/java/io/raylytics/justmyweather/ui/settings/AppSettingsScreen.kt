@@ -27,6 +27,7 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import io.raylytics.justmyweather.billing.RemoveAdsStatus
+import io.raylytics.justmyweather.region.AdEligibility
 
 /**
  * Settings that are about the app, not the canvas. Customize is for what the
@@ -39,9 +40,9 @@ fun AppSettingsScreen(
     gadgetbridgeEnabled: Boolean,
     onSetGadgetbridgeEnabled: (Boolean) -> Unit,
     adsRemoved: Boolean,
-    /** False where the region's consent rules keep the banner off
-     * (region/AdConsent): no banner, so no purchase to offer. */
-    adsServedHere: Boolean,
+    /** Whether the banner may be shown (region/AdEligibility). Anything but
+     * ALLOWED means no banner, so no purchase to offer. */
+    adEligibility: AdEligibility,
     /** "United Kingdom · °C, mph" — the Region & units row's second line. */
     regionSummary: String,
     onRegion: () -> Unit,
@@ -82,7 +83,7 @@ fun AppSettingsScreen(
                 )
                 AdsSection(
                     adsRemoved = adsRemoved,
-                    adsServedHere = adsServedHere,
+                    adEligibility = adEligibility,
                     price = removeAdsPrice,
                     status = removeAdsStatus,
                     onBuy = onBuyRemoveAds,
@@ -119,7 +120,7 @@ fun AppSettingsScreen(
 @Composable
 private fun AdsSection(
     adsRemoved: Boolean,
-    adsServedHere: Boolean,
+    adEligibility: AdEligibility,
     price: String?,
     status: RemoveAdsStatus,
     onBuy: () -> Unit,
@@ -141,13 +142,24 @@ private fun AdsSection(
             }
             return@Column
         }
-        if (!adsServedHere) {
+        if (adEligibility != AdEligibility.ALLOWED) {
             // Nothing to remove: selling Remove Ads where no banner is shown
-            // would be selling nothing.
+            // would be selling nothing. The two reasons read differently: a
+            // US tablet with no network and no location is not somewhere the
+            // law asks for consent (roborev 5425).
+            val (title, detail) =
+                when (adEligibility) {
+                    AdEligibility.CONSENT_REQUIRED ->
+                        "No ads in your region" to "The banner isn't shown where the law asks for a consent form first."
+                    else ->
+                        "No ads for now" to
+                            "The banner is only shown once the app can tell where your phone is, from its mobile " +
+                            "network or its location."
+                }
             Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-                Text("No ads in your region", style = MaterialTheme.typography.bodyLarge)
+                Text(title, style = MaterialTheme.typography.bodyLarge)
                 Text(
-                    text = "The banner isn't shown where the law asks for a consent form first.",
+                    text = detail,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

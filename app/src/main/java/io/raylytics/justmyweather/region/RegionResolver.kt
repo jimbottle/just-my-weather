@@ -107,12 +107,15 @@ object RegionResolver {
      *
      * Units and dates still follow every clue and the manual choice.
      */
-    fun adConsent(clues: RegionClues): AdConsent {
+    fun adEligibility(clues: RegionClues): AdEligibility {
         val physical =
             listOf(clues.phoneNetwork, clues.phoneLocation)
                 .firstOrNull { it != null && Regions.isKnown(it) }
-                ?: return AdConsent.CERTIFIED_CMP_REQUIRED
-        return Regions.of(physical).adConsent
+                ?: return AdEligibility.LOCATION_UNKNOWN
+        return when (Regions.of(physical).adConsent) {
+            AdConsent.NOT_REQUIRED -> AdEligibility.ALLOWED
+            AdConsent.CERTIFIED_CMP_REQUIRED -> AdEligibility.CONSENT_REQUIRED
+        }
     }
 
     /** The conventions in force: the region's, with any unit the user chose

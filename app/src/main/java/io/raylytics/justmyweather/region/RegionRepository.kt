@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import io.raylytics.justmyweather.data.WeatherLocation
 import io.raylytics.justmyweather.view.Conventions
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
@@ -59,9 +60,21 @@ class RegionRepository(
     /** What "automatic" would choose — shown beside the manual picker. */
     val automatic: Flow<ResolvedRegion> = clues.map { RegionResolver.resolve(RegionSettings.AUTOMATIC, it) }
 
-    /** Whether the banner may be shown here — from the clues alone, never
-     * the manual region (RegionResolver.adConsent). */
-    val adConsent: Flow<AdConsent> = clues.map(RegionResolver::adConsent).distinctUntilChanged()
+    /**
+     * The clues THIS process has gathered, held in memory and never
+     * persisted. Ad eligibility reads only these: the remembered clues are
+     * fine for units, but a "network: US" saved at home and read on a cold
+     * start in Berlin, before the launch refresh lands, would let the
+     * banner load an ad there (roborev 5425). Null until the first refresh.
+     */
+    private val session = MutableStateFlow<RegionClues?>(null)
+
+    /** Whether the banner may be shown — from this session's physical clues
+     * alone (RegionResolver.adEligibility); LOCATION_UNKNOWN until gathered. */
+    val adEligibility: Flow<AdEligibility> =
+        session
+            .map { clues -> clues?.let(RegionResolver::adEligibility) ?: AdEligibility.LOCATION_UNKNOWN }
+            .distinctUntilChanged()
 
     /** How everything reads right now: the region's conventions with the
      * user's unit choices applied. What every screen formats through. */
@@ -77,6 +90,7 @@ class RegionRepository(
      * effort: a failure keeps the clues already remembered. */
     suspend fun refresh(place: WeatherLocation?) {
         val gathered = runCatching { gather(signals, place) }.getOrNull() ?: return
+        session.value = gathered
         runCatching {
             dataStore.edit { prefs ->
                 val stored = RegionCodec.decodeClues(prefs[CLUES])
@@ -101,7 +115,7 @@ class RegionRepository(
          *
          * Physical clues (network, location fix) are NEVER carried over:
          * whether an ad may start rests on them alone (RegionResolver.
-         * adConsent), so a stale "network: US" from home must not keep
+         * adEligibility), so a stale "network: US" from home must not keep
          * allowing ads once the phone loses its signal abroad — consent
          * then fails closed instead (security review, 2026-10-06).
          */
