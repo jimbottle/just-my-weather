@@ -103,7 +103,9 @@ object Regions {
                 "ZA",
                 PlayStatus.READY,
                 DefaultPlace("Johannesburg, South Africa", -26.2, 28.04, "Africa/Johannesburg"),
-                DateOrder.MONTH_FIRST,
+                // CLDR's short date here is year-first (y/MM/dd), but South
+                // Africa writes day before month (roborev 5409).
+                DateOrder.DAY_FIRST,
                 clock24 = true,
             ),
             Prepared(
@@ -211,7 +213,11 @@ object Regions {
                 precipitation = if (code in INCHES) PrecipitationUnit.INCHES else PrecipitationUnit.MILLIMETRES,
             )
         val locale = localeFor(code)
-        val date = shortPattern(locale, FormatStyle.SHORT, null)
+        // MEDIUM, not SHORT: a year-first short pattern (South Africa's
+        // y/MM/dd) hides whether the day or the month leads, where the
+        // medium one spells it out (dd MMM y; Japan's stays y/MM/dd, month
+        // first, which is right there).
+        val date = shortPattern(locale, FormatStyle.MEDIUM, null)
         val time = shortPattern(locale, null, FormatStyle.SHORT)
         return Conventions(
             units = units,

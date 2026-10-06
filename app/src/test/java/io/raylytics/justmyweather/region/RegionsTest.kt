@@ -81,7 +81,7 @@ class RegionsTest {
                 "PK" to (DateOrder.DAY_FIRST to false),
                 "NG" to (DateOrder.DAY_FIRST to true),
                 "PH" to (DateOrder.MONTH_FIRST to false),
-                "ZA" to (DateOrder.MONTH_FIRST to true),
+                "ZA" to (DateOrder.DAY_FIRST to true),
                 "KE" to (DateOrder.DAY_FIRST to true),
                 "GH" to (DateOrder.DAY_FIRST to false),
                 "MY" to (DateOrder.DAY_FIRST to false),
@@ -94,5 +94,13 @@ class RegionsTest {
             assertEquals(dates.second, region.conventions.clock24, code)
             assertEquals(AdConsent.NOT_REQUIRED, region.adConsent, code)
         }
+    }
+
+    @Test
+    fun `an unprepared year-first country still derives the order it writes day and month in`() {
+        // Japan writes 10/6; derivation reads the medium pattern, not a
+        // year-first short one that would hide the order.
+        assertEquals(DateOrder.MONTH_FIRST, Regions.of("JP").conventions.dateOrder)
+        assertEquals(DateOrder.DAY_FIRST, Regions.conventionsFor("ZA").dateOrder)
     }
 }
