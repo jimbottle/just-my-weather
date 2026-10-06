@@ -103,15 +103,34 @@ class RegionResolverTest {
     }
 
     @Test
-    fun `a refresh that only knows the language never overwrites a physical clue`() {
+    fun `a remembered place survives a place-less refresh, but a stale physical clue never does`() {
         val language = RegionClues(deviceSettings = "US")
-        // The Berlin tablet: its region came from the place it shows.
-        assertEquals(false, RegionRepository.shouldReplace(RegionClues(place = "DE"), language))
-        assertEquals(false, RegionRepository.shouldReplace(RegionClues(phoneNetwork = "GB"), language))
-        // Physical clues always win, even over physical ones: the phone moved.
-        assertEquals(true, RegionRepository.shouldReplace(RegionClues(place = "DE"), RegionClues(phoneNetwork = "FR")))
-        // With nothing stronger stored, the language is the best there is.
-        assertEquals(true, RegionRepository.shouldReplace(null, language))
-        assertEquals(true, RegionRepository.shouldReplace(RegionClues(deviceSettings = "GB"), language))
+        // The Berlin tablet: its units came from the place it shows (roborev 5421).
+        assertEquals(
+            RegionClues(place = "DE", deviceSettings = "US"),
+            RegionRepository.merge(RegionClues(place = "DE"), language),
+        )
+        // A network clue from home is not carried abroad: consent fails closed.
+        val merged = RegionRepository.merge(RegionClues(phoneNetwork = "US"), language)
+        assertEquals(language, merged)
+        assertEquals(AdConsent.CERTIFIED_CMP_REQUIRED, RegionResolver.adConsent(merged))
+        // Anything fresh and strong simply replaces what was stored.
+        val fresh = RegionClues(phoneNetwork = "FR")
+        assertEquals(fresh, RegionRepository.merge(RegionClues(place = "DE"), fresh))
+        assertEquals(language, RegionRepository.merge(null, language))
+    }
+
+    @Test
+    fun `ads need a physical clue, and without one consent is treated as required`() {
+        // Where the phone is: the network, or a location fix.
+        assertEquals(AdConsent.NOT_REQUIRED, RegionResolver.adConsent(RegionClues(phoneLocation = "US")))
+        assertEquals(AdConsent.CERTIFIED_CMP_REQUIRED, RegionResolver.adConsent(RegionClues(phoneLocation = "DE")))
+        // The place being shown, or the language setting, says nothing about
+        // where the phone is: a tablet in Berlin looking at New York.
+        assertEquals(AdConsent.CERTIFIED_CMP_REQUIRED, RegionResolver.adConsent(RegionClues(place = "US")))
+        assertEquals(AdConsent.CERTIFIED_CMP_REQUIRED, RegionResolver.adConsent(RegionClues(deviceSettings = "US")))
+        assertEquals(AdConsent.CERTIFIED_CMP_REQUIRED, RegionResolver.adConsent(RegionClues()))
+        // Junk in a physical clue is no clue.
+        assertEquals(AdConsent.CERTIFIED_CMP_REQUIRED, RegionResolver.adConsent(RegionClues(phoneNetwork = "")))
     }
 }

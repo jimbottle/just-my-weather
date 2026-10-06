@@ -80,7 +80,7 @@ class RegionRepository(
         runCatching {
             dataStore.edit { prefs ->
                 val stored = RegionCodec.decodeClues(prefs[CLUES])
-                if (shouldReplace(stored, gathered)) prefs[CLUES] = RegionCodec.encodeClues(gathered)
+                prefs[CLUES] = RegionCodec.encodeClues(merge(stored, gathered))
             }
         }
     }
@@ -93,19 +93,22 @@ class RegionRepository(
 
     companion object {
         /**
-         * Whether freshly [gathered] clues may replace the [stored] ones. Not
-         * when the new answer rests on the phone's language settings alone
-         * while the stored one came from something physical — the network,
-         * a location fix, or the place shown. A refresh that couldn't see
-         * those (no SIM, no fix, no place passed) knows LESS, and letting it
+         * The clues to remember after a refresh: what was just [gathered],
+         * except that a remembered PLACE survives a refresh that saw none —
+         * a place-less refresh knows less, and letting the language setting
          * win would move a Wi-Fi tablet in Berlin set to US English from DE
-         * to US — units, and whether ads may start (roborev 5421).
+         * to US units (roborev 5421).
+         *
+         * Physical clues (network, location fix) are NEVER carried over:
+         * whether an ad may start rests on them alone (RegionResolver.
+         * adConsent), so a stale "network: US" from home must not keep
+         * allowing ads once the phone loses its signal abroad — consent
+         * then fails closed instead (security review, 2026-10-06).
          */
-        internal fun shouldReplace(stored: RegionClues?, gathered: RegionClues): Boolean {
-            val weakOnly = gathered.phoneNetwork == null && gathered.phoneLocation == null && gathered.place == null
-            val storedStrong =
-                stored != null && (stored.phoneNetwork != null || stored.phoneLocation != null || stored.place != null)
-            return !(weakOnly && storedStrong)
+        internal fun merge(stored: RegionClues?, gathered: RegionClues): RegionClues {
+            val sawNothingStrong =
+                gathered.phoneNetwork == null && gathered.phoneLocation == null && gathered.place == null
+            return if (sawNothingStrong && stored?.place != null) gathered.copy(place = stored.place) else gathered
         }
 
         private val SETTINGS = stringPreferencesKey("region_settings")
