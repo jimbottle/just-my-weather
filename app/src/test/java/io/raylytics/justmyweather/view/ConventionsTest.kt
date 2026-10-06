@@ -47,8 +47,7 @@ class ConventionsTest {
     }
 
     @Test
-    fun `a threshold step converts by scale, a temperature by offset too`() {
-        assertEquals(5.0, TemperatureUnit.CELSIUS.spanFromFahrenheit(9.0), 1e-9)
+    fun `conversions round-trip`() {
         assertEquals(35.6, TemperatureUnit.CELSIUS.toFahrenheit(2.0), 1e-9)
         assertEquals(10.0, WindUnit.KMH.toMph(WindUnit.KMH.fromMph(10.0)), 1e-9)
     }

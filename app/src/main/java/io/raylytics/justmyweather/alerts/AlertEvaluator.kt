@@ -36,8 +36,7 @@ object AlertEvaluator {
                 ?: return FireDecision(false, "No ${rule.subject.label.lowercase()} reading", null)
 
         val fired = rule.comparison.test(value, rule.threshold)
-        val actual = rule.subject.format(value, conventions)
-        val limit = rule.subject.format(rule.threshold, conventions)
+        val (actual, limit) = rule.subject.formatPair(value, rule.threshold, conventions)
         val reason =
             if (fired) {
                 "${rule.subject.label} is $actual, ${rule.comparison.word} your $limit"
@@ -68,8 +67,7 @@ object AlertEvaluator {
                 Comparison.ABOVE -> values.max()
             }
         val fired = rule.comparison.test(extreme, rule.threshold)
-        val actual = rule.subject.format(extreme, context.conventions)
-        val limit = rule.subject.format(rule.threshold, context.conventions)
+        val (actual, limit) = rule.subject.formatPair(extreme, rule.threshold, context.conventions)
         val reason =
             if (fired) {
                 "${rule.subject.label} ${rule.window.phrase} reaches $actual, ${rule.comparison.word} your $limit"

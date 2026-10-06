@@ -71,6 +71,7 @@ import io.raylytics.justmyweather.ui.theme.ThemeViewModel
 import io.raylytics.justmyweather.ui.theme.themeResolvesToDark
 import io.raylytics.justmyweather.view.Conventions
 import io.raylytics.justmyweather.view.ThemeConfig
+import io.raylytics.justmyweather.widget.WidgetRefreshWorker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -118,7 +119,13 @@ class MainActivity : ComponentActivity() {
     }
 
     private val regionViewModel: RegionViewModel by viewModels {
-        viewModelFactory { initializer { RegionViewModel(container.regionRepository) } }
+        viewModelFactory {
+            initializer {
+                RegionViewModel(container.regionRepository) {
+                    WidgetRefreshWorker.runOnce(applicationContext, afterCurrent = true)
+                }
+            }
+        }
     }
 
     private val placesViewModel: PlacesViewModel by viewModels {

@@ -13,7 +13,12 @@ import kotlinx.coroutines.launch
 
 /** Backs the Region & units screen: what is in force, what automatic would
  * pick, and the user's overrides. */
-class RegionViewModel(private val repository: RegionRepository) : ViewModel() {
+class RegionViewModel(
+    private val repository: RegionRepository,
+    /** After a change lands: the widgets carry the conventions of their last
+     * fetch, so they need one more to read in the new units. */
+    private val onChanged: () -> Unit = {},
+) : ViewModel() {
     val settings: StateFlow<RegionSettings> =
         repository.settings.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), RegionSettings.AUTOMATIC)
     val resolved: StateFlow<ResolvedRegion?> =
@@ -24,6 +29,9 @@ class RegionViewModel(private val repository: RegionRepository) : ViewModel() {
         repository.conventions.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), Conventions.US)
 
     fun update(transform: (RegionSettings) -> RegionSettings) {
-        viewModelScope.launch { repository.update(transform) }
+        viewModelScope.launch {
+            repository.update(transform)
+            onChanged()
+        }
     }
 }

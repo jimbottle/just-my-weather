@@ -48,7 +48,7 @@ data class AlertRule(
      * or "Chance of rain above 50% within 12 hours" for a forecast window —
      * the threshold in the user's units. */
     fun summary(conventions: Conventions): String {
-        val core = "${subject.label} ${comparison.word} ${subject.format(threshold, conventions)}"
+        val core = "${subject.label} ${comparison.word} ${subject.formatThreshold(threshold, conventions)}"
         return if (window.isForecast) "$core ${window.phrase}" else core
     }
 

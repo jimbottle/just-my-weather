@@ -139,7 +139,7 @@ fun AlertsScreen(
                 }
             }
 
-            AddRuleForm(onAdd = onAdd)
+            AddRuleForm(onAdd = onAdd, chanceOfRainAvailable = officialAlertsHere != false)
 
             HorizontalDivider(
                 color = MaterialTheme.colorScheme.surfaceVariant,
@@ -464,6 +464,10 @@ private enum class LimitChoice(val label: String) {
 @Composable
 private fun AddRuleForm(
     onAdd: (AlertSubject, Comparison, Double, AlertWindow, FireLimit) -> Unit,
+    /** False outside NWS territory: MET reports a chance of precipitation
+     * only for the Nordics, so a chance-of-rain rule there would never fire
+     * — and a rule that silently never fires is worse than none. */
+    chanceOfRainAvailable: Boolean = true,
 ) {
     var window by remember { mutableStateOf(AlertWindow.NOW) }
     var subject by remember { mutableStateOf(AlertSubject.current.first()) }
@@ -486,7 +490,12 @@ private fun AddRuleForm(
     // (temperature, wind, plus chance of rain); "right now" offers every
     // current reading. Subjects are matched by key so the chip stays selected
     // across the Field/PrecipChance wrapping.
-    val subjects = if (window.isForecast) AlertSubject.forecast else AlertSubject.current
+    val subjects =
+        when {
+            !window.isForecast -> AlertSubject.current
+            chanceOfRainAvailable -> AlertSubject.forecast
+            else -> AlertSubject.forecast - AlertSubject.PrecipChance
+        }
     LaunchedEffect(window) {
         if (subjects.none { it.key == subject.key }) subject = subjects.first()
     }

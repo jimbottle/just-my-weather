@@ -28,10 +28,6 @@ enum class TemperatureUnit(val key: String, val label: String) {
     fun fromFahrenheit(f: Double): Double = if (this == FAHRENHEIT) f else (f - 32.0) * 5.0 / 9.0
 
     fun toFahrenheit(value: Double): Double = if (this == FAHRENHEIT) value else Units.celsiusToFahrenheit(value)
-
-    /** A temperature DIFFERENCE (a threshold step, a spread) converts by scale
-     * alone — a 9 °F swing is 5 °C, not -12.8. */
-    fun spanFromFahrenheit(f: Double): Double = if (this == FAHRENHEIT) f else f * 5.0 / 9.0
 }
 
 enum class WindUnit(val key: String, val label: String, private val perMph: Double) {
