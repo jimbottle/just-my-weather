@@ -18,7 +18,7 @@ Switching region switches, all at once:
 | What | How | Where in code |
 |---|---|---|
 | Units: temperature, wind, pressure, precipitation | Per-country table (°F in the US and a handful of others; mph in the US and UK; kPa in Canada; m/s in the Nordics; metric elsewhere) | `region/Regions.kt` `conventionsFor` |
-| Date order (10/6 or 6/10) and clock (4:05 PM or 16:05) | The country's own CLDR locale data, read from the platform | `region/Regions.kt` `conventionsFor` |
+| Date order (10/6 or 6/10) and clock (4:05 PM or 16:05) | Written into each prepared region's entry, so it reads the same on every phone; for any other country, the platform's CLDR locale data | `region/Regions.kt` `PREPARED`, `conventionsFor` |
 | Whether the ad banner (and so the Remove Ads purchase) may be shown | Google's EU User Consent Policy: no banner in the EEA, UK and Switzerland until the app has a certified consent platform | `region/Region.kt` `AdConsent` |
 | Where a first run opens with no location and no saved place | The region's default place | `region/Regions.kt` `PREPARED` |
 
@@ -69,11 +69,21 @@ that decided it*. Look there first when someone reports the wrong units.
 ## The registry
 
 `app/src/main/java/io/raylytics/justmyweather/region/Regions.kt` holds
-`PREPARED`, one line per region we ship to or intend to:
+`PREPARED`, one entry per region we ship to or intend to:
 
 ```kotlin
-Prepared("GB", PlayStatus.PLANNED, DefaultPlace("London, United Kingdom", 51.51, -0.13, "Europe/London")),
+Prepared(
+    "GB",
+    PlayStatus.PLANNED,
+    DefaultPlace("London, United Kingdom", 51.51, -0.13, "Europe/London"),
+    DateOrder.DAY_FIRST,
+    clock24 = true,
+),
 ```
+
+The date order and clock are written down rather than derived. CLDR data
+changes between Java and Android versions: Java 17 and 21 disagree for a
+wave-2 country. A region we ship to must read the same on every phone.
 
 | `PlayStatus` | Means | Who sets it |
 |---|---|---|
@@ -115,13 +125,15 @@ A region moves from `PLANNED` to `READY` only when every item holds:
 
 ## Adding a region — step by step
 
-1. **Add the line** to `PREPARED` in `region/Regions.kt`, with
-   `PlayStatus.PLANNED` and a default place (the largest or capital city,
-   with its IANA zone).
-2. **Check the derived conventions.** Add the region to `RegionsTest`
-   with the units, date order and clock it should read in. If the
-   derivation is wrong for it, pass `conventions =` explicitly on its
-   `Prepared` line, and say why in a comment.
+1. **Add the entry** to `PREPARED` in `region/Regions.kt`, with
+   `PlayStatus.PLANNED`, a default place (the largest or capital city, with
+   its IANA zone), and the region's date order and clock. Take those from
+   current CLDR (`Regions.conventionsFor` on Java 21 prints them), then
+   check them against how the country actually writes dates.
+2. **Check the conventions.** Add the region to `RegionsTest` with the
+   units, date order and clock it should read in. If its units are wrong,
+   fix the per-country unit tables in `Regions.kt` and say why in a
+   comment.
 3. **Check its consent regime.** If it requires a certified consent
    platform, add it to `CERTIFIED_CMP_REQUIRED` in `Regions.kt`.
 4. **Check place search.** Add two or three of its cities to

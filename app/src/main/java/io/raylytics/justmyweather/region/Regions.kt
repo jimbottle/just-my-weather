@@ -13,14 +13,15 @@ import java.time.format.FormatStyle
 import java.util.Locale
 
 /**
- * The region registry: **to add a region, add one line to [PREPARED]** and
+ * The region registry: **to add a region, add one entry to [PREPARED]** and
  * follow docs/REGIONS.md. Every other country still works — [of] derives
  * sensible defaults for any ISO code — but only a prepared region has a Play
  * status and a first-run place, and only those are ever opened on Play.
  *
- * Pure: no Android, no I/O. The date order and clock come from the JDK's
- * CLDR locale data (the same data Android's ICU carries), so a new region
- * reads its dates the local way without a table here to keep.
+ * Pure: no Android, no I/O. For a country not in the registry the date
+ * order and clock come from the platform's CLDR locale data, so it reads the
+ * local way without a table to keep; a prepared region pins them (see
+ * [Prepared]) so it reads identically on every phone.
  */
 object Regions {
     /**
@@ -31,46 +32,132 @@ object Regions {
     private val PREPARED: List<Prepared> =
         listOf(
             // Wave 0 — live since 0.2.0.
-            Prepared("US", PlayStatus.LIVE, DefaultPlace("New York, NY", 40.7128, -74.0060, "America/New_York")),
+            Prepared(
+                "US",
+                PlayStatus.LIVE,
+                DefaultPlace("New York, NY", 40.7128, -74.006, "America/New_York"),
+                DateOrder.MONTH_FIRST,
+                clock24 = false,
+            ),
             // Wave 1 — English-primary, strong ad markets. READY: gate passed
             // 2026-10-06, evidence in localization/wave-1.md.
-            Prepared("CA", PlayStatus.READY, DefaultPlace("Toronto, Canada", 43.70, -79.42, "America/Toronto")),
-            Prepared("AU", PlayStatus.READY, DefaultPlace("Sydney, Australia", -33.87, 151.21, "Australia/Sydney")),
+            Prepared(
+                "CA",
+                PlayStatus.READY,
+                DefaultPlace("Toronto, Canada", 43.7, -79.42, "America/Toronto"),
+                DateOrder.MONTH_FIRST,
+                clock24 = false,
+            ),
+            Prepared(
+                "AU",
+                PlayStatus.READY,
+                DefaultPlace("Sydney, Australia", -33.87, 151.21, "Australia/Sydney"),
+                DateOrder.DAY_FIRST,
+                clock24 = false,
+            ),
             Prepared(
                 "NZ",
                 PlayStatus.READY,
                 DefaultPlace("Auckland, New Zealand", -36.85, 174.76, "Pacific/Auckland"),
+                DateOrder.DAY_FIRST,
+                clock24 = false,
             ),
-            Prepared("GB", PlayStatus.READY, DefaultPlace("London, United Kingdom", 51.51, -0.13, "Europe/London")),
-            Prepared("IE", PlayStatus.READY, DefaultPlace("Dublin, Ireland", 53.33, -6.25, "Europe/Dublin")),
+            Prepared(
+                "GB",
+                PlayStatus.READY,
+                DefaultPlace("London, United Kingdom", 51.51, -0.13, "Europe/London"),
+                DateOrder.DAY_FIRST,
+                clock24 = true,
+            ),
+            Prepared(
+                "IE",
+                PlayStatus.READY,
+                DefaultPlace("Dublin, Ireland", 53.33, -6.25, "Europe/Dublin"),
+                DateOrder.DAY_FIRST,
+                clock24 = true,
+            ),
             // Wave 2 — English official or dominant, very large populations.
             // READY: gate passed 2026-10-06, evidence in localization/wave-2.md.
-            Prepared("IN", PlayStatus.READY, DefaultPlace("New Delhi, India", 28.64, 77.22, "Asia/Kolkata")),
-            Prepared("PH", PlayStatus.READY, DefaultPlace("Manila, Philippines", 14.60, 120.98, "Asia/Manila")),
-            Prepared("NG", PlayStatus.READY, DefaultPlace("Lagos, Nigeria", 6.45, 3.39, "Africa/Lagos")),
+            Prepared(
+                "IN",
+                PlayStatus.READY,
+                DefaultPlace("New Delhi, India", 28.64, 77.22, "Asia/Kolkata"),
+                DateOrder.DAY_FIRST,
+                clock24 = false,
+            ),
+            Prepared(
+                "PH",
+                PlayStatus.READY,
+                DefaultPlace("Manila, Philippines", 14.6, 120.98, "Asia/Manila"),
+                DateOrder.MONTH_FIRST,
+                clock24 = false,
+            ),
+            Prepared(
+                "NG",
+                PlayStatus.READY,
+                DefaultPlace("Lagos, Nigeria", 6.45, 3.39, "Africa/Lagos"),
+                DateOrder.DAY_FIRST,
+                clock24 = true,
+            ),
             Prepared(
                 "ZA",
                 PlayStatus.READY,
-                DefaultPlace("Johannesburg, South Africa", -26.20, 28.04, "Africa/Johannesburg"),
+                DefaultPlace("Johannesburg, South Africa", -26.2, 28.04, "Africa/Johannesburg"),
+                DateOrder.MONTH_FIRST,
+                clock24 = true,
             ),
-            Prepared("PK", PlayStatus.READY, DefaultPlace("Karachi, Pakistan", 24.86, 67.01, "Asia/Karachi")),
-            Prepared("KE", PlayStatus.READY, DefaultPlace("Nairobi, Kenya", -1.28, 36.82, "Africa/Nairobi")),
-            Prepared("GH", PlayStatus.READY, DefaultPlace("Accra, Ghana", 5.56, -0.20, "Africa/Accra")),
-            Prepared("SG", PlayStatus.READY, DefaultPlace("Singapore, Singapore", 1.29, 103.85, "Asia/Singapore")),
+            Prepared(
+                "PK",
+                PlayStatus.READY,
+                DefaultPlace("Karachi, Pakistan", 24.86, 67.01, "Asia/Karachi"),
+                DateOrder.DAY_FIRST,
+                clock24 = false,
+            ),
+            Prepared(
+                "KE",
+                PlayStatus.READY,
+                DefaultPlace("Nairobi, Kenya", -1.28, 36.82, "Africa/Nairobi"),
+                DateOrder.DAY_FIRST,
+                clock24 = true,
+            ),
+            Prepared(
+                "GH",
+                PlayStatus.READY,
+                DefaultPlace("Accra, Ghana", 5.56, -0.2, "Africa/Accra"),
+                DateOrder.DAY_FIRST,
+                clock24 = false,
+            ),
+            Prepared(
+                "SG",
+                PlayStatus.READY,
+                DefaultPlace("Singapore, Singapore", 1.29, 103.85, "Asia/Singapore"),
+                DateOrder.DAY_FIRST,
+                clock24 = false,
+            ),
             Prepared(
                 "MY",
                 PlayStatus.READY,
                 DefaultPlace("Kuala Lumpur, Malaysia", 3.14, 101.69, "Asia/Kuala_Lumpur"),
+                DateOrder.DAY_FIRST,
+                clock24 = false,
             ),
         )
 
-    /** One row of the registry. Conventions are derived like any other
-     * country's; pass [conventions] only where the derivation is wrong. */
+    /**
+     * One row of the registry. Units come from the per-country tables below.
+     * The date order and clock are written down HERE rather than derived:
+     * derivation reads the platform's CLDR data, which changes between
+     * versions — Java 17 and 21 disagree for a wave-2 country, and Android
+     * carries whatever ICU its OS version shipped — so a region we ship to
+     * must read the same on every phone. Values from CLDR 42 (Java 21 /
+     * recent Android), 2026-10-06; change one when local feedback says so.
+     */
     private data class Prepared(
         val code: String,
         val play: PlayStatus,
         val defaultPlace: DefaultPlace,
-        val conventions: Conventions? = null,
+        val dateOrder: DateOrder,
+        val clock24: Boolean,
     )
 
     /** Every prepared region, in rollout order. */
@@ -89,7 +176,10 @@ object Regions {
         val prepared = PREPARED.firstOrNull { it.code == upper }
         return Region(
             code = upper,
-            conventions = prepared?.conventions ?: conventionsFor(upper),
+            conventions =
+                conventionsFor(upper).let { derived ->
+                    prepared?.let { derived.copy(dateOrder = it.dateOrder, clock24 = it.clock24) } ?: derived
+                },
             adConsent =
                 if (upper in CERTIFIED_CMP_REQUIRED) AdConsent.CERTIFIED_CMP_REQUIRED else AdConsent.NOT_REQUIRED,
             play = prepared?.play,
