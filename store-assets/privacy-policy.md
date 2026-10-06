@@ -19,7 +19,8 @@ measurement is described under "Ads and purchases").
 The app is free and shows one banner ad, served by **Google AdMob**, at the
 bottom of the screen. AdMob receives standard advertising signals from your
 device to serve that ad (see "Ads and purchases"). A one-time $0.99 purchase
-removes the ad.
+removes the ad. In the United Kingdom, the European Economic Area and
+Switzerland the app currently shows no ad at all.
 
 Everything you set up — which modules show, how they are arranged, your theme,
 your saved places, your alert rules — stays on your phone (and in your own
