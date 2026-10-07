@@ -19,7 +19,6 @@ Switching region switches, all at once:
 |---|---|---|
 | Units: temperature, wind, pressure, precipitation | Per-country table (°F in the US and a handful of others; mph in the US and UK; kPa in Canada; m/s in the Nordics; metric elsewhere) | `region/Regions.kt` `conventionsFor` |
 | Date order (10/6 or 6/10) and clock (4:05 PM or 16:05) | Written into each prepared region's entry, so it reads the same on every phone; for any other country, the platform's CLDR locale data | `region/Regions.kt` `PREPARED`, `conventionsFor` |
-| Whether the ad banner (and so the Remove Ads purchase) may be shown | Google's EU User Consent Policy: no banner in the EEA, UK and Switzerland until the app has a certified consent platform | `region/Region.kt` `AdConsent` |
 | Where a first run opens with no location and no saved place | The region's default place | `region/Regions.kt` `PREPARED` |
 
 What a region does **not** decide: where the weather comes from. That is per
@@ -28,19 +27,10 @@ else (`data/WeatherRepository.kt`). Someone in Leeds who looks at Ohio gets
 NWS's Ohio forecast, read in Celsius.
 
 A region the user picks by hand changes units and dates only. **Whether an
-ad may be shown, and the ad SDK started, follows only where the phone
-physically is**: its mobile network or its location fix. It never follows the
-manual region, the place being shown, or the language setting. With neither
-physical clue, no ad is shown (fail closed). Only clues gathered in the
-current session count: they are held in memory, so a cold start reads
-"location unknown" until the first refresh. Eligibility is three-state
-(`AdEligibility`: allowed, consent required, or location unknown), and App
-settings says which one applies. So picking "United States" in Berlin, or viewing New York from a
-Wi-Fi tablet there, can never serve an ad without the consent the law
-requires. The cost is no banner on a phone with no mobile network and no
-location permission, even in the US. Remembered physical clues are never
-reused: each decision rests on what the phone can see now
-(`RegionRepository.merge`).
+ad may be shown is not a region matter at all.** Google's consent SDK (UMP)
+decides that on every launch, from Google's side: it asks the user where the
+law requires it (the EEA, the UK, Switzerland) and answers "not required"
+everywhere else. See "Ads and consent" below.
 
 The user can pin any unit by hand. A pinned unit overrides the region's,
 and the unpinned ones keep following the region. The date order and the
@@ -122,11 +112,12 @@ A region moves from `PLANNED` to `READY` only when every item holds:
    Today the UI is English only, so only English-reading regions pass.
 4. **Place search.** The region's major cities resolve from the gazetteer
    with the right label and time zone. Add them to `BundledGazetteerTest`.
-5. **Ads and billing.** Either AdMob serves there and the `remove_ads`
-   product is purchasable (Play Billing's country list), or `AdConsent`
-   keeps the banner off, in which case the purchase is not offered.
-6. **Consent and privacy.** The region's consent regime is answered (see
-   "Ads and consent" below), and the privacy policy's claims hold there.
+5. **Ads and billing.** AdMob serves there and the `remove_ads` product is
+   purchasable (Play Billing's country list). Consent is handled by UMP
+   (see "Ads and consent"), so nothing per region is needed in code.
+6. **Privacy.** The privacy policy's claims hold there. If the country has
+   a privacy law of its own beyond GDPR (India's DPDP, US state laws), it
+   has been read.
 7. **Honest degradation.** Outside NWS territory the glance says
    "Forecast for …" rather than "Observed", the Alerts screen explains
    that there are no official warnings, and nothing renders as an empty
@@ -144,8 +135,8 @@ A region moves from `PLANNED` to `READY` only when every item holds:
    units, date order and clock it should read in. If its units are wrong,
    fix the per-country unit tables in `Regions.kt` and say why in a
    comment.
-3. **Check its consent regime.** If it requires a certified consent
-   platform, add it to `CERTIFIED_CMP_REQUIRED` in `Regions.kt`.
+3. **Check its privacy regime.** UMP covers GDPR countries. A country with
+   its own consent law may need a message in AdMob's Privacy & messaging.
 4. **Check place search.** Add two or three of its cities to
    `BundledGazetteerTest`. If they are missing, the gazetteer only carries
    places of 15,000+ people (GeoNames `cities15000`); see
@@ -170,8 +161,7 @@ A region moves from `PLANNED` to `READY` only when every item holds:
 
 Order matters. Never mark a region `LIVE` before the console says so, and
 never open a region on the console in a build whose registry doesn't have
-it at least `READY`: the build would serve the wrong units, or ads where
-consent is required.
+it at least `READY`: the build would serve the wrong units.
 
 ## Pausing or removing a region
 
@@ -188,18 +178,25 @@ where its history and default place live.
 
 ## Ads and consent
 
-Today the app serves only non-personalized ads and ships no consent form.
 Google's EU User Consent Policy requires a Google-certified consent
-management platform (the UMP SDK) for ad traffic from the EEA, the UK and
-Switzerland. Without one only "limited ads" serve, and the policy
-requirement is not met. So the app shows **no banner** in those regions
-(`AdConsent.CERTIFIED_CMP_REQUIRED`), and therefore offers no Remove Ads
-purchase there.
+platform for ad traffic from the EEA, the UK and Switzerland, even for
+non-personalized ads. The app uses **Google's UMP SDK** (`ads/AdsConsent`,
+`ads/UmpConsentGateway`, decided 2026-10-07):
 
-The decision to integrate UMP, which would allow the banner in those regions, is
-tracked as **just-my-weather-5fm.9** and belongs to Evan. If UMP is added,
-gate the banner on its consent answer and move the regions out of
-`CERTIFIED_CMP_REQUIRED` in the same change.
+- Every launch, MainActivity asks UMP whether consent is needed. Google
+  decides that from the request, not the app, so a phone with no SIM and no
+  location is handled like any other. Where consent is needed, UMP shows the
+  form published in the **AdMob console** (Privacy & messaging, then the
+  GDPR message).
+- The ads SDK starts, and the banner loads, only once UMP's
+  `canRequestAds()` is true. Before an answer, or with no published form,
+  there are no ads.
+- Where a form applies, App settings shows **Privacy choices**, which Google
+  requires and which reopens the form. Remove Ads is offered wherever ads
+  can run.
+- Requests stay non-personalized (`AdPolicy`), whatever the user chose.
+- To test from anywhere: `./gradlew :app:assembleDebug -PumpGeography=eea`
+  (or `not_eea`). It's ignored in release builds.
 
 ## Rollout waves
 
@@ -209,13 +206,14 @@ first. The detail is in `localization/PLAN.md`.
 | Wave | Regions |
 |---|---|
 | 0 | US (live) |
-| 1 | CA, AU, NZ (no consent platform needed); GB, IE (open without a banner, or after UMP) |
+| 1 | CA, AU, NZ, GB, IE |
 | 2 | IN, PH, NG, ZA, PK, KE, GH, SG, MY |
 | 3+ | Europe by Play's own grouping, after UI translation |
 
 ## Files at a glance
 
-- `region/Region.kt`: what a region is (`Region`, `AdConsent`, `PlayStatus`).
+- `region/Region.kt`: what a region is (`Region`, `PlayStatus`).
+- `ads/AdsConsent.kt`, `ads/UmpConsentGateway.kt`: whether ads may run (Google's UMP).
 - `region/Regions.kt`: **the registry**, plus derived conventions for every country.
 - `region/RegionResolver.kt`: the decision order, the user's settings, and the clues.
 - `region/RegionRepository.kt`, `AndroidRegionSignals.kt`: gathering and remembering clues.

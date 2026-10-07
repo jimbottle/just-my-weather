@@ -75,6 +75,12 @@ android {
         // the samples (AdPolicy.bannerUnitId re-checks the unit at runtime).
         manifestPlaceholders["admobAppId"] = admobSampleAppId
         buildConfigField("String", "ADMOB_BANNER_UNIT_ID", "\"$admobSampleBannerId\"")
+
+        // Debug-only: pretend to be in the EEA (or not) so the consent form can
+        // be checked on an emulator anywhere — `./gradlew assembleDebug
+        // -PumpGeography=eea`. Ignored by release builds (ads/UmpConsentGateway).
+        val umpGeography = (project.findProperty("umpGeography") as String?).orEmpty()
+        buildConfigField("String", "UMP_DEBUG_GEOGRAPHY", "\"$umpGeography\"")
     }
 
     signingConfigs {
@@ -181,6 +187,10 @@ dependencies {
     // packages and one call site. Play requires Billing Library 8+ for new
     // apps since 2026-08-31.
     implementation("com.google.android.gms:play-services-ads:25.5.0")
+    // Google's certified consent platform (UMP), which decides whether ads may
+    // run at all — it asks the user where the law requires it (EEA, UK,
+    // Switzerland) and answers "not required" elsewhere (Evan, 2026-10-07).
+    implementation("com.google.android.ump:user-messaging-platform:4.0.0")
     implementation("com.android.billingclient:billing-ktx:9.1.0")
     // The ads SDK pulls in a pre-1.3 androidx.fragment, and release lint
     // (lintVitalRelease) refuses an app that registers for activity results

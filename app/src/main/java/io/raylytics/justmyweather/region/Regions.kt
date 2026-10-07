@@ -182,8 +182,6 @@ object Regions {
                 conventionsFor(upper).let { derived ->
                     prepared?.let { derived.copy(dateOrder = it.dateOrder, clock24 = it.clock24) } ?: derived
                 },
-            adConsent =
-                if (upper in CERTIFIED_CMP_REQUIRED) AdConsent.CERTIFIED_CMP_REQUIRED else AdConsent.NOT_REQUIRED,
             play = prepared?.play,
             defaultPlace = prepared?.defaultPlace,
         )
@@ -257,14 +255,4 @@ object Regions {
     private val KILOPASCALS = setOf("CA") // Environment Canada reports kPa.
     private val MILLIMETRES_OF_MERCURY = setOf("RU", "BY")
     private val INCHES = US_CUSTOMARY + setOf("LR")
-
-    /** Google's EU User Consent Policy: the EEA (EU + IS, LI, NO), the UK and
-     * Switzerland. See [AdConsent]. */
-    private val CERTIFIED_CMP_REQUIRED =
-        setOf(
-            "AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", "GR", "HU", "IE", "IT",
-            "LV", "LT", "LU", "MT", "NL", "PL", "PT", "RO", "SK", "SI", "ES", "SE",
-            "IS", "LI", "NO",
-            "GB", "CH",
-        )
 }

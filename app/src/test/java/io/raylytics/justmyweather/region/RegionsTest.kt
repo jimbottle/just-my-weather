@@ -18,7 +18,6 @@ class RegionsTest {
     fun `the United States reads exactly as the app always did`() {
         assertEquals(Conventions.US, Regions.of("US").conventions)
         assertEquals(PlayStatus.LIVE, Regions.of("US").play)
-        assertEquals(AdConsent.NOT_REQUIRED, Regions.of("US").adConsent)
     }
 
     @Test
@@ -54,16 +53,6 @@ class RegionsTest {
     }
 
     @Test
-    fun `the banner is withheld wherever a certified consent platform is required`() {
-        for (code in listOf("GB", "IE", "DE", "FR", "NO", "IS", "CH")) {
-            assertEquals(AdConsent.CERTIFIED_CMP_REQUIRED, Regions.of(code).adConsent, code)
-        }
-        for (code in listOf("US", "CA", "AU", "NZ", "IN")) {
-            assertEquals(AdConsent.NOT_REQUIRED, Regions.of(code).adConsent, code)
-        }
-    }
-
-    @Test
     fun `every prepared region is a real code with a first-run place`() {
         assertTrue(Regions.prepared.isNotEmpty())
         for (region in Regions.prepared) {
@@ -92,7 +81,6 @@ class RegionsTest {
             assertEquals(UnitPrefs.METRIC, region.conventions.units, code)
             assertEquals(dates.first, region.conventions.dateOrder, code)
             assertEquals(dates.second, region.conventions.clock24, code)
-            assertEquals(AdConsent.NOT_REQUIRED, region.adConsent, code)
         }
     }
 

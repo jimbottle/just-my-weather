@@ -4,6 +4,8 @@ import android.app.Application
 import android.content.Context
 import androidx.datastore.preferences.preferencesDataStore
 import com.google.android.gms.ads.MobileAds
+import io.raylytics.justmyweather.ads.AdsConsent
+import io.raylytics.justmyweather.ads.UmpConsentGateway
 import io.raylytics.justmyweather.alerts.AlertNotifier
 import io.raylytics.justmyweather.alerts.AlertScheduling
 import io.raylytics.justmyweather.alerts.AlertWorker
@@ -32,7 +34,6 @@ import io.raylytics.justmyweather.data.places.PlaceLookup
 import io.raylytics.justmyweather.data.places.SavedPlacesRepository
 import io.raylytics.justmyweather.location.LocationProvider
 import io.raylytics.justmyweather.location.LocationResolver
-import io.raylytics.justmyweather.region.AdEligibility
 import io.raylytics.justmyweather.region.AndroidRegionSignals
 import io.raylytics.justmyweather.region.RegionRepository
 import kotlinx.coroutines.CoroutineScope
@@ -151,6 +152,19 @@ class AppContainer(context: Context, scope: CoroutineScope) {
     // is the only thing that talks to Play Billing.
     val adsEntitlementRepository = AdsEntitlementRepository(appContext.dataStore)
     val removeAdsManager = RemoveAdsManager(PlayBillingGateway(appContext), adsEntitlementRepository, scope)
+
+    // Whether ads may run at all is Google's consent SDK's call (UMP): it asks
+    // the user where the law requires it and says "not required" elsewhere.
+    // The ads SDK starts once, only after that — and never for an owner of
+    // Remove Ads, who has nothing to show.
+    val adsConsent =
+        AdsConsent(
+            UmpConsentGateway(appContext, BuildConfig.UMP_DEBUG_GEOGRAPHY, BuildConfig.DEBUG),
+        ) {
+            scope.launch {
+                if (!adsEntitlementRepository.adsRemoved.first()) MobileAds.initialize(appContext) {}
+            }
+        }
 }
 
 class JustMyWeatherApp : Application() {
@@ -175,26 +189,11 @@ class JustMyWeatherApp : Application() {
             if (hasWork) AlertWorker.runOnce(this@JustMyWeatherApp)
         }
         appScope.launch {
-            // An owner's phone never starts the ads SDK at all — nothing to
-            // show, so nothing to initialise, and no network it would wake
-            // for. Nor does a phone where the law asks for a consent form
-            // first (region/AdConsent: EEA, UK, Switzerland): starting the
-            // SDK there can reach Google before any consent, even with no
-            // banner ever requested (roborev 5416). The clues are re-read
-            // first — on a first launch none are remembered yet, and the
-            // device language alone could say "US" in Berlin — with a place
-            // the user chose or a fix (never the fallback city, which comes
-            // from the region itself; roborev 5421, 5424). Only this
-            // session's network or location fix may allow it (roborev 5425).
-            // Everyone else
-            // initialises it here, off the main thread, where it costs no
-            // frame. Then Play is asked what the account owns, which is
-            // what turns a reinstall back into an owner.
-            runCatching { container.regionRepository.refresh(container.locationResolver.resolveKnown()) }
-            val eligibility = runCatching { container.regionRepository.adEligibility.first() }.getOrNull()
-            if (!container.adsEntitlementRepository.adsRemoved.first() && eligibility == AdEligibility.ALLOWED) {
-                MobileAds.initialize(this@JustMyWeatherApp) {}
-            }
+            // Play is asked what the account owns, which is what turns a
+            // reinstall back into an owner. The ads SDK is NOT started here:
+            // Google's consent SDK decides when it may be (AdsConsent, from
+            // MainActivity), so it never starts before consent where the law
+            // asks for it.
             container.removeAdsManager.start()
         }
     }

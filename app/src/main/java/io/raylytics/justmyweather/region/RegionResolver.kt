@@ -92,32 +92,6 @@ object RegionResolver {
         return ResolvedRegion(Regions.of(code), source)
     }
 
-    /**
-     * Whether an ad may be shown — and the ad SDK started — which follows
-     * where the phone physically IS, and fails CLOSED:
-     *
-     *  - never a region the user picked by hand (roborev 5400): picking
-     *    "United States" for its 12-hour clock must not serve an ad from
-     *    Berlin without the consent the law requires there;
-     *  - never the place being SHOWN or the phone's language settings
-     *    (security review, 2026-10-06): a Wi-Fi tablet in Berlin looking at
-     *    New York, or set to US English, is still in Berlin;
-     *  - and with no physical clue at all — no mobile network, no location
-     *    fix — consent is treated as required: no ads, rather than a guess.
-     *
-     * Units and dates still follow every clue and the manual choice.
-     */
-    fun adEligibility(clues: RegionClues): AdEligibility {
-        val physical =
-            listOf(clues.phoneNetwork, clues.phoneLocation)
-                .firstOrNull { it != null && Regions.isKnown(it) }
-                ?: return AdEligibility.LOCATION_UNKNOWN
-        return when (Regions.of(physical).adConsent) {
-            AdConsent.NOT_REQUIRED -> AdEligibility.ALLOWED
-            AdConsent.CERTIFIED_CMP_REQUIRED -> AdEligibility.CONSENT_REQUIRED
-        }
-    }
-
     /** The conventions in force: the region's, with any unit the user chose
      * put in its place. The date order and clock always follow the region —
      * choosing a region is how to change them. */

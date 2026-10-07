@@ -19,10 +19,10 @@ measurement is described under "Ads and purchases").
 The app is free and shows one banner ad, served by **Google AdMob**, at the
 bottom of the screen. AdMob receives standard advertising signals from your
 device to serve that ad (see "Ads and purchases"). A one-time $0.99 purchase
-removes the ad. When the app can tell from your mobile network or your
-location that you are in the United Kingdom, the European Economic Area or
-Switzerland, or cannot tell where you are at all, it shows no ad and does not
-start the ad library.
+removes the ad. In the United Kingdom, the European Economic Area and
+Switzerland the app asks first, using Google's consent form, and shows no ad
+until you have chosen; you can change your choice any time in App settings →
+Privacy choices.
 
 Everything you set up — which modules show, how they are arranged, your theme,
 your saved places, your alert rules — stays on your phone (and in your own
@@ -60,9 +60,8 @@ format, the app works out which country you are in. It reads the country of
 the mobile network your phone is connected to (which needs no permission), or
 the country of your approximate location or of the place you are viewing,
 matched against the bundled place list, or your phone's language settings; you
-can also set your region yourself in App settings. Whether an ad may be shown
-follows only the mobile network or your approximate location, never the place
-you are viewing, your language settings or a region you set (see "Ads and
+can also set your region yourself in App settings. Whether an ad may be shown does
+not depend on any of this: Google's consent service decides that (see "Ads and
 purchases"). All of this happens on your phone, and the country is not sent to
 the developer or to any weather or ad service.
 
@@ -90,11 +89,15 @@ no advertising ID.
 ## Ads and purchases
 
 Unless you have bought ad removal, the app shows **one banner ad** at the
-bottom of the screen. When the app can tell from your mobile network or your
-location that you are in the United Kingdom, the European Economic Area or
-Switzerland, or cannot tell where you are at all, it shows no ad and does not
-start the ad SDK, so nothing below reaches Google. A region you pick by hand in
-the app changes units and dates only, never this. It is served by **Google AdMob**, a Google service, and
+bottom of the screen. Each time the app opens it asks **Google's consent
+service** (the User Messaging Platform) whether your consent is needed where
+you are; Google answers from the request (your IP address, as for any
+connection), and stores your answer on your device. Where consent is needed —
+the United Kingdom, the European Economic Area and Switzerland — the app shows
+Google's consent form and starts the ad SDK only after you have chosen; if you
+decline, Google may still show a limited ad that uses no cookies or advertising
+identifiers. You can change your choice any time in App settings → Privacy
+choices. It is served by **Google AdMob**, a Google service, and
 the app requests **non-personalized ads only**. To serve and measure that ad,
 the Google Mobile Ads SDK built into the app may collect:
 
@@ -125,7 +128,8 @@ The app stores the following on your device, in its private app storage:
 - your view configuration (modules, sizes, order, labels, density, theme);
 - your saved places and the last location the app used;
 - your alert rules, whether each has fired, and your quiet-hours setting;
-- whether you have bought ad removal;
+- whether you have bought ad removal, and your choice in Google's consent form
+  (stored by Google's consent SDK on your device);
 - your region and unit settings, and the country the app last worked out;
 - a short-lived cache of the most recent weather so the app opens instantly;
 - a small cache of up to 32 recently looked-up approximate areas (coordinates

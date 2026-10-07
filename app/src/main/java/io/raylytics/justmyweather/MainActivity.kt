@@ -40,7 +40,6 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import io.raylytics.justmyweather.ads.AdBanner
 import io.raylytics.justmyweather.ads.AdPolicy
 import io.raylytics.justmyweather.alerts.AlertWorker
-import io.raylytics.justmyweather.region.AdEligibility
 import io.raylytics.justmyweather.support.SupportKind
 import io.raylytics.justmyweather.support.bugDiagnostics
 import io.raylytics.justmyweather.support.composeSupportMail
@@ -193,17 +192,21 @@ class MainActivity : ComponentActivity() {
             requestLocation.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
         }
 
+        // Once per launch: Google's consent SDK says whether ads may run here,
+        // asking the user first where the law requires it (ads/AdsConsent).
+        container.adsConsent.gather(this)
+
         setContent {
             val themeConfig by themeViewModel.config.collectAsStateWithLifecycle()
             // Starts true: the banner is withheld until the store's answer
             // is read, so an owner never sees it flash in.
             val adsRemoved by container.adsEntitlementRepository.adsRemoved.collectAsStateWithLifecycle(true)
-            // The region decides how everything reads, and whether a banner
-            // may be shown at all (region/AdConsent). Unknown until the store
-            // answers, and the banner is withheld until then, like adsRemoved.
+            // The region decides how everything reads; whether a banner may
+            // be shown at all is Google's consent SDK's call (ads/AdsConsent),
+            // false until it has answered, so no ad loads before then.
             val conventions by container.regionRepository.conventions.collectAsStateWithLifecycle(Conventions.US)
-            val adEligibility by container.regionRepository.adEligibility
-                .collectAsStateWithLifecycle(AdEligibility.LOCATION_UNKNOWN)
+            val canShowAds by container.adsConsent.canShowAds.collectAsStateWithLifecycle()
+            val privacyOptionsRequired by container.adsConsent.privacyOptionsRequired.collectAsStateWithLifecycle()
             // The bars sit on the app-painted background, and the user can
             // force a mood against the system setting — so bar icon contrast
             // must follow the app's resolved mood, not the system default
@@ -247,7 +250,9 @@ class MainActivity : ComponentActivity() {
                             onEnterAlerts = ::requestNotificationsIfNeeded,
                             loadBugReportState = ::bugReportState,
                             adsRemoved = adsRemoved,
-                            adEligibility = adEligibility,
+                            canShowAds = canShowAds,
+                            privacyOptionsRequired = privacyOptionsRequired,
+                            onPrivacyChoices = { container.adsConsent.showPrivacyOptions(this@MainActivity) },
                             onBuyRemoveAds = { appSettingsViewModel.buyRemoveAds(this@MainActivity) },
                             onRateApp = { openStoreListing() },
                         )
@@ -303,8 +308,11 @@ private fun App(
     onThemeChange: (ThemeConfig) -> Unit,
     onEnterAlerts: () -> Unit,
     adsRemoved: Boolean,
-    /** Whether the banner may be shown at all (region/AdEligibility). */
-    adEligibility: AdEligibility,
+    /** Whether Google's consent SDK says ads may run (ads/AdsConsent). */
+    canShowAds: Boolean,
+    /** Whether a "Privacy choices" entry must be offered. */
+    privacyOptionsRequired: Boolean,
+    onPrivacyChoices: () -> Unit,
     /** Opens Play's purchase sheet; needs the Activity, so the host supplies it. */
     onBuyRemoveAds: () -> Unit,
     /** Opens the Play listing; the Activity owns the intent. */
@@ -360,7 +368,7 @@ private fun App(
                     },
                     modifier = Modifier.weight(1f),
                 )
-                if (!adsRemoved && adEligibility == AdEligibility.ALLOWED) {
+                if (!adsRemoved && canShowAds) {
                     AdBanner(unitId = AdPolicy.bannerUnitId(BuildConfig.DEBUG, BuildConfig.ADMOB_BANNER_UNIT_ID))
                 }
             }
@@ -413,7 +421,9 @@ private fun App(
                 gadgetbridgeEnabled = gadgetbridgeEnabled,
                 onSetGadgetbridgeEnabled = appSettingsViewModel::setGadgetbridgeEnabled,
                 adsRemoved = settingsAdsRemoved,
-                adEligibility = adEligibility,
+                canShowAds = canShowAds,
+                privacyOptionsRequired = privacyOptionsRequired,
+                onPrivacyChoices = onPrivacyChoices,
                 regionSummary = regionSummary,
                 onRegion = { screen = Screen.REGION },
                 removeAdsPrice = removeAdsOffer?.formattedPrice,

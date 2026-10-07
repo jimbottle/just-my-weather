@@ -5,7 +5,8 @@ package io.raylytics.justmyweather.ads
  * JVM and the privacy policy's promises have one place to point at:
  *
  * - every request is non-personalized ([NPA_KEY] = [NPA_VALUE]), which is
- *   what the policy says and what lets the app skip a consent form;
+ *   what the policy says — whatever the user chose in Google's consent form
+ *   (ads/AdsConsent decides whether ads run at all);
  * - a debug build never serves a real ad unit — Google's sample units show
  *   labelled test ads and earn nothing, and clicking one's own live ads is
  *   how AdMob accounts get suspended.

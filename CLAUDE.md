@@ -487,8 +487,9 @@ readable `AppContainer` in `JustMyWeatherApp.kt` — no Hilt). Package layout un
   coordinate" with no geocoder.
 - **`region/`** — a region is a Google Play country. `Regions.kt` is the
   registry; `RegionResolver` picks the region (manual choice > phone network
-  > last fix > place shown > language settings). It drives units, dates,
-  clock and ad consent. **docs/REGIONS.md** has how it works and the
+  > last fix > place shown > language settings). It drives units, dates
+  and clock. Whether ads may run is Google's UMP consent SDK's call
+  (`ads/AdsConsent`), not the region's. **docs/REGIONS.md** has how it works and the
   step-by-step for adding, opening, pausing or removing a region. Never
   change the Play Console country list yourself — hand it off.
 - **`view/Conventions.kt`** — the ONE place a canonical value (°F, mph, inHg,

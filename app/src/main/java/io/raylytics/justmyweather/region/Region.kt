@@ -7,8 +7,8 @@ import io.raylytics.justmyweather.view.Conventions
  * keyed by the same ISO 3166-1 alpha-2 code Play's console, its API and its
  * supported-locations page use ("GB", not "UK"). Everything the app adapts
  * per place-in-the-world hangs off one of these — units, date order, the
- * clock, whether an ad may be shown — so switching region switches all of
- * them at once. How the app decides which region it is in, and how to add
+ * clock — so switching region switches all of them at once. (Whether an ad
+ * may run is not a region matter: Google's consent SDK decides, ads/AdsConsent.) How the app decides which region it is in, and how to add
  * one, is docs/REGIONS.md.
  */
 data class Region(
@@ -18,7 +18,6 @@ data class Region(
      * The user can override units one by one (RegionSettings); the region
      * itself never changes because of that. */
     val conventions: Conventions,
-    val adConsent: AdConsent,
     /** Where the app stands in this region on Google Play. Null for a
      * country the registry has never been prepared for: the app still
      * adapts to it (derived defaults), it just isn't a region we ship to. */
@@ -39,42 +38,6 @@ data class DefaultPlace(
     val longitude: Double,
     val timeZone: String,
 )
-
-/**
- * Whether the banner may be shown here as the app is built today.
- *
- * The app serves only non-personalized ads and ships no consent dialog.
- * Google's EU User Consent Policy requires a Google-certified consent
- * platform (the UMP SDK) for ad traffic from the EEA, the UK and
- * Switzerland. Until the app has one (a human decision: 5fm J, see
- * docs/REGIONS.md), those regions get NO banner — and so no Remove Ads
- * purchase either, which would have nothing to remove.
- */
-enum class AdConsent {
-    /** Non-personalized ads need no consent form here. */
-    NOT_REQUIRED,
-
-    /** A certified consent platform is required before any ad is served. */
-    CERTIFIED_CMP_REQUIRED,
-}
-
-/**
- * Whether the banner may be shown — and the ad SDK started — on this phone
- * right now. Three states, because "the law here asks for consent" and "the
- * app can't tell where the phone is" are different facts, and the settings
- * screen says which one applies (roborev 5425).
- */
-enum class AdEligibility {
-    /** The phone is somewhere no certified consent platform is required. */
-    ALLOWED,
-
-    /** The phone is in the EEA, the UK or Switzerland ([AdConsent]). */
-    CONSENT_REQUIRED,
-
-    /** No mobile network and no location fix this session: no ads, since
-     * the app can't rule out a consent-required country (fail closed). */
-    LOCATION_UNKNOWN,
-}
 
 /**
  * The region's state on Google Play, which only a human changes (Play

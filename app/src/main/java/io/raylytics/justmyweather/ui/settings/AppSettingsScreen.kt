@@ -27,7 +27,6 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import io.raylytics.justmyweather.billing.RemoveAdsStatus
-import io.raylytics.justmyweather.region.AdEligibility
 
 /**
  * Settings that are about the app, not the canvas. Customize is for what the
@@ -40,9 +39,12 @@ fun AppSettingsScreen(
     gadgetbridgeEnabled: Boolean,
     onSetGadgetbridgeEnabled: (Boolean) -> Unit,
     adsRemoved: Boolean,
-    /** Whether the banner may be shown (region/AdEligibility). Anything but
-     * ALLOWED means no banner, so no purchase to offer. */
-    adEligibility: AdEligibility,
+    /** Whether Google's consent SDK says ads may run here. When not, there is
+     * no banner, so no purchase to offer. */
+    canShowAds: Boolean,
+    /** Where a consent form applies, the user must be able to reopen it. */
+    privacyOptionsRequired: Boolean,
+    onPrivacyChoices: () -> Unit,
     /** "United Kingdom · °C, mph" — the Region & units row's second line. */
     regionSummary: String,
     onRegion: () -> Unit,
@@ -83,7 +85,9 @@ fun AppSettingsScreen(
                 )
                 AdsSection(
                     adsRemoved = adsRemoved,
-                    adEligibility = adEligibility,
+                    canShowAds = canShowAds,
+                    privacyOptionsRequired = privacyOptionsRequired,
+                    onPrivacyChoices = onPrivacyChoices,
                     price = removeAdsPrice,
                     status = removeAdsStatus,
                     onBuy = onBuyRemoveAds,
@@ -120,7 +124,9 @@ fun AppSettingsScreen(
 @Composable
 private fun AdsSection(
     adsRemoved: Boolean,
-    adEligibility: AdEligibility,
+    canShowAds: Boolean,
+    privacyOptionsRequired: Boolean,
+    onPrivacyChoices: () -> Unit,
     price: String?,
     status: RemoveAdsStatus,
     onBuy: () -> Unit,
@@ -142,24 +148,22 @@ private fun AdsSection(
             }
             return@Column
         }
-        if (adEligibility != AdEligibility.ALLOWED) {
+        // Wherever a consent form applies, the choice can be changed here —
+        // Google requires the entry, and it belongs beside the ads it governs.
+        if (privacyOptionsRequired) {
+            AboutLink(
+                title = "Privacy choices",
+                detail = "Change what you agreed to about ads.",
+                onClick = onPrivacyChoices,
+            )
+        }
+        if (!canShowAds) {
             // Nothing to remove: selling Remove Ads where no banner is shown
-            // would be selling nothing. The two reasons read differently: a
-            // US tablet with no network and no location is not somewhere the
-            // law asks for consent (roborev 5425).
-            val (title, detail) =
-                when (adEligibility) {
-                    AdEligibility.CONSENT_REQUIRED ->
-                        "No ads in your region" to "The banner isn't shown where the law asks for a consent form first."
-                    else ->
-                        "No ads for now" to
-                            "The banner is only shown once the app can tell where your phone is, from its mobile " +
-                            "network or its location."
-                }
+            // would be selling nothing.
             Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-                Text(title, style = MaterialTheme.typography.bodyLarge)
+                Text("No ads for now", style = MaterialTheme.typography.bodyLarge)
                 Text(
-                    text = detail,
+                    text = "Where the law asks first, the banner waits for your choice in the consent form.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

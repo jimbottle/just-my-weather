@@ -92,17 +92,6 @@ class RegionResolverTest {
     }
 
     @Test
-    fun `a region picked by hand changes the units, never whether an ad may be shown`() {
-        // An American in London who picks the US for its 12-hour clock.
-        val inLondon = RegionClues(phoneNetwork = "GB")
-        val settings = RegionSettings(manualRegion = "US")
-        assertEquals("US", RegionResolver.resolve(settings, inLondon).region.code)
-        assertEquals(AdEligibility.CONSENT_REQUIRED, RegionResolver.adEligibility(inLondon))
-        // And the reverse: a Briton in Ohio who picks the UK still gets the banner.
-        assertEquals(AdEligibility.ALLOWED, RegionResolver.adEligibility(RegionClues(phoneNetwork = "US")))
-    }
-
-    @Test
     fun `a remembered place survives a place-less refresh, but a stale physical clue never does`() {
         val language = RegionClues(deviceSettings = "US")
         // The Berlin tablet: its units came from the place it shows (roborev 5421).
@@ -110,30 +99,11 @@ class RegionResolverTest {
             RegionClues(place = "DE", deviceSettings = "US"),
             RegionRepository.merge(RegionClues(place = "DE"), language),
         )
-        // A network clue from home is not carried abroad: consent fails closed.
-        val merged = RegionRepository.merge(RegionClues(phoneNetwork = "US"), language)
-        assertEquals(language, merged)
-        assertEquals(AdEligibility.LOCATION_UNKNOWN, RegionResolver.adEligibility(merged))
+        // A network clue from home is not carried abroad.
+        assertEquals(language, RegionRepository.merge(RegionClues(phoneNetwork = "US"), language))
         // Anything fresh and strong simply replaces what was stored.
         val fresh = RegionClues(phoneNetwork = "FR")
         assertEquals(fresh, RegionRepository.merge(RegionClues(place = "DE"), fresh))
         assertEquals(language, RegionRepository.merge(null, language))
-    }
-
-    @Test
-    fun `ads need a physical clue, and without one the location is unknown, so no ads`() {
-        // Where the phone is: the network, or a location fix.
-        assertEquals(AdEligibility.ALLOWED, RegionResolver.adEligibility(RegionClues(phoneLocation = "US")))
-        assertEquals(AdEligibility.CONSENT_REQUIRED, RegionResolver.adEligibility(RegionClues(phoneLocation = "DE")))
-        // The place being shown, or the language setting, says nothing about
-        // where the phone is: a tablet in Berlin looking at New York.
-        assertEquals(AdEligibility.LOCATION_UNKNOWN, RegionResolver.adEligibility(RegionClues(place = "US")))
-        assertEquals(
-            AdEligibility.LOCATION_UNKNOWN,
-            RegionResolver.adEligibility(RegionClues(deviceSettings = "US")),
-        )
-        assertEquals(AdEligibility.LOCATION_UNKNOWN, RegionResolver.adEligibility(RegionClues()))
-        // Junk in a physical clue is no clue.
-        assertEquals(AdEligibility.LOCATION_UNKNOWN, RegionResolver.adEligibility(RegionClues(phoneNetwork = "")))
     }
 }
