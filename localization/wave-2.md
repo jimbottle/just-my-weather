@@ -1,8 +1,7 @@
 # Wave 2 — India, Pakistan, Nigeria, Philippines, South Africa, Kenya, Ghana, Malaysia, Singapore
 
 Gate run 2026-10-06 (session 2185c006). The gate is defined in
-[docs/REGIONS.md](../docs/REGIONS.md). All nine regions are `READY`; none is
-`LIVE`.
+[docs/REGIONS.md](../docs/REGIONS.md). All nine regions went **LIVE on 2026-10-07** with 0.3.0 (versionCode 7).
 
 | # | Gate item | Result |
 |---|---|---|

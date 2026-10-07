@@ -39,69 +39,69 @@ object Regions {
                 DateOrder.MONTH_FIRST,
                 clock24 = false,
             ),
-            // Wave 1 — English-primary, strong ad markets. READY: gate passed
-            // 2026-10-06, evidence in localization/wave-1.md.
+            // Wave 1 — English-primary, strong ad markets. LIVE 2026-10-07
+            // (0.3.0, versionCode 7); gate evidence in localization/wave-1.md.
             Prepared(
                 "CA",
-                PlayStatus.READY,
+                PlayStatus.LIVE,
                 DefaultPlace("Toronto, Canada", 43.7, -79.42, "America/Toronto"),
                 DateOrder.MONTH_FIRST,
                 clock24 = false,
             ),
             Prepared(
                 "AU",
-                PlayStatus.READY,
+                PlayStatus.LIVE,
                 DefaultPlace("Sydney, Australia", -33.87, 151.21, "Australia/Sydney"),
                 DateOrder.DAY_FIRST,
                 clock24 = false,
             ),
             Prepared(
                 "NZ",
-                PlayStatus.READY,
+                PlayStatus.LIVE,
                 DefaultPlace("Auckland, New Zealand", -36.85, 174.76, "Pacific/Auckland"),
                 DateOrder.DAY_FIRST,
                 clock24 = false,
             ),
             Prepared(
                 "GB",
-                PlayStatus.READY,
+                PlayStatus.LIVE,
                 DefaultPlace("London, United Kingdom", 51.51, -0.13, "Europe/London"),
                 DateOrder.DAY_FIRST,
                 clock24 = true,
             ),
             Prepared(
                 "IE",
-                PlayStatus.READY,
+                PlayStatus.LIVE,
                 DefaultPlace("Dublin, Ireland", 53.33, -6.25, "Europe/Dublin"),
                 DateOrder.DAY_FIRST,
                 clock24 = true,
             ),
             // Wave 2 — English official or dominant, very large populations.
-            // READY: gate passed 2026-10-06, evidence in localization/wave-2.md.
+            // LIVE 2026-10-07 (0.3.0, versionCode 7); evidence in localization/wave-2.md.
             Prepared(
                 "IN",
-                PlayStatus.READY,
+                PlayStatus.LIVE,
                 DefaultPlace("New Delhi, India", 28.64, 77.22, "Asia/Kolkata"),
                 DateOrder.DAY_FIRST,
                 clock24 = false,
             ),
             Prepared(
                 "PH",
-                PlayStatus.READY,
+                PlayStatus.LIVE,
                 DefaultPlace("Manila, Philippines", 14.6, 120.98, "Asia/Manila"),
                 DateOrder.MONTH_FIRST,
                 clock24 = false,
             ),
             Prepared(
                 "NG",
-                PlayStatus.READY,
+                PlayStatus.LIVE,
                 DefaultPlace("Lagos, Nigeria", 6.45, 3.39, "Africa/Lagos"),
                 DateOrder.DAY_FIRST,
                 clock24 = true,
             ),
             Prepared(
                 "ZA",
-                PlayStatus.READY,
+                PlayStatus.LIVE,
                 DefaultPlace("Johannesburg, South Africa", -26.2, 28.04, "Africa/Johannesburg"),
                 // CLDR's short date here is year-first (y/MM/dd), but South
                 // Africa writes day before month (roborev 5409).
@@ -110,35 +110,35 @@ object Regions {
             ),
             Prepared(
                 "PK",
-                PlayStatus.READY,
+                PlayStatus.LIVE,
                 DefaultPlace("Karachi, Pakistan", 24.86, 67.01, "Asia/Karachi"),
                 DateOrder.DAY_FIRST,
                 clock24 = false,
             ),
             Prepared(
                 "KE",
-                PlayStatus.READY,
+                PlayStatus.LIVE,
                 DefaultPlace("Nairobi, Kenya", -1.28, 36.82, "Africa/Nairobi"),
                 DateOrder.DAY_FIRST,
                 clock24 = true,
             ),
             Prepared(
                 "GH",
-                PlayStatus.READY,
+                PlayStatus.LIVE,
                 DefaultPlace("Accra, Ghana", 5.56, -0.2, "Africa/Accra"),
                 DateOrder.DAY_FIRST,
                 clock24 = false,
             ),
             Prepared(
                 "SG",
-                PlayStatus.READY,
+                PlayStatus.LIVE,
                 DefaultPlace("Singapore, Singapore", 1.29, 103.85, "Asia/Singapore"),
                 DateOrder.DAY_FIRST,
                 clock24 = false,
             ),
             Prepared(
                 "MY",
-                PlayStatus.READY,
+                PlayStatus.LIVE,
                 DefaultPlace("Kuala Lumpur, Malaysia", 3.14, 101.69, "Asia/Kuala_Lumpur"),
                 DateOrder.DAY_FIRST,
                 clock24 = false,

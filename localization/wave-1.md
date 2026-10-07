@@ -2,9 +2,7 @@
 
 Gate run 2026-10-06 (session 2185c006) against main at the region commit and
 after. The gate itself is defined in [docs/REGIONS.md](../docs/REGIONS.md).
-All five regions are `READY` in `region/Regions.kt`. None is `LIVE`: that
-needs a build containing this work on Play, plus the console change
-(human only).
+All five regions went **LIVE on 2026-10-07** with 0.3.0 (versionCode 7).
 
 | # | Gate item | Result |
 |---|---|---|

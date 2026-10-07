@@ -19,7 +19,12 @@ Per-version log of what shipped where. Two audiences:
 
 ---
 
-## 0.3.0 — versionCode 7, Play internal 2026-10-06 (supersedes 6)
+## 0.3.0 — versionCode 7, Play production 2026-10-07 (internal 2026-10-06; supersedes 6)
+
+Live in production in 15 countries (US + wave 1 + wave 2);
+scripts/check-regions.sh agrees with the registry. Store description and
+privacy policy (raylytics-site #45, #46) updated the same day.
+
 
 versionCode 7 cut from bb35f1f (CI green incl. Maestro). It replaces 6,
 which must NOT be promoted: 6 still started the AdMob SDK in the EEA, UK
