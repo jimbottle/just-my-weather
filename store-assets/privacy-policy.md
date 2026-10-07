@@ -56,14 +56,15 @@ cities worldwide that is bundled inside the app, or type coordinates. The
 search runs entirely on your phone; nothing you type is sent anywhere.
 
 **Your region.** To show the weather in your units and your date and time
-format, and to know whether an ad may be shown where you are, the app works
-out which country you are in. It reads the country of the mobile network
-your phone is connected to (which needs no permission), or the country of
-your approximate location or of the place you are viewing, matched against
-the bundled place list, or your phone's language settings. All of this
-happens on your phone, and the country is not sent to the developer or to any
-weather or ad service. You can set
-your region yourself in App settings.
+format, the app works out which country you are in. It reads the country of
+the mobile network your phone is connected to (which needs no permission), or
+the country of your approximate location or of the place you are viewing,
+matched against the bundled place list, or your phone's language settings; you
+can also set your region yourself in App settings. Whether an ad may be shown
+follows only the mobile network or your approximate location, never the place
+you are viewing, your language settings or a region you set (see "Ads and
+purchases"). All of this happens on your phone, and the country is not sent to
+the developer or to any weather or ad service.
 
 ## Where your data goes
 
