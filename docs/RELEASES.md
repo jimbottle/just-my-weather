@@ -19,6 +19,29 @@ Per-version log of what shipped where. Two audiences:
 
 ---
 
+## 0.3.1 — unreleased (next upload: versionCode 8)
+
+Google's consent form (UMP) decides when ads may run, so the UK, Ireland
+(and any EEA/Swiss users) can see the banner after consenting, and a US
+phone with no SIM and no location gets ads again. Plus a shorter hold to
+leave arrange mode.
+
+### Store-facing (≤500 chars)
+
+> Where the law asks first — the UK, the EEA and Switzerland — the app now
+> shows Google's consent form before any ad, and you can change your choice
+> any time in App settings → Privacy choices. Rearranging the glance is
+> quicker to leave: a half-second hold on a tile is enough.
+
+### Internal
+
+- Added: ads/AdsConsent + UmpConsentGateway (UMP 4.0.0); Privacy choices
+  in App settings; -PumpGeography debug switch (just-my-weather-5fm.14).
+- Changed: region code no longer gates ads (AdConsent/AdEligibility
+  removed); arrange-mode exit hold 1s → 500ms (7c283af); the location
+  prompt waits for the consent form; Remove Ads owners skip consent.
+- Fixed: roborev 5436, 5437.
+
 ## 0.3.0 — versionCode 7, Play production 2026-10-07 (internal 2026-10-06; supersedes 6)
 
 Live in production in 15 countries (US + wave 1 + wave 2);
