@@ -33,9 +33,11 @@ class AdsConsent(
      * that asked while it was in flight (a rotation mid-request). */
     private val waiting = mutableListOf<() -> Unit>()
 
-    /** The newest activity to ask: if the form was meant for one that has
-     * since been destroyed, it is shown on this one instead. */
-    private var newest: WeakReference<Activity>? = null
+    /** The activity the request in flight was made on (its form, if any,
+     * is shown there), and which request that is: an answer from an older
+     * one is ignored once a newer one has been made. */
+    private var askedOn: WeakReference<Activity>? = null
+    private var generation = 0
 
     /** True once ads may be requested — the banner waits on this. */
     val canShowAds: StateFlow<Boolean> = canShow.asStateFlow()
@@ -61,7 +63,12 @@ class AdsConsent(
             Request.DONE -> then()
             Request.IN_FLIGHT -> {
                 waiting += then
-                newest = WeakReference(activity)
+                // The activity the request (and its form) belonged to is gone
+                // — a rotation or theme switch, which destroys it before this
+                // one is created. Don't wait on its callback, which may never
+                // come (roborev 5444): ask again here, where a form can show.
+                val prior = askedOn?.get()
+                if (prior == null || prior.isFinishing || prior.isDestroyed) ask(activity)
             }
             Request.IDLE -> {
                 waiting += then
@@ -72,13 +79,11 @@ class AdsConsent(
 
     private fun ask(activity: Activity) {
         request = Request.IN_FLIGHT
-        newest = WeakReference(activity)
+        askedOn = WeakReference(activity)
+        val mine = ++generation
         gateway.update(activity) {
+            if (mine != generation) return@update // superseded by a newer ask
             settle()
-            // The form was meant for an activity that is gone (recreated
-            // mid-request), so it never showed: ask again on the live one.
-            val live = newest?.get()?.takeIf { it !== activity && !it.isFinishing && !it.isDestroyed }
-            if (!canShow.value && live != null) return@update ask(live)
             request = Request.DONE
             val ready = waiting.toList()
             waiting.clear()

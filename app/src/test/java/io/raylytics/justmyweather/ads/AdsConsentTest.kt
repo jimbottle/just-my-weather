@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.mock
+import org.mockito.kotlin.whenever
 
 /** Ads run only after Google's consent SDK allows them, and the ads SDK
  * starts exactly once — never before that answer. */
@@ -112,7 +113,7 @@ class AdsConsentTest {
     }
 
     @Test
-    fun `a rotation mid-request waits for consent, and the form moves to the live activity`() {
+    fun `a rotation mid-request waits for consent, asked again on the new activity`() {
         val gateway = FakeGateway(can = false, options = true)
         var asks = 0
         val counting =
@@ -127,17 +128,40 @@ class AdsConsentTest {
         val second: Activity = mock()
         var thens = 0
         consent.gather(first) { thens++ }
-        consent.gather(second) { thens++ } // recreated before Google answered
+        val firstAnswer = gateway.pending!!
+        // Rotated with the form up: Android destroys the first activity
+        // before the second asks, and the first's callback may never come.
+        whenever(first.isDestroyed).thenReturn(true)
+        consent.gather(second) { thens++ }
+        assertEquals(2, asks, "asked again where a form can show")
         assertEquals(0, thens, "nothing runs before consent has settled")
-        // The first request ends with no choice (its form had no activity):
-        // the flow is asked again on the live activity rather than given up.
-        gateway.pending!!()
-        assertEquals(2, asks)
-        assertEquals(0, thens)
         // The user chooses on the live activity; both follow-ups now run.
         gateway.settleWith = { gateway.can = true }
         gateway.pending!!()
         assertEquals(2, thens)
         assertTrue(consent.canShowAds.value)
+        // A late answer from the first request changes nothing.
+        firstAnswer()
+        assertEquals(2, thens)
+    }
+
+    @Test
+    fun `a second gather from the same live activity waits rather than asking again`() {
+        val gateway = FakeGateway(can = false, options = true)
+        var asks = 0
+        val counting =
+            object : ConsentGateway by gateway {
+                override fun update(activity: Activity, onDone: () -> Unit) {
+                    asks++
+                    gateway.update(activity, onDone)
+                }
+            }
+        val consent = AdsConsent(counting) {}
+        var thens = 0
+        consent.gather(activity) { thens++ }
+        consent.gather(activity) { thens++ }
+        assertEquals(1, asks)
+        gateway.pending!!()
+        assertEquals(2, thens)
     }
 }
