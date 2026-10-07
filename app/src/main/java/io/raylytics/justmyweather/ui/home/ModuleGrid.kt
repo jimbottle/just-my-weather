@@ -94,12 +94,22 @@ private enum class DragKind { MOVE, RESIZE }
 
 /**
  * How long a tile must be held, without moving, to LEAVE arrange mode — timed
- * from the finger landing. Deliberately well past the platform's long-press
- * (~400ms), which while arranging already lifts the tile for a drag: the hold
- * that exits must not be one a user makes by grabbing a tile and pausing to
- * think. Any movement past touch slop forfeits the exit for that gesture.
+ * from the finger landing. Halved from 1s at Evan's request (2026-10-07), so
+ * it now sits just past the platform's long-press (~400ms), which while
+ * arranging already lifts the tile for a drag. Any movement past touch slop
+ * forfeits the exit for that gesture.
  */
-private const val EXIT_HOLD_MS = 1_000L
+private const val EXIT_HOLD_MS = 500L
+
+/**
+ * The least time the exit waits AFTER the long-press lifts the tile. On a
+ * device whose long-press is 500ms or more (an accessibility "touch & hold
+ * delay", or older Android), [EXIT_HOLD_MS] alone would fire at the very
+ * moment the tile is picked up, and every attempt to move a tile would leave
+ * arrange mode instead. This keeps a beat in which a still finger means
+ * "about to move", not "done".
+ */
+private const val EXIT_AFTER_LIFT_MIN_MS = 100L
 
 /** The dragged tile lifts slightly, the way a launcher icon does. */
 private const val DRAG_SCALE = 1.04f
@@ -468,7 +478,7 @@ internal fun ModuleGrid(
                                 val serial = dragSerial
                                 val remaining = EXIT_HOLD_MS - viewConfiguration.longPressTimeoutMillis
                                 scope.launch {
-                                    delay(remaining.coerceAtLeast(0L))
+                                    delay(remaining.coerceAtLeast(EXIT_AFTER_LIFT_MIN_MS))
                                     val stillHeld = dragSerial == serial && dragOwner == DragOwner.LONG_PRESS
                                     if (!stillHeld || holdMoved || !isArranging) return@launch
                                     haptics.performHapticFeedback(HapticFeedbackType.LongPress)
