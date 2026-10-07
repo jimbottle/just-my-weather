@@ -164,4 +164,33 @@ class AdsConsentTest {
         gateway.pending!!()
         assertEquals(2, thens)
     }
+
+    @Test
+    fun `a form torn down with its activity is not a choice - the next activity asks again`() {
+        val gateway = FakeGateway(can = false, options = true)
+        var asks = 0
+        val counting =
+            object : ConsentGateway by gateway {
+                override fun update(activity: Activity, onDone: () -> Unit) {
+                    asks++
+                    gateway.update(activity, onDone)
+                }
+            }
+        val consent = AdsConsent(counting) {}
+        val first: Activity = mock()
+        val second: Activity = mock()
+        var thens = 0
+        consent.gather(first) { thens++ }
+        // Rotated with the form up: UMP reports "Activity is destroyed"
+        // while tearing the first activity down, before the second exists.
+        whenever(first.isDestroyed).thenReturn(true)
+        gateway.pending!!()
+        assertEquals(0, thens, "no choice was made, so nothing waiting runs")
+        consent.gather(second) { thens++ }
+        assertEquals(2, asks, "the recreated activity shows the form again")
+        gateway.settleWith = { gateway.can = true }
+        gateway.pending!!()
+        assertEquals(2, thens)
+        assertTrue(consent.canShowAds.value)
+    }
 }

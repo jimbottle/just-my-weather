@@ -84,6 +84,14 @@ class AdsConsent(
         gateway.update(activity) {
             if (mine != generation) return@update // superseded by a newer ask
             settle()
+            // The form's activity was destroyed under it (a rotation with the
+            // form up): UMP answers "Activity is destroyed" and no choice was
+            // made — seen on the emulator. That is not settled; go back to
+            // IDLE so the recreated activity asks again and shows the form.
+            if (!canShow.value && activity.isDestroyed) {
+                request = Request.IDLE
+                return@update
+            }
             request = Request.DONE
             val ready = waiting.toList()
             waiting.clear()
