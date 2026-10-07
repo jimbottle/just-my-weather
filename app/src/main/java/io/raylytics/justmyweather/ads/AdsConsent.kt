@@ -34,10 +34,15 @@ class AdsConsent(
      * launch applies at once ([settle] before the request), so a returning
      * user's banner doesn't wait on the network; then Google is asked again,
      * since what applies can change (the user travelled, the rules moved).
+     * [then] runs once that has settled — form shown and dismissed, no form
+     * needed, or an error — so a first launch's other prompts can wait.
      */
-    fun gather(activity: Activity) {
+    fun gather(activity: Activity, then: () -> Unit = {}) {
         settle()
-        gateway.update(activity) { settle() }
+        gateway.update(activity) {
+            settle()
+            then()
+        }
     }
 
     fun showPrivacyOptions(activity: Activity) {

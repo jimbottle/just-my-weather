@@ -188,13 +188,17 @@ class MainActivity : ComponentActivity() {
         // (the safeDrawingPadding below) covers them all.
         enableEdgeToEdge()
 
-        if (!container.locationProvider.hasPermission()) {
-            requestLocation.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
-        }
-
         // Once per launch: Google's consent SDK says whether ads may run here,
         // asking the user first where the law requires it (ads/AdsConsent).
-        container.adsConsent.gather(this)
+        // The location prompt waits until that has settled, so a first launch
+        // in Europe shows one dialog at a time rather than the permission
+        // sheet stacked on top of the consent form (seen on the emulator).
+        container.adsConsent.gather(this) {
+            val alive = !isFinishing && !isDestroyed
+            if (alive && !container.locationProvider.hasPermission()) {
+                requestLocation.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
+            }
+        }
 
         setContent {
             val themeConfig by themeViewModel.config.collectAsStateWithLifecycle()

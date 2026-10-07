@@ -81,4 +81,14 @@ class AdsConsentTest {
         assertFalse(consent.canShowAds.value)
         assertEquals(0, starts)
     }
+
+    @Test
+    fun `what waits on consent runs once it has settled, not before`() {
+        val gateway = FakeGateway(can = false, options = true)
+        var prompted = 0
+        AdsConsent(gateway) {}.gather(activity) { prompted++ }
+        assertEquals(0, prompted, "the consent form is still open")
+        gateway.pending!!()
+        assertEquals(1, prompted)
+    }
 }
