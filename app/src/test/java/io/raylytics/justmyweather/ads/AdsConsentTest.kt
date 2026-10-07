@@ -110,4 +110,34 @@ class AdsConsentTest {
         assertEquals(1, updates)
         assertEquals(2, then)
     }
+
+    @Test
+    fun `a rotation mid-request waits for consent, and the form moves to the live activity`() {
+        val gateway = FakeGateway(can = false, options = true)
+        var asks = 0
+        val counting =
+            object : ConsentGateway by gateway {
+                override fun update(activity: Activity, onDone: () -> Unit) {
+                    asks++
+                    gateway.update(activity, onDone)
+                }
+            }
+        val consent = AdsConsent(counting) {}
+        val first: Activity = mock()
+        val second: Activity = mock()
+        var thens = 0
+        consent.gather(first) { thens++ }
+        consent.gather(second) { thens++ } // recreated before Google answered
+        assertEquals(0, thens, "nothing runs before consent has settled")
+        // The first request ends with no choice (its form had no activity):
+        // the flow is asked again on the live activity rather than given up.
+        gateway.pending!!()
+        assertEquals(2, asks)
+        assertEquals(0, thens)
+        // The user chooses on the live activity; both follow-ups now run.
+        gateway.settleWith = { gateway.can = true }
+        gateway.pending!!()
+        assertEquals(2, thens)
+        assertTrue(consent.canShowAds.value)
+    }
 }

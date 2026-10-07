@@ -11,7 +11,7 @@ All five regions went **LIVE on 2026-10-07** with 0.3.0 (versionCode 7).
 | 3 | Language | **Pass.** English UI; all five list in English. |
 | 4 | Place search | **Pass.** `BundledGazetteerTest`: Toronto, London, Dublin, Sydney and Auckland resolve with the right zones; every bundled row parses. |
 | 5 | Ads and billing | Banner and Remove Ads as in the US. Consent is decided by Google's UMP since 2026-10-07 (just-my-weather-5fm.14): in the UK and Ireland the consent form applies; elsewhere no form is needed. |
-| 6 | Consent and privacy | `store-assets/privacy-policy.md` updated for this (worldwide place list, MET abroad, the on-device region). **The hosted copy at raylytics.io must be republished before or with the build.** GB/IE are covered by withholding the banner until 5fm.9 is decided. |
+| 6 | Consent and privacy | `store-assets/privacy-policy.md` updated for this (worldwide place list, MET abroad, the on-device region). **The hosted copy at raylytics.io must be republished before or with the build.** GB/IE are covered by Google's UMP consent form (since 2026-10-07), not by withholding the banner. |
 | 7 | Honest degradation | **Pass**, emulator 2026-10-06 (London via place search): "Forecast for 17:00 · MET Norway", a Today tile then whole MET days, and the Alerts screen explaining that official warnings are US-only. |
 
 ## Verified on the emulator (Pixel_7_API_35, Android 15)

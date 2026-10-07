@@ -4,6 +4,7 @@ import android.app.Activity
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import java.lang.ref.WeakReference
 
 /**
  * Whether ads may run, and the one moment the ads SDK starts. Google's
@@ -22,7 +23,19 @@ class AdsConsent(
     private val canShow = MutableStateFlow(false)
     private val privacyOptions = MutableStateFlow(false)
     private var started = false
-    private var asked = false
+
+    /** Where this process's one consent request stands. */
+    private enum class Request { IDLE, IN_FLIGHT, DONE }
+
+    private var request = Request.IDLE
+
+    /** Follow-ups waiting for the request to settle, from every activity
+     * that asked while it was in flight (a rotation mid-request). */
+    private val waiting = mutableListOf<() -> Unit>()
+
+    /** The newest activity to ask: if the form was meant for one that has
+     * since been destroyed, it is shown on this one instead. */
+    private var newest: WeakReference<Activity>? = null
 
     /** True once ads may be requested — the banner waits on this. */
     val canShowAds: StateFlow<Boolean> = canShow.asStateFlow()
@@ -40,14 +53,36 @@ class AdsConsent(
      */
     fun gather(activity: Activity, then: () -> Unit = {}) {
         settle()
-        // Once per PROCESS, as the KDoc says: an activity recreated by a
-        // rotation or a theme switch must not ask Google again or reload the
-        // form (roborev 5436). Its [then] still runs.
-        if (asked) return then()
-        asked = true
+        // Once per PROCESS (roborev 5436), but never "done" before Google has
+        // answered (roborev 5439): an activity recreated by a rotation while
+        // the request is in flight waits with the others, so its location
+        // prompt can't jump ahead of the consent form.
+        when (request) {
+            Request.DONE -> then()
+            Request.IN_FLIGHT -> {
+                waiting += then
+                newest = WeakReference(activity)
+            }
+            Request.IDLE -> {
+                waiting += then
+                ask(activity)
+            }
+        }
+    }
+
+    private fun ask(activity: Activity) {
+        request = Request.IN_FLIGHT
+        newest = WeakReference(activity)
         gateway.update(activity) {
             settle()
-            then()
+            // The form was meant for an activity that is gone (recreated
+            // mid-request), so it never showed: ask again on the live one.
+            val live = newest?.get()?.takeIf { it !== activity && !it.isFinishing && !it.isDestroyed }
+            if (!canShow.value && live != null) return@update ask(live)
+            request = Request.DONE
+            val ready = waiting.toList()
+            waiting.clear()
+            ready.forEach { it() }
         }
     }
 
