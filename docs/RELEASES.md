@@ -19,7 +19,7 @@ Per-version log of what shipped where. Two audiences:
 
 ---
 
-## 0.3.1 — unreleased (next upload: versionCode 8)
+## 0.3.1 — versionCode 8, Play internal 2026-10-07
 
 Google's consent form (UMP) decides when ads may run, so the UK, Ireland
 (and any EEA/Swiss users) can see the banner after consenting, and a US
@@ -40,7 +40,11 @@ leave arrange mode.
 - Changed: region code no longer gates ads (AdConsent/AdEligibility
   removed); arrange-mode exit hold 1s → 500ms (7c283af); the location
   prompt waits for the consent form; Remove Ads owners skip consent.
-- Fixed: roborev 5436, 5437.
+- Changed: the consent request survives a rotation with the form up (it
+  is asked again on the new activity; UMP's "Activity is destroyed" is not
+  a choice), emulator-verified.
+- Fixed: roborev 5436, 5437, 5439, 5441, 5444.
+- Cut from 482bc90 (CI green: unit + ktlint + build, Maestro UI flows).
 
 ## 0.3.0 — versionCode 7, Play production 2026-10-07 (internal 2026-10-06; supersedes 6)
 
