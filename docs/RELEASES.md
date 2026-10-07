@@ -19,7 +19,15 @@ Per-version log of what shipped where. Two audiences:
 
 ---
 
-## 0.3.0 — versionCode 6, Play internal 2026-10-06
+## 0.3.0 — versionCode 7, Play internal 2026-10-06 (supersedes 6)
+
+versionCode 7 cut from bb35f1f (CI green incl. Maestro). It replaces 6,
+which must NOT be promoted: 6 still started the AdMob SDK in the EEA, UK
+and Switzerland (roborev 5416, 5421, 5424, 5425 + security review — ad
+eligibility now from this session's mobile network or location fix only,
+fail closed). Store-facing text unchanged.
+
+### versionCode 6 (superseded) — Play internal 2026-10-06
 
 Home screen widgets, and the app outside the US. Cut from main at
 4555bec+chore (code identical to 456f3e6, CI green incl. Maestro).
