@@ -163,7 +163,14 @@ private fun AdsSection(
             Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
                 Text("No ads for now", style = MaterialTheme.typography.bodyLarge)
                 Text(
-                    text = "Where the law asks first, the banner waits for your choice in the consent form.",
+                    // Consent wording only where a form applies; a first launch
+                    // offline, anywhere, just hasn't reached Google yet (roborev 5436).
+                    text =
+                        if (privacyOptionsRequired) {
+                            "Where the law asks first, the banner waits for your choice in the consent form."
+                        } else {
+                            "The banner appears once the app has reached Google."
+                        },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

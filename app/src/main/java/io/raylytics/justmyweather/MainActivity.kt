@@ -34,6 +34,7 @@ import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
@@ -74,6 +75,7 @@ import io.raylytics.justmyweather.widget.WidgetRefreshWorker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.time.Instant
@@ -193,11 +195,17 @@ class MainActivity : ComponentActivity() {
         // The location prompt waits until that has settled, so a first launch
         // in Europe shows one dialog at a time rather than the permission
         // sheet stacked on top of the consent form (seen on the emulator).
-        container.adsConsent.gather(this) {
+        // An owner of Remove Ads never meets the consent flow: there are no
+        // ads to consent to, so no request to Google and no form (roborev 5436).
+        val askLocation = {
             val alive = !isFinishing && !isDestroyed
             if (alive && !container.locationProvider.hasPermission()) {
                 requestLocation.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
             }
+        }
+        lifecycleScope.launch {
+            val owner = runCatching { container.adsEntitlementRepository.adsRemoved.first() }.getOrDefault(false)
+            if (owner) askLocation() else container.adsConsent.gather(this@MainActivity) { askLocation() }
         }
 
         setContent {

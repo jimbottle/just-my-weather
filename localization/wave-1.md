@@ -10,7 +10,7 @@ All five regions went **LIVE on 2026-10-07** with 0.3.0 (versionCode 7).
 | 2 | Units, dates, clock | **Pass.** Pinned in `RegionsTest`. CA: °C, km/h, kPa, mm, 12-hour. AU: metric, day-first, 12-hour. NZ: metric. GB: °C, mph, hPa, mm, day-first, 24-hour. IE: metric, 24-hour. |
 | 3 | Language | **Pass.** English UI; all five list in English. |
 | 4 | Place search | **Pass.** `BundledGazetteerTest`: Toronto, London, Dublin, Sydney and Auckland resolve with the right zones; every bundled row parses. |
-| 5 | Ads and billing | CA, AU, NZ: banner served as in the US, Remove Ads offered. GB, IE: banner withheld (`AdConsent.CERTIFIED_CMP_REQUIRED`) and Remove Ads not offered — checked on the emulator with the region set to GB: "No ads in your region". |
+| 5 | Ads and billing | Banner and Remove Ads as in the US. Consent is decided by Google's UMP since 2026-10-07 (just-my-weather-5fm.14): in the UK and Ireland the consent form applies; elsewhere no form is needed. |
 | 6 | Consent and privacy | `store-assets/privacy-policy.md` updated for this (worldwide place list, MET abroad, the on-device region). **The hosted copy at raylytics.io must be republished before or with the build.** GB/IE are covered by withholding the banner until 5fm.9 is decided. |
 | 7 | Honest degradation | **Pass**, emulator 2026-10-06 (London via place search): "Forecast for 17:00 · MET Norway", a Today tile then whole MET days, and the Alerts screen explaining that official warnings are US-only. |
 

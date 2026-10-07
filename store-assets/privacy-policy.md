@@ -1,6 +1,6 @@
 # Privacy Policy — Just My Weather
 
-_Last updated: 2026-10-06_
+_Last updated: 2026-10-07_
 
 Just My Weather is a free Android weather app published by Raylytics, LLC. It shows the weather for a place you choose, lets you build your
 own view of it, and sends you notifications for conditions you define. This
@@ -31,9 +31,10 @@ current weather and that place's name can also reach your paired watch. The
 only data the app itself sends off your device is the latitude and longitude
 of the place you are viewing, or that your alerts watch, sent to public
 weather services so the app can fetch the forecast; separately, the ad
-library sends AdMob what it needs to show the banner (where one is shown), and
-Google Play Billing
-handles the ad-removal purchase and its restore check. A bug report or idea you
+library sends AdMob what it needs to show the banner (where one is shown);
+each time the app opens it asks Google's consent service whether your consent
+is needed (see "Ads and purchases"), unless you have bought ad removal; and
+Google Play Billing handles the ad-removal purchase and its restore check. A bug report or idea you
 send from the app goes from your own email app, and you see every line of it
 before you send it.
 
@@ -139,7 +140,8 @@ The app stores the following on your device, in its private app storage:
 
 Clearing the app's data in Android settings, or uninstalling the app, deletes
 all of it. If you use Android's device backup, Android may include all of the
-app's stored data — your settings (including your region), saved places, last position, the
+app's stored data — your settings (including your region and your choice in
+Google's consent form), saved places, last position, the
 country the app last worked out, and the area cache — in your Google account backup, under your control; the developer has
 no access to that backup.
 

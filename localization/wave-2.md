@@ -10,6 +10,6 @@ Gate run 2026-10-06 (session 2185c006). The gate is defined in
 | 2 | Units, dates, clock | **Pass.** All metric. Date order and clock are written into each entry in `region/Regions.kt` and pinned in `RegionsTest`: the Philippines is month-first and the rest day-first. South Africa is day-first, corrected from CLDR's year-first short pattern (roborev 5409). Nigeria, South Africa and Kenya use the 24-hour clock. |
 | 3 | Language | **Pass.** English is an official or the dominant app language in each. |
 | 4 | Place search | **Pass.** `BundledGazetteerTest`: Mumbai, Karachi, Lagos, Manila, Johannesburg, Nairobi, Accra, Kuala Lumpur and Singapore resolve with the right zones. |
-| 5 | Ads and billing | No consent platform is required in any of them (`AdConsent.NOT_REQUIRED`), so the banner and Remove Ads behave as in the US. AdMob fill and Play Billing availability were not checked live; confirm when opening them. |
+| 5 | Ads and billing | Banner and Remove Ads as in the US; Google's UMP (since 2026-10-07) says no consent form is needed in these countries. AdMob fill and Play Billing availability were not checked live; confirm from AdMob and Play reports. |
 | 6 | Consent and privacy | The updated `store-assets/privacy-policy.md` applies. India's DPDP Act rules are being phased in. The app sends only coordinates to the weather services, plus AdMob's non-personalized request, but have this read before India opens. |
 | 7 | Honest degradation | The same code paths as wave 1, already verified on the emulator. |

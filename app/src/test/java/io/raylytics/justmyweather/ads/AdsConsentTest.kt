@@ -91,4 +91,23 @@ class AdsConsentTest {
         gateway.pending!!()
         assertEquals(1, prompted)
     }
+
+    @Test
+    fun `a recreated activity does not ask Google again, but its follow-up still runs`() {
+        val gateway = FakeGateway(can = true)
+        var updates = 0
+        val counting =
+            object : ConsentGateway by gateway {
+                override fun update(activity: Activity, onDone: () -> Unit) {
+                    updates++
+                    onDone()
+                }
+            }
+        val consent = AdsConsent(counting) {}
+        var then = 0
+        consent.gather(activity) { then++ }
+        consent.gather(activity) { then++ } // a rotation
+        assertEquals(1, updates)
+        assertEquals(2, then)
+    }
 }

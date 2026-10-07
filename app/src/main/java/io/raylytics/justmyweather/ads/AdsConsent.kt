@@ -22,6 +22,7 @@ class AdsConsent(
     private val canShow = MutableStateFlow(false)
     private val privacyOptions = MutableStateFlow(false)
     private var started = false
+    private var asked = false
 
     /** True once ads may be requested — the banner waits on this. */
     val canShowAds: StateFlow<Boolean> = canShow.asStateFlow()
@@ -39,6 +40,11 @@ class AdsConsent(
      */
     fun gather(activity: Activity, then: () -> Unit = {}) {
         settle()
+        // Once per PROCESS, as the KDoc says: an activity recreated by a
+        // rotation or a theme switch must not ask Google again or reload the
+        // form (roborev 5436). Its [then] still runs.
+        if (asked) return then()
+        asked = true
         gateway.update(activity) {
             settle()
             then()
